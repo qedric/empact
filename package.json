@@ -6,9 +6,17 @@
     "release": "npx thirdweb@latest release"
   },
   "devDependencies": {
-    "hardhat": "^2.10.1"
+    "@nomiclabs/hardhat-waffle": "^2.0.3",
+    "chai": "^4.3.7",
+    "ethereum-waffle": "^4.0.9",
+    "ethers": "^5.4",
+    "hardhat": "^2.12.6"
   },
   "dependencies": {
-    "@thirdweb-dev/contracts": "^3"
+    "@nomiclabs/hardhat-ethers": "^2.2.2",
+    "@openzeppelin/contracts": "^4.8.1",
+    "@openzeppelin/contracts-upgradeable": "^4.8.1",
+    "@thirdweb-dev/contracts": "^3",
+    "dotenv": "^16.0.3"
   }
 }
