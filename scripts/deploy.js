@@ -26,13 +26,23 @@ async function main() {
   const _royaltyBps = '400'
   const _primarySaleRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C';
 
-  // Get owner/deployer's wallet address
-  //const [owner] = await hre.ethers.getSigners();
+  const _libAddress = '0x31f476750845799a8BC43cc1e0C4357B4B5c854c' // Goerli deployed via thirdweb
 
-  // deploy the library first
+  // Get owner/deployer's wallet address
+  const owner = await hre.ethers.getSigners();
+
+  txn = await ethers.provider.getBalance(owner.address);
+  console.log('balance:',txn);
+
+  /*// deploy the library first if necessary
   const Lib = await hre.ethers.getContractFactory("Utils");
   const lib = await Lib.deploy();
-  await lib.deployed();
+  await lib.deployed();*/
+
+  // get the library if it's already deployed
+  const lib = await ethers.getContractAt("Utils", _libAddress );
+
+  console.log('got library at ', lib.address);
   
   // Get contract that we want to deploy
   const PiggyFactory = await hre.ethers.getContractFactory("CryptoPiggies", {
@@ -40,6 +50,8 @@ async function main() {
       Utils: lib.address,
     }}
   );
+
+  console.log('got the conract we want to deploy');
 
   // deploy
   const deployedFactory = await PiggyFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient);
@@ -49,6 +61,25 @@ async function main() {
 
   // Get contract address
   console.log("Owner is: ", await deployedFactory.owner())
+
+  // then deploy the implementation piggy bank that the factory can then clone:
+  const Piggy = await hre.ethers.getContractFactory("PiggyBank");
+
+  const deployedPiggy = await Piggy.deploy();
+
+  await deployedPiggy.deployed();
+  console.log(deployedPiggy);
+
+  /*const data = {
+    owner: owner,
+    tokenId: 0,
+    name: '',
+    supply: 1,
+    externalUrl: '',
+    targetBalance: ethers.BigNumber.from(99),
+    piggyBank: owner
+  }*/
+
 
 /*  // deploy piggybank implementation
   const PiggyBank = await ethers.getContractFactory("PiggyBank");
@@ -95,16 +126,7 @@ async function main() {
     uint256 tokenId;
 }
 
-struct Attr {
-    address owner;
-    uint256 tokenId;
-    string name;
-    uint256 supply;
-    string externalUrl;
-    uint256 unlockTime;
-    uint256 targetBalance;
-    address piggyBank;
-}
+
 
 */
 

@@ -245,11 +245,6 @@ contract PiggyBank is Initializable, Ownable {
     Attr public attributes;
     uint8 private breakPiggy_fee_Bps = 4;
 
-    constructor()
-    {
-        initialize(Attr(address(0x0),0,'0',0,'0',0,0,address(0x0)));
-    }
-
     function initialize(
         Attr memory _data
     ) public initializer
@@ -295,6 +290,10 @@ contract PiggyBank is Initializable, Ownable {
     }
 
     function setBreakPiggyBps(uint8 bps) public onlyOwner {
+        require(
+            bps <= 9,
+            "Don't be greedy!"
+        );
         breakPiggy_fee_Bps = bps;
     }
 }
