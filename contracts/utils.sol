@@ -37,7 +37,6 @@ interface ISignatureMintERC1155 {
     /// @dev Emitted when tokens are minted.
     event TokensMintedWithSignature(
         address indexed signer,
-        address indexed mintedTo,
         uint256 indexed tokenIdMinted,
         MintRequest mintRequest
     );

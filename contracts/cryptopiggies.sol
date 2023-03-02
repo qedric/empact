@@ -152,15 +152,11 @@ contract PiggyBank is Initializable, Ownable {
         require(bps <= 9, "Don't be greedy!");
         breakPiggy_fee_Bps = bps;
     }
-}
+} 
 
 contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155 {
     event PiggyCreated(address);
-    event TokensMintedWithSignature(
-        address signer_receiver,
-        uint256 tokenId,
-        Attr attributes
-    );
+
     event ProxyDeployed(
         address piggyBankImplementation,
         address deployedProxy,
@@ -265,7 +261,8 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155 {
         // Mint tokens.
         _mint(signer, tokenIdToMint, _req.quantity, "");
 
-        emit TokensMintedWithSignature(signer, tokenIdToMint, piglet);
+        emit TokensMintedWithSignature(signer, tokenIdToMint, _req);
+
     }
 
     function _deployProxyByImplementation(

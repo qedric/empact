@@ -29,11 +29,11 @@ async function main() {
   const _libAddress = '0x48466f3a11F4EFdFC5D107f24ff79D21C7EdE01F' // Goerli deployed via thirdweb
 
   // Get owner/deployer's wallet address
-  const owner = await hre.ethers.getSigners();
+  //const owner = await hre.ethers.getSigners();
 
-  console.log(owner.address)
+  //console.log(owner.address)
 
-  txn = await ethers.provider.getBalance(owner.address);
+  txn = await ethers.provider.getBalance('0x92abb8F1238a81E55C5310C6D1baf399Be1b483C');
   console.log('balance:',txn);
 
   /*// deploy the library first if necessary
