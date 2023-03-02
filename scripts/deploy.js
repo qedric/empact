@@ -20,16 +20,18 @@ async function main() {
     uint128 _royaltyBps,
     address _primarySaleRecipient
   */
-  const _name = 'CryptoPiggies'
+  const _name = 'CryptoPiggiesTEST'
   const _symbol = 'CTP'
   const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
   const _royaltyBps = '400'
   const _primarySaleRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C';
 
-  const _libAddress = '0x31f476750845799a8BC43cc1e0C4357B4B5c854c' // Goerli deployed via thirdweb
+  const _libAddress = '0x48466f3a11F4EFdFC5D107f24ff79D21C7EdE01F' // Goerli deployed via thirdweb
 
   // Get owner/deployer's wallet address
   const owner = await hre.ethers.getSigners();
+
+  console.log(owner.address)
 
   txn = await ethers.provider.getBalance(owner.address);
   console.log('balance:',txn);
@@ -62,13 +64,13 @@ async function main() {
   // Get contract address
   console.log("Owner is: ", await deployedFactory.owner())
 
-  // then deploy the implementation piggy bank that the factory can then clone:
+  /*// then deploy the implementation piggy bank that the factory can then clone:
   const Piggy = await hre.ethers.getContractFactory("PiggyBank");
 
   const deployedPiggy = await Piggy.deploy();
 
   await deployedPiggy.deployed();
-  console.log(deployedPiggy);
+  console.log(deployedPiggy);*/
 
   /*const data = {
     owner: owner,
