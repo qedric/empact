@@ -2,6 +2,7 @@
 pragma solidity ^0.8.11;
 import "@thirdweb-dev/contracts/base/ERC1155Base.sol";
 import "@thirdweb-dev/contracts/extension/PrimarySale.sol";
+import "@thirdweb-dev/contracts/extension/Permissions.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/proxy/utils/Initializable.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
@@ -154,7 +155,7 @@ contract PiggyBank is Initializable, Ownable {
     }
 } 
 
-contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155 {
+contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, Permissions {
     event PiggyCreated(address);
 
     event ProxyDeployed(
@@ -162,6 +163,8 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155 {
         address deployedProxy,
         address msgSender
     );
+
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     uint256 private makePiggy_fee = 0.004 ether;
     address internal _piggyBankImplementation;
@@ -175,6 +178,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155 {
         address _primarySaleRecipient
     ) ERC1155Base(_name, _symbol, _royaltyRecipient, _royaltyBps) {
         _setupPrimarySaleRecipient(_primarySaleRecipient);
+        _setupRole(MINTER_ROLE, msg.sender);
     }
 
     function mintTo(

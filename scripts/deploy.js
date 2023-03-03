@@ -20,7 +20,7 @@ async function main() {
     uint128 _royaltyBps,
     address _primarySaleRecipient
   */
-  const _name = 'CryptoPiggiesTEST'
+  const _name = 'CryptoPiggiesTESTPermissions2'
   const _symbol = 'CTP'
   const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
   const _royaltyBps = '400'
