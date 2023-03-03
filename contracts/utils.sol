@@ -31,7 +31,6 @@ interface ISignatureMintERC1155 {
         string metadata;
         uint256 unlockTime;
         uint256 targetBalance;
-        uint256 tokenId;
     }
 
     /// @dev Emitted when tokens are minted.

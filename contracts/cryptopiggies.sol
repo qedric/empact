@@ -2,7 +2,7 @@
 pragma solidity ^0.8.11;
 import "@thirdweb-dev/contracts/base/ERC1155Base.sol";
 import "@thirdweb-dev/contracts/extension/PrimarySale.sol";
-import "@thirdweb-dev/contracts/extension/Permissions.sol";
+import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/proxy/utils/Initializable.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
@@ -15,7 +15,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
 
     bytes32 internal constant TYPEHASH =
         keccak256(
-            "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string metadata,string uri,uint256 unlockTime,uint256 targetBalance,uint256 tokenId)"
+            "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string name,string metadata,uint256 unlockTime,uint256 targetBalance)"
         );
 
     /// @dev Mapping from mint request UID => whether the mint request is processed.
@@ -29,7 +29,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
         bytes calldata _signature
     ) public view returns (bool success, address signer) {
         signer = _recoverAddress(_req, _signature);
-        success = !minted[_req.tokenId] && _canSignMintRequest(signer);
+        success = _canSignMintRequest(signer);
     }
 
     /// @dev Returns whether a given address is authorized to sign mint requests.
@@ -77,7 +77,6 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
         string metadata;
         uint256 unlockTime;
         uint256 targetBalance;
-        uint256 tokenId;
     }
     */
 
@@ -95,8 +94,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
                 keccak256(bytes(_req.name)),
                 keccak256(bytes(_req.metadata)),
                 _req.unlockTime,
-                _req.targetBalance,
-                _req.tokenId
+                _req.targetBalance
             );
     }
 }
@@ -155,7 +153,7 @@ contract PiggyBank is Initializable, Ownable {
     }
 } 
 
-contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, Permissions {
+contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, PermissionsEnumerable {
     event PiggyCreated(address);
 
     event ProxyDeployed(
@@ -209,20 +207,12 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
             "Unlock time should be in the future, or target balance greater than 0"
         );
 
-        uint256 tokenIdToMint;
-        uint256 nextIdToMint = nextTokenIdToMint();
-
         // always mint new token ids
-        tokenIdToMint = nextIdToMint;
+        uint256 tokenIdToMint = nextTokenIdToMint();
         nextTokenIdToMint_ += 1;
 
         // Verify and process payload.
         signer = _processRequest(_req, _signature);
-
-        // No need to set royalties - the default supplied to constructor will be used.
-        /*if (_req.royaltyRecipient != address(0)) {
-            _setupRoyaltyInfoForToken(tokenIdToMint, _req.royaltyRecipient, _req.royaltyBps);
-        }*/
 
         // Collect price
         _collectPriceOnClaim(
@@ -245,10 +235,10 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         }
         */
 
-        bytes32 salt = bytes32(nextIdToMint);
+        bytes32 salt = bytes32(tokenIdToMint);
         Attr memory piglet = Attr(
             address(this),
-            nextIdToMint,
+            tokenIdToMint,
             _req.name,
             _req.quantity,
             _req.metadata,
@@ -318,7 +308,6 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
     }
 
     function uri(uint256 tokenId) public view override returns (string memory) {
-        require(tokenId == 0, "tokenId must be 0");
         return
             string(
                 abi.encodePacked(
