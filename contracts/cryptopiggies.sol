@@ -10,6 +10,8 @@ import "@thirdweb-dev/contracts/lib/TWAddress.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./utils.sol";
 
+import "hardhat/console.sol";
+
 abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     using ECDSA for bytes32;
 
@@ -17,9 +19,6 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
         keccak256(
             "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string name,string metadata,uint256 unlockTime,uint256 targetBalance)"
         );
-
-    /// @dev Mapping from mint request UID => whether the mint request is processed.
-    mapping(uint256 => bool) private minted;
 
     constructor() EIP712("SignatureMintERC1155", "1") {}
 
@@ -30,6 +29,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     ) public view returns (bool success, address signer) {
         signer = _recoverAddress(_req, _signature);
         success = _canSignMintRequest(signer);
+        console.log(signer);
     }
 
     /// @dev Returns whether a given address is authorized to sign mint requests.
@@ -37,7 +37,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
         address _signer
     ) internal view virtual returns (bool);
 
-    /// @dev Verifies a mint request and marks the request as minted.
+    /// @dev Verifies a mint request
     function _processRequest(
         MintRequest calldata _req,
         bytes calldata _signature
@@ -52,8 +52,6 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
             "Request expired"
         );
         require(_req.quantity > 0, "0 qty");
-
-        minted[_req.tokenId] = true;
     }
 
     /// @dev Returns the address of the signer of the mint request.
@@ -215,12 +213,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         signer = _processRequest(_req, _signature);
 
         // Collect price
-        _collectPriceOnClaim(
-            primarySaleRecipient(),
-            _req.quantity,
-            CurrencyTransferLib.NATIVE_TOKEN,
-            makePiggy_fee / _req.quantity
-        );
+        _collectMakePiggyFee(primarySaleRecipient());
 
         /*
         struct Attr {
@@ -376,30 +369,23 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
     }
 
     /// @dev Collects and distributes the primary sale value of NFTs being claimed.
-    function _collectPriceOnClaim(
-        address _primarySaleRecipient,
-        uint256 _quantityToClaim,
-        address _currency,
-        uint256 _pricePerToken
+    function _collectMakePiggyFee(
+        address _primarySaleRecipient
     ) internal virtual {
-        if (_pricePerToken == 0) {
+        if (makePiggy_fee == 0) {
             return;
         }
 
-        uint256 totalPrice = _quantityToClaim * _pricePerToken;
-
-        if (_currency == CurrencyTransferLib.NATIVE_TOKEN) {
-            require(msg.value == totalPrice, "Must send total price.");
-        }
-
+        require(msg.value == makePiggy_fee, "Must send the fee");
+        
         address saleRecipient = _primarySaleRecipient == address(0)
             ? primarySaleRecipient()
             : _primarySaleRecipient;
         CurrencyTransferLib.transferCurrency(
-            _currency,
+            CurrencyTransferLib.NATIVE_TOKEN,
             msg.sender,
             saleRecipient,
-            totalPrice
+            makePiggy_fee
         );
     }
 }

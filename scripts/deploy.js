@@ -20,13 +20,13 @@ async function main() {
     uint128 _royaltyBps,
     address _primarySaleRecipient
   */
-  const _name = 'PiggiesTESTPermissions3'
+  const _name = 'PiggiesTEST5'
   const _symbol = 'CTP'
   const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
   const _royaltyBps = '400'
   const _primarySaleRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C';
 
-  const _libAddress = '0x48466f3a11F4EFdFC5D107f24ff79D21C7EdE01F' // Goerli deployed via thirdweb
+  const _libAddress = '0xd9e5f418398BE708F804C03c5Ca958Edd5DaF2Af' // Goerli deployed via thirdweb
 
   // Get owner/deployer's wallet address
   //const owner = await hre.ethers.getSigners();
@@ -36,8 +36,8 @@ async function main() {
   txn = await ethers.provider.getBalance('0x92abb8F1238a81E55C5310C6D1baf399Be1b483C');
   console.log('balance:',txn);
 
-  /*// deploy the library first if necessary
-  const Lib = await hre.ethers.getContractFactory("Utils");
+  // deploy the library first if necessary
+  /*const Lib = await hre.ethers.getContractFactory("Utils");
   const lib = await Lib.deploy();
   await lib.deployed();*/
 
