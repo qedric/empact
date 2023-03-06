@@ -6,18 +6,15 @@ import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/proxy/utils/Initializable.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
-import "@thirdweb-dev/contracts/lib/TWAddress.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./utils.sol";
-
-import "hardhat/console.sol";
 
 abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     using ECDSA for bytes32;
 
     bytes32 internal constant TYPEHASH =
         keccak256(
-            "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string name,string metadata,uint256 unlockTime,uint256 targetBalance)"
+            "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string name,string external_url,string metadata,uint256 unlockTime,uint256 targetBalance)"
         );
 
     constructor() EIP712("SignatureMintERC1155", "1") {}
@@ -29,7 +26,6 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     ) public view returns (bool success, address signer) {
         signer = _recoverAddress(_req, _signature);
         success = _canSignMintRequest(signer);
-        console.log(signer);
     }
 
     /// @dev Returns whether a given address is authorized to sign mint requests.
@@ -72,6 +68,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
         uint128 validityStartTimestamp;
         uint128 validityEndTimestamp;
         string name;
+        string external_url;
         string metadata;
         uint256 unlockTime;
         uint256 targetBalance;
@@ -90,6 +87,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
                 _req.validityStartTimestamp,
                 _req.validityEndTimestamp,
                 keccak256(bytes(_req.name)),
+                keccak256(bytes(_req.external_url)),
                 keccak256(bytes(_req.metadata)),
                 _req.unlockTime,
                 _req.targetBalance
@@ -111,7 +109,8 @@ contract PiggyBank is Initializable, Ownable {
 
     function payout(
         address recipient,
-        uint256 thisOwnerBalance
+        uint256 thisOwnerBalance,
+        uint256 totalSupply
     ) external onlyOwner {
         require(
             block.timestamp >= attributes.unlockTime,
@@ -125,7 +124,7 @@ contract PiggyBank is Initializable, Ownable {
 
         // calculate the amount owed
         uint256 payoutAmount = (address(attributes.piggyBank).balance *
-            thisOwnerBalance) / attributes.supply;
+            thisOwnerBalance) / totalSupply;
         uint256 payoutFee = (payoutAmount * breakPiggy_fee_Bps) / 100;
 
         // send the withdrawal event and pay the owner
@@ -171,10 +170,12 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         string memory _symbol,
         address _royaltyRecipient,
         uint128 _royaltyBps,
-        address _primarySaleRecipient
+        address _primarySaleRecipient,
+        address __piggyBankImplementation
     ) ERC1155Base(_name, _symbol, _royaltyRecipient, _royaltyBps) {
         _setupPrimarySaleRecipient(_primarySaleRecipient);
         _setupRole(MINTER_ROLE, msg.sender);
+        _piggyBankImplementation = __piggyBankImplementation;
     }
 
     function mintTo(
@@ -220,7 +221,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
             address owner;
             uint256 tokenId;
             string name;
-            uint256 supply;
+            string external_url;
             string metadata;
             uint256 unlockTime;
             uint256 targetBalance;
@@ -233,7 +234,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
             address(this),
             tokenIdToMint,
             _req.name,
-            _req.quantity,
+            _req.external_url,
             _req.metadata,
             _req.unlockTime,
             _req.targetBalance,
@@ -246,9 +247,9 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         _attributes[tokenIdToMint] = piglet;
 
         // Mint tokens.
-        _mint(signer, tokenIdToMint, _req.quantity, "");
+        _mint(_req.to, tokenIdToMint, _req.quantity, "");
 
-        emit TokensMintedWithSignature(signer, tokenIdToMint, _req);
+        emit TokensMintedWithSignature(signer, _req.to, tokenIdToMint, _req);
 
     }
 
@@ -277,73 +278,77 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
     }
 
     function payout(uint256 tokenId) external {
-        Attr memory attributes = _attributes[tokenId];
-
-        require(attributes.supply != 0, "Token data not found");
+        require(totalSupply[tokenId] != 0, "Token data not found");
 
         uint256 thisOwnerBalance = balanceOf[msg.sender][tokenId];
 
         require(thisOwnerBalance != 0, "You must be an owner to withdraw!");
 
-        TWAddress.functionCall(
-            attributes.piggyBank,
-            (
-                abi.encodeWithSignature(
-                    "payout(address, uint256)",
-                    msg.sender,
-                    thisOwnerBalance
-                )
+        (bool success, bytes memory returndata) = _attributes[tokenId].piggyBank.call{ value: 0 }(
+            abi.encodeWithSignature(
+                "payout(address, uint256, uint256)",
+                msg.sender,
+                thisOwnerBalance,
+                totalSupply[tokenId]
             )
         );
-        // burn the tokens so the owner can't claim twice:
-        _burn(msg.sender, tokenId, thisOwnerBalance);
-        _attributes[tokenId].supply -= thisOwnerBalance;
+
+        if (success) {
+            // burn the tokens so the owner can't claim twice:
+            _burn(msg.sender, tokenId, thisOwnerBalance);
+        } else {
+            // Look for revert reason and bubble it up if present
+            if (returndata.length > 0) {
+                // The easiest way to bubble the revert reason is using memory via assembly
+                assembly {
+                    let returndata_size := mload(returndata)
+                    revert(add(32, returndata), returndata_size)
+                }
+            } else {
+                revert("payout failed");
+            }
+        }
     }
 
     function uri(uint256 tokenId) public view override returns (string memory) {
-        return
-            string(
-                abi.encodePacked(
-                    "data:application/json;base64,",
-                    Base64.encode(
-                        bytes(
-                            string(
-                                abi.encodePacked(
-                                    '{"name": "',
-                                    _attributes[tokenId].name,
-                                    '",',
-                                    '"image_data": "',
-                                    Utils.getSvg(
-                                        _attributes[tokenId].name,
-                                        _attributes[tokenId].piggyBank,
-                                        _attributes[tokenId].targetBalance,
-                                        _attributes[tokenId].unlockTime
-                                    ),
-                                    '",',
-                                    '"attributes": [{"trait_type": "Manturity Date", "value": ',
-                                    Utils.uint2str(
-                                        _attributes[tokenId].unlockTime
-                                    ),
-                                    "},",
-                                    '{"trait_type": "Target Balance", "value": ',
-                                    Utils.uint2str(
-                                        _attributes[tokenId].targetBalance /
-                                            1 ether
-                                    ),
-                                    "},",
-                                    '{"trait_type": "Receive Address", "value": ',
-                                    Utils.toAsciiString(
-                                        address(_attributes[tokenId].piggyBank)
-                                    ),
-                                    "},",
-                                    _attributes[tokenId].metadata,
-                                    "]}"
-                                )
-                            )
+        return string(
+            abi.encodePacked(
+                "data:application/json;base64,",
+                Base64.encode(
+                    bytes(
+                        abi.encodePacked(
+                            '{"name": "',
+                            _attributes[tokenId].name,
+                            '","image_data": "',
+                            Utils.getSvg(
+                                _attributes[tokenId].name,
+                                _attributes[tokenId].piggyBank,
+                                _attributes[tokenId].targetBalance,
+                                _attributes[tokenId].unlockTime
+                            ),
+                            '","external_url":"',
+                            _attributes[tokenId].external_url,
+                            '","attributes": [{"trait_type": "Maturity Date", "value": ',
+                            Utils.uint2str(
+                                _attributes[tokenId].unlockTime
+                            ),
+                            "},",
+                            '{"trait_type": "Target Balance", "value": ',
+                            Utils.uint2str(
+                                _attributes[tokenId].targetBalance /
+                                    1 ether
+                            ),
+                            "},",
+                            '{"trait_type": "Receive Address", "value": "',
+                            address(_attributes[tokenId].piggyBank),
+                            '"}',
+                            _attributes[tokenId].metadata,
+                            "]}"
                         )
-                    )
+                    )   
                 )
-            );
+            )
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

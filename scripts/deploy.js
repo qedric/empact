@@ -20,13 +20,13 @@ async function main() {
     uint128 _royaltyBps,
     address _primarySaleRecipient
   */
-  const _name = 'PiggiesTEST5'
-  const _symbol = 'CTP'
+  const _name = 'PiggiesTEST7'
+  const _symbol = 'CPG'
   const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
   const _royaltyBps = '400'
   const _primarySaleRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C';
 
-  const _libAddress = '0xd9e5f418398BE708F804C03c5Ca958Edd5DaF2Af' // Goerli deployed via thirdweb
+  const _libAddress = '0xa07aF7c5e842a1095b5BfED0E5FfcEF7B8113F98' // Goerli deployed via thirdweb
 
   // Get owner/deployer's wallet address
   //const owner = await hre.ethers.getSigners();

@@ -5,7 +5,7 @@ struct Attr {
     address owner;
     uint256 tokenId;
     string name;
-    uint256 supply;
+    string external_url;
     string metadata;
     uint256 unlockTime;
     uint256 targetBalance;
@@ -28,6 +28,7 @@ interface ISignatureMintERC1155 {
         uint128 validityStartTimestamp;
         uint128 validityEndTimestamp;
         string name;
+        string external_url;
         string metadata;
         uint256 unlockTime;
         uint256 targetBalance;
@@ -36,6 +37,7 @@ interface ISignatureMintERC1155 {
     /// @dev Emitted when tokens are minted.
     event TokensMintedWithSignature(
         address indexed signer,
+        address indexed mintedTo,
         uint256 indexed tokenIdMinted,
         MintRequest mintRequest
     );
@@ -72,7 +74,7 @@ library Utils {
         address piggyBank,
         uint256 targetBalance,
         uint256 unlockTime
-    ) public view returns (string memory) {
+    ) public view returns (bytes memory) {
         uint256 percentage = (address(piggyBank).balance * 100) / targetBalance;
         string memory markup = string(
             abi.encodePacked(
@@ -130,7 +132,7 @@ library Utils {
             )
         );
         markup = string(
-            abi.encodePacked(markup, Utils.toAsciiString(address(piggyBank)))
+            abi.encodePacked(markup, address(piggyBank))
         );
         markup = string(
             abi.encodePacked(
@@ -142,7 +144,10 @@ library Utils {
                 '" type="text/javascript">function refreshValues(){ var s = document.getElementById("PiggyScript"); var bal = s.getAttribute("data-balance"); var target = s.getAttribute("data-target"); var n = document.getElementById("PiggyNeeds"); var h = document.getElementById("PiggyHas"); n.innerHTML=Math.round(target-bal / 10000000000000000, 2).toString(); h.innerHTML=Math.round(bal / 10000000000000000, 2).toString(); }window.addEventListener("load",refreshValues);</script></svg>'
             )
         );
-        return markup;
+
+        return abi.encodePacked(
+            "data:image/svg+xml;base64,",
+            Base64.encode(bytes(markup)));
     }
 
     function _daysToDate(
@@ -216,18 +221,6 @@ library Utils {
         }
 
         return string(bstr);
-    }
-
-    function toAsciiString(address x) internal pure returns (string memory) {
-        bytes memory s = new bytes(40);
-        for (uint i = 0; i < 20; i++) {
-            bytes1 b = bytes1(uint8(uint(uint160(x)) / (2 ** (8 * (19 - i)))));
-            bytes1 hi = bytes1(uint8(b) / 16);
-            bytes1 lo = bytes1(uint8(b) - 16 * uint8(hi));
-            s[2 * i] = char(hi);
-            s[2 * i + 1] = char(lo);
-        }
-        return string(s);
     }
 
     function char(bytes1 b) internal pure returns (bytes1 c) {
