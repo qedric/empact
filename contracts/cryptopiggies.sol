@@ -333,12 +333,12 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
                             Utils.uint2str(
                                 _attributes[tokenId].unlockTime
                             ),
-                            '},"{"trait_type": "Target Balance", "value": '",
+                            '},"{"trait_type": "Target Balance", "value": "',
                             Utils.uint2str(
                                 _attributes[tokenId].targetBalance /
                                     1 ether
                             ),
-                            ' ETH"'},"{"trait_type": "Receive Address", "value": "',
+                            ' ETH"},"{"trait_type": "Receive Address", "value": "',
                             address(_attributes[tokenId].piggyBank),
                             '"}',
                             _attributes[tokenId].metadata,
@@ -358,7 +358,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
     function _canSignMintRequest(
         address _signer
     ) internal view virtual override returns (bool) {
-        return hasRole(MINTER_ROLE, signer);
+        return hasRole(MINTER_ROLE, _signer);
     }
 
     /// @dev Returns whether primary sale recipient can be set in the given execution context.
