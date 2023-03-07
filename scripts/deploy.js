@@ -20,13 +20,14 @@ async function main() {
     uint128 _royaltyBps,
     address _primarySaleRecipient
   */
-  const _name = 'PiggiesTEST8'
+  const _name = 'PiggiesTEST9'
   const _symbol = 'CPG'
   const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
   const _royaltyBps = '400'
   const _primarySaleRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C';
 
   const _libAddress = '0x913df26caB524734C559F279E7809627D75e1527' // Goerli deployed via thirdweb
+  const _implAddress = '0x113459c544f4CaF69E5e758dC445f90B7Bb20B0d' // Goerli deployed PB implementation
 
   // Get owner/deployer's wallet address
   //const owner = await hre.ethers.getSigners();
@@ -56,7 +57,7 @@ async function main() {
   console.log('got the conract we want to deploy');
 
   // deploy
-  const deployedFactory = await PiggyFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient);
+  const deployedFactory = await PiggyFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient, _implAddress);
 
   // Wait for this transaction to be mined
   await deployedFactory.deployed();

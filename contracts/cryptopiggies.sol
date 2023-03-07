@@ -271,7 +271,6 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
             (
                 abi.encodeWithSignature(
                     "initialize(Attr)",
-                    msg.sender,
                     _piggyData
                 )
             )
