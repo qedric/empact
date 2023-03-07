@@ -174,6 +174,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         address __piggyBankImplementation
     ) ERC1155Base(_name, _symbol, _royaltyRecipient, _royaltyBps) {
         _setupPrimarySaleRecipient(_primarySaleRecipient);
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(MINTER_ROLE, msg.sender);
         _piggyBankImplementation = __piggyBankImplementation;
     }
@@ -328,18 +329,16 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
                             ),
                             '","external_url":"',
                             _attributes[tokenId].external_url,
-                            '","attributes": [{"trait_type": "Maturity Date", "value": ',
+                            '","attributes": [{"display_type": "date","trait_type": "Maturity Date", "value": ',
                             Utils.uint2str(
                                 _attributes[tokenId].unlockTime
                             ),
-                            "},",
-                            '{"trait_type": "Target Balance", "value": ',
+                            '},"{"trait_type": "Target Balance", "value": '",
                             Utils.uint2str(
                                 _attributes[tokenId].targetBalance /
                                     1 ether
                             ),
-                            "},",
-                            '{"trait_type": "Receive Address", "value": "',
+                            ' ETH"'},"{"trait_type": "Receive Address", "value": "',
                             address(_attributes[tokenId].piggyBank),
                             '"}',
                             _attributes[tokenId].metadata,
@@ -359,7 +358,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
     function _canSignMintRequest(
         address _signer
     ) internal view virtual override returns (bool) {
-        return _signer == owner();
+        return hasRole(MINTER_ROLE, signer);
     }
 
     /// @dev Returns whether primary sale recipient can be set in the given execution context.
