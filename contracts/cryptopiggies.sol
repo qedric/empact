@@ -4,7 +4,6 @@ import "@thirdweb-dev/contracts/base/ERC1155Base.sol";
 import "@thirdweb-dev/contracts/extension/PrimarySale.sol";
 import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
-import "@thirdweb-dev/contracts/openzeppelin-presets/proxy/utils/Initializable.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./utils.sol";
@@ -93,61 +92,6 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
                 _req.targetBalance
             );
     }
-}
-
-contract PiggyBank is Initializable, Ownable {
-    event Received(address _from, uint _amount);
-    event Withdrawal(address who, uint amount, uint balance);
-
-    Attr public attributes;
-    uint8 private breakPiggy_fee_Bps = 4;
-
-    function initialize(Attr memory _data) public initializer {
-        _setupOwner(msg.sender);
-        attributes = _data;
-    }
-
-    function payout(
-        address recipient,
-        uint256 thisOwnerBalance,
-        uint256 totalSupply
-    ) external onlyOwner {
-        require(
-            block.timestamp >= attributes.unlockTime,
-            "You can't withdraw yet"
-        );
-        require(
-            address(this).balance >= attributes.targetBalance,
-            "Piggy is still hungry!"
-        );
-        require(address(this).balance >= 0, "Piggy has nothing to give!");
-
-        // calculate the amount owed
-        uint256 payoutAmount = (address(attributes.piggyBank).balance *
-            thisOwnerBalance) / totalSupply;
-        uint256 payoutFee = (payoutAmount * breakPiggy_fee_Bps) / 100;
-
-        // send the withdrawal event and pay the owner
-        payable(recipient).transfer(payoutAmount - payoutFee);
-        // send the fee to the factory contract owner
-        payable(owner()).transfer(payoutFee);
-
-        emit Withdrawal(recipient, payoutAmount, thisOwnerBalance);
-    }
-
-    receive() external payable {
-        emit Received(msg.sender, msg.value);
-    }
-
-    /// @dev Returns whether owner can be set in the given execution context.
-    function _canSetOwner() internal view virtual override returns (bool) {
-        return msg.sender == owner();
-    }
-
-    function setBreakPiggyBps(uint8 bps) public onlyOwner {
-        require(bps <= 9, "Don't be greedy!");
-        breakPiggy_fee_Bps = bps;
-    }
 } 
 
 contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, PermissionsEnumerable {
@@ -229,8 +173,6 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
             address piggyBank;
         }
         */
-
-        bytes32 salt = bytes32(tokenIdToMint);
         Attr memory piglet = Attr(
             address(this),
             tokenIdToMint,
@@ -241,6 +183,9 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
             _req.targetBalance,
             address(0x0)
         );
+
+        bytes32 salt = bytes32(tokenIdToMint);
+        
         // deploy a separate proxy contract to hold the token's ETH; add its address to the attributes
         piglet.piggyBank = _deployProxyByImplementation(piglet, salt);
 
@@ -258,6 +203,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         Attr memory _piggyData,
         bytes32 _salt
     ) internal returns (address deployedProxy) {
+
         bytes32 salthash = keccak256(abi.encodePacked(msg.sender, _salt));
         deployedProxy = Clones.cloneDeterministic(
             _piggyBankImplementation,
@@ -268,11 +214,9 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
 
         TWAddress.functionCall(
             deployedProxy,
-            (
-                abi.encodeWithSignature(
-                    "initialize(Attr)",
-                    _piggyData
-                )
+            abi.encodeWithSignature(
+                "initialize(Attr)",
+                _piggyData
             )
         );
     }
