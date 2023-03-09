@@ -7,7 +7,7 @@ contract PiggyBank is Initializable, Ownable {
     event Withdrawal(address who, uint amount, uint balance);
 
     Attr public attributes;
-    uint8 private breakPiggy_fee_Bps = 4;
+    uint8 public breakPiggy_fee_Bps = 4;
 
     function initialize(Attr memory _data) public initializer {
         _setupOwner(msg.sender);
@@ -18,7 +18,7 @@ contract PiggyBank is Initializable, Ownable {
         address recipient,
         uint256 thisOwnerBalance,
         uint256 totalSupply
-    ) external onlyOwner {
+    ) external payable onlyOwner {
         require(
             block.timestamp >= attributes.unlockTime,
             "You can't withdraw yet"
@@ -27,10 +27,10 @@ contract PiggyBank is Initializable, Ownable {
             address(this).balance >= attributes.targetBalance,
             "Piggy is still hungry!"
         );
-        require(address(this).balance >= 0, "Piggy has nothing to give!");
+        require(address(this).balance > 0, "Piggy has nothing to give!");
 
         // calculate the amount owed
-        uint256 payoutAmount = (address(attributes.piggyBank).balance *
+        uint256 payoutAmount = (address(this).balance *
             thisOwnerBalance) / totalSupply;
         uint256 payoutFee = (payoutAmount * breakPiggy_fee_Bps) / 100;
 
