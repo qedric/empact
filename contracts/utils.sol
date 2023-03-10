@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.11;
 
-struct Attr {
+struct Attr { 
     address owner;
     uint256 tokenId;
     string name;
-    string external_url;
+    string externalUrl;
     string metadata;
     uint256 unlockTime;
     uint256 targetBalance;
     address piggyBank;
 }
 
-interface ISignatureMintERC1155 {
+interface ISignatureMintERC1155 { 
     /**
      *  @notice The body of a request to mint tokens.
      *
@@ -28,7 +28,7 @@ interface ISignatureMintERC1155 {
         uint128 validityStartTimestamp;
         uint128 validityEndTimestamp;
         string name;
-        string external_url;
+        string externalUrl;
         string metadata;
         uint256 unlockTime;
         uint256 targetBalance;

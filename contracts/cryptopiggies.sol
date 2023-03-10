@@ -6,14 +6,14 @@ import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import "./utils.sol";
+import "./utils.sol"; 
 
 abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     using ECDSA for bytes32;
 
     bytes32 internal constant TYPEHASH =
         keccak256(
-            "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string name,string external_url,string metadata,uint256 unlockTime,uint256 targetBalance)"
+            "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string name,string externalUrl,string metadata,uint256 unlockTime,uint256 targetBalance)"
         );
 
     constructor() EIP712("SignatureMintERC1155", "1") {}
@@ -36,7 +36,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     function _processRequest(
         MintRequest calldata _req,
         bytes calldata _signature
-    ) internal returns (address signer) {
+    ) internal view returns (address signer) {
         bool success;
         (success, signer) = verify(_req, _signature);
 
@@ -67,7 +67,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
         uint128 validityStartTimestamp;
         uint128 validityEndTimestamp;
         string name;
-        string external_url;
+        string externalUrl;
         string metadata;
         uint256 unlockTime;
         uint256 targetBalance;
@@ -86,7 +86,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
                 _req.validityStartTimestamp,
                 _req.validityEndTimestamp,
                 keccak256(bytes(_req.name)),
-                keccak256(bytes(_req.external_url)),
+                keccak256(bytes(_req.externalUrl)),
                 keccak256(bytes(_req.metadata)),
                 _req.unlockTime,
                 _req.targetBalance
@@ -128,7 +128,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         uint256 _tokenId,
         string memory _tokenURI,
         uint256 _amount
-    ) public override {
+    ) public pure override {
         require(false, "Use mintWithSignature.");
     }
 
@@ -137,7 +137,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         uint256[] memory _tokenIds,
         uint256[] memory _amounts,
         string memory _baseURI
-    ) public override {
+    ) public pure override {
         require(false, "Use mintWithSignature.");
     }
 
@@ -166,7 +166,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
             address owner;
             uint256 tokenId;
             string name;
-            string external_url;
+            string externalUrl;
             string metadata;
             uint256 unlockTime;
             uint256 targetBalance;
@@ -177,7 +177,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
             address(this),
             tokenIdToMint,
             _req.name,
-            _req.external_url,
+            _req.externalUrl,
             _req.metadata,
             _req.unlockTime,
             _req.targetBalance,
@@ -271,7 +271,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
                                 _attributes[tokenId].unlockTime
                             ),
                             '","external_url":"',
-                            _attributes[tokenId].external_url,
+                            _attributes[tokenId].externalUrl,
                             '","attributes": [{"display_type": "date","trait_type": "Maturity Date", "value": ',
                             Utils.uint2str(
                                 _attributes[tokenId].unlockTime

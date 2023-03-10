@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.11; 
 import "./utils.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/proxy/utils/Initializable.sol";
 import "@thirdweb-dev/contracts/extension/Ownable.sol";
 
-contract PiggyBank is Initializable, Ownable {
+contract PiggyBank is Initializable, Ownable { 
     event Received(address _from, uint _amount);
     event Withdrawal(address who, uint amount, uint balance);
 
