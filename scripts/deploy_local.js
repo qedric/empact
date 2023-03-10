@@ -5,6 +5,25 @@
 // will compile your contracts, add the Hardhat Runtime Environment's members to the
 // global scope, and execute the script.
 
+
+/*
+{
+  "owner":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "tokenId":99999999,
+  "name":"",
+  "externalUrl":"",
+  "metadata":"",
+  "unlockTime":0,
+  "targetBalance":0,
+  "piggyBank":"0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+}
+
+["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",99999999,"","","",0,0,"0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"]
+*/
+
+// factory constructor params:
+// "RemixTest","CTR","0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", 400,"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266","0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+
 const hre = require("hardhat");
 
 function callback(x) {
@@ -13,37 +32,29 @@ function callback(x) {
 
 async function main() {
 
-  /*
-    string memory _name,
-    string memory _symbol,
-    address _royaltyRecipient,
-    uint128 _royaltyBps,
-    address _primarySaleRecipient
-  */
-  const _name = 'PiggiesTEST9'
+  const _name = 'PiggiesTESTLOCAL'
   const _symbol = 'CPG'
-  const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
+  const _royaltyRecipient = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
   const _royaltyBps = '400'
-  const _primarySaleRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C';
+  const _primarySaleRecipient = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 
-  const _libAddress = '0x913df26caB524734C559F279E7809627D75e1527' // Goerli deployed via thirdweb
-  const _implAddress = '0x113459c544f4CaF69E5e758dC445f90B7Bb20B0d' // Goerli deployed PB implementation
+  /*const _libAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3' // Goerli deployed via thirdweb
+  const _implAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512' // Goerli deployed PB implementation*/
 
-  // Get owner/deployer's wallet address
-  //const owner = await hre.ethers.getSigners();
+  // deploy the PiggyBank first if necessary
+  const PB = await hre.ethers.getContractFactory("PiggyBank");
+  const pb = await PB.deploy();
+  await pb.deployed();
 
-  //console.log(owner.address)
-
-  txn = await ethers.provider.getBalance('0x92abb8F1238a81E55C5310C6D1baf399Be1b483C');
-  console.log('balance:',txn);
+  console.log('got PiggyBank at ', pb.address);
 
   // deploy the library first if necessary
-  /*const Lib = await hre.ethers.getContractFactory("Utils");
+  const Lib = await hre.ethers.getContractFactory("Utils");
   const lib = await Lib.deploy();
-  await lib.deployed();*/
+  await lib.deployed();
 
   // get the library if it's already deployed
-  const lib = await ethers.getContractAt("Utils", _libAddress );
+  //const lib = await ethers.getContractAt("Utils", _libAddress );
 
   console.log('got library at ', lib.address);
   
@@ -57,13 +68,15 @@ async function main() {
   console.log('got the conract we want to deploy');
 
   // deploy
-  const deployedFactory = await PiggyFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient, _implAddress);
+  const deployedFactory = await PiggyFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient, pb.address);
 
   // Wait for this transaction to be mined
   await deployedFactory.deployed();
 
   // Get contract address
   console.log("Owner is: ", await deployedFactory.owner())
+
+  console.log('PiggyFactory address:', deployedFactory.address)
 
   /*// then deploy the implementation piggy bank that the factory can then clone:
   const Piggy = await hre.ethers.getContractFactory("PiggyBank");
