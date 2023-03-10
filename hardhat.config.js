@@ -19,6 +19,9 @@ module.exports = {
     goerli: {
       url: `https://eth-goerli.alchemyapi.io/v2/${ALCHECMY_API_KEY_TEST}`,
       accounts: [PK]
+    },
+    hardhat: {
+      chainId: 1337,
     }
   },
   etherscan: {
