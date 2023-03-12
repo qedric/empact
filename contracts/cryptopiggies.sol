@@ -39,7 +39,6 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     ) internal view returns (address signer) {
         bool success;
         (success, signer) = verify(_req, _signature);
-
         require(success, "Invalid request");
         require(
             _req.validityStartTimestamp <= block.timestamp &&
@@ -95,7 +94,6 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
 } 
 
 contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, PermissionsEnumerable {
-    event PiggyCreated(address);
 
     event ProxyDeployed(
         address piggyBankImplementation,

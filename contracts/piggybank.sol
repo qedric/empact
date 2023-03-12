@@ -3,7 +3,8 @@ pragma solidity ^0.8.11;
 import "@thirdweb-dev/contracts/openzeppelin-presets/proxy/utils/Initializable.sol";
 import "@thirdweb-dev/contracts/extension/Ownable.sol";
 
-contract PiggyBank is Initializable, Ownable { 
+contract PiggyBank is Initializable, Ownable {
+    event PiggyInitialised(Attr);
     event Received(address _from, uint _amount);
     event Withdrawal(address who, uint amount, uint balance);
 
@@ -24,6 +25,7 @@ contract PiggyBank is Initializable, Ownable {
     function initialize(Attr memory _data) public initializer {
         _setupOwner(msg.sender);
         attributes = _data;
+        emit PiggyInitialised(_data);
     }
 
     function payout(
