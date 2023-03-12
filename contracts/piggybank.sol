@@ -3,10 +3,7 @@ pragma solidity ^0.8.11;
 import "@thirdweb-dev/contracts/openzeppelin-presets/proxy/utils/Initializable.sol";
 import "@thirdweb-dev/contracts/extension/Ownable.sol";
 
-contract PiggyBank is Initializable, Ownable {
-    event PiggyInitialised(Attr);
-    event Received(address _from, uint _amount);
-    event Withdrawal(address who, uint amount, uint balance);
+interface IPiggyBank {
 
     struct Attr { 
         address owner;
@@ -19,12 +16,27 @@ contract PiggyBank is Initializable, Ownable {
         address piggyBank;
     }
 
-    Attr public attributes;
-    uint8 public breakPiggy_fee_Bps = 4;
+    event PiggyInitialised(Attr attributes);
+    event Received(address _from, uint _amount);
+    event Withdrawal(address who, uint amount, uint balance);
 
-    function initialize(Attr memory _data) public initializer {
+    function initialize(Attr calldata _data) external;
+
+    function payout(address recipient, uint256 thisOwnerBalance, uint256 totalSupply) external payable;
+
+    function setBreakPiggyBps(uint8 bps) external;
+
+}
+
+contract PiggyBank is IPiggyBank, Initializable, Ownable {
+    
+    Attr public attributes;
+    uint8 public breakPiggy_fee_Bps;
+
+    function initialize(Attr calldata _data) public initializer {
         _setupOwner(msg.sender);
         attributes = _data;
+        breakPiggy_fee_Bps = 4;
         emit PiggyInitialised(_data);
     }
 

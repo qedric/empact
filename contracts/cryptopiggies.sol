@@ -6,7 +6,8 @@ import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import "./utils.sol"; 
+import "./utils.sol";
+import "./piggybank.sol";
 
 abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     using ECDSA for bytes32;
@@ -105,7 +106,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
 
     uint256 private makePiggy_fee = 0.004 ether;
     address internal _piggyBankImplementation;
-    mapping(uint256 => Attr) internal _attributes;
+    mapping(uint256 => IPiggyBank.Attr) internal _attributes;
 
     constructor(
         string memory _name,
@@ -171,7 +172,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
             address piggyBank;
         }
         */
-        Attr memory piglet = Attr(
+        IPiggyBank.Attr memory piglet = IPiggyBank.Attr(
             address(this),
             tokenIdToMint,
             _req.name,
@@ -183,9 +184,12 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         );
 
         bytes32 salt = bytes32(tokenIdToMint);
+        address piggyBankAddress;
         
         // deploy a separate proxy contract to hold the token's ETH; add its address to the attributes
-        piglet.piggyBank = _deployProxyByImplementation(piglet, salt);
+        piggyBankAddress = _deployProxyByImplementation(piglet, salt);
+
+        piglet.piggyBank = piggyBankAddress;
 
         // Set token data
         _attributes[tokenIdToMint] = piglet;
@@ -194,11 +198,10 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         _mint(_req.to, tokenIdToMint, _req.quantity, "");
 
         emit TokensMintedWithSignature(signer, _req.to, tokenIdToMint, _req);
-
     }
 
     function _deployProxyByImplementation(
-        Attr memory _piggyData,
+        IPiggyBank.Attr memory _piggyData,
         bytes32 _salt
     ) internal returns (address deployedProxy) {
 
@@ -208,15 +211,9 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
             salthash
         );
 
-        emit ProxyDeployed(_piggyBankImplementation, deployedProxy, msg.sender);
+        IPiggyBank(deployedProxy).initialize(_piggyData);
 
-        TWAddress.functionCall(
-            deployedProxy,
-            abi.encodeWithSignature(
-                "initialize(Attr)",
-                _piggyData
-            )
-        );
+        emit ProxyDeployed(_piggyBankImplementation, deployedProxy, msg.sender);
     }
 
     function payout(uint256 tokenId) external {
@@ -289,6 +286,10 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
                 )
             )
         );
+    }
+
+    function setBreakPiggyBps(uint256 tokenId, uint8 bps) public onlyOwner {
+        IPiggyBank(_attributes[tokenId].piggyBank).setBreakPiggyBps(bps);
     }
 
     /*//////////////////////////////////////////////////////////////
