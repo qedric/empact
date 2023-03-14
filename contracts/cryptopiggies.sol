@@ -256,9 +256,9 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
                 Base64.encode(
                     bytes(
                         abi.encodePacked(
-                            '{"name": "',
+                            '{"name":"',
                             _attributes[tokenId].name,
-                            '","image_data": "',
+                            '","image_data":"',
                             Utils.getSvg(
                                 _attributes[tokenId].name,
                                 _attributes[tokenId].piggyBank,
@@ -267,20 +267,22 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
                             ),
                             '","external_url":"',
                             _attributes[tokenId].externalUrl,
-                            '","attributes": [{"display_type": "date","trait_type": "Maturity Date", "value": ',
+                            '","attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
                             Utils.uint2str(
                                 _attributes[tokenId].unlockTime
                             ),
-                            '},"{"trait_type": "Target Balance", "value": "',
+                            '},{"trait_type":"Target Balance","value":"',
                             Utils.uint2str(
                                 _attributes[tokenId].targetBalance /
                                     1 ether
                             ),
-                            ' ETH"},"{"trait_type": "Receive Address", "value": "',
-                            address(_attributes[tokenId].piggyBank),
+                            ' ETH"},{"trait_type":"Receive Address","value":"',
+                            Utils.toAsciiString(
+                                address(_attributes[tokenId].piggyBank)
+                            ),
                             '"}',
                             _attributes[tokenId].metadata,
-                            "]}"
+                            ']}'
                         )
                     )   
                 )
