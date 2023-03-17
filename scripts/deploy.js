@@ -32,14 +32,14 @@ function callback(x) {
 
 async function main() {
 
-  const _name = 'PiggiesTEST12'
+  const _name = 'PiggiesTEST18'
   const _symbol = 'CPG'
   const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
   const _royaltyBps = '400'
   const _primarySaleRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C';
 
-  const _libAddress = '0xe003d5d9d133E24d3b64f5657c7Fdd1715CD1211' // Goerli deployed via thirdweb
-  const _implAddress = '0xFF490211D0706d7214446f2E7c3472E629e08E82' // Goerli deployed PB implementation*/
+  const _libAddress = '0x4eEa97281346D80b5Ef66FC9c7E7d54Af8fC2738' // Goerli deployed via thirdweb
+  const _implAddress = '0x0f8f457e28dEeF3480C9954D7E05a23094DF0DA0' // Goerli deployed PB implementation*/
 
   // get the library if it's already deployed
   const lib = await ethers.getContractAt("Utils", _libAddress );
