@@ -6,14 +6,13 @@ import "@thirdweb-dev/contracts/extension/Ownable.sol";
 interface IPiggyBank {
 
     struct Attr { 
-        address owner;
         uint256 tokenId;
         string name;
+        string description;
         string externalUrl;
         string metadata;
         uint256 unlockTime;
         uint256 targetBalance;
-        address piggyBank;
     }
 
     event PiggyInitialised(Attr attributes);

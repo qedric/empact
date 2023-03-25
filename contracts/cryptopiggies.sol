@@ -14,7 +14,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
 
     bytes32 internal constant TYPEHASH =
         keccak256(
-            "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string name,string externalUrl,string metadata,uint256 unlockTime,uint256 targetBalance)"
+            "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string name,string description,string externalUrl,string metadata,uint256 unlockTime,uint256 targetBalance)"
         );
 
     constructor() EIP712("SignatureMintERC1155", "1") {}
@@ -67,6 +67,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
         uint128 validityStartTimestamp;
         uint128 validityEndTimestamp;
         string name;
+        string description;
         string externalUrl;
         string metadata;
         uint256 unlockTime;
@@ -86,6 +87,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
                 _req.validityStartTimestamp,
                 _req.validityEndTimestamp,
                 keccak256(bytes(_req.name)),
+                keccak256(bytes(_req.description)),
                 keccak256(bytes(_req.externalUrl)),
                 keccak256(bytes(_req.metadata)),
                 _req.unlockTime,
@@ -107,6 +109,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
     uint256 private makePiggy_fee = 0.004 ether;
     address internal _piggyBankImplementation;
     mapping(uint256 => IPiggyBank.Attr) internal _attributes;
+    mapping(uint256 => address) internal _receiveAddresses;
 
     constructor(
         string memory _name,
@@ -162,34 +165,27 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
 
         /*
         struct Attr {
-            address owner;
             uint256 tokenId;
             string name;
+            string description;
             string externalUrl;
             string metadata;
             uint256 unlockTime;
             uint256 targetBalance;
-            address piggyBank;
         }
         */
         IPiggyBank.Attr memory piglet = IPiggyBank.Attr(
-            address(this),
             tokenIdToMint,
             _req.name,
+            _req.description,
             _req.externalUrl,
             _req.metadata,
             _req.unlockTime,
-            _req.targetBalance,
-            address(0x0)
+            _req.targetBalance
         );
-
-        bytes32 salt = bytes32(tokenIdToMint);
-        address piggyBankAddress;
-        
+    
         // deploy a separate proxy contract to hold the token's ETH; add its address to the attributes
-        piggyBankAddress = _deployProxyByImplementation(piglet, salt);
-
-        piglet.piggyBank = piggyBankAddress;
+        _receiveAddresses[tokenIdToMint] = _deployProxyByImplementation(piglet, bytes32(tokenIdToMint));
 
         // Set token data
         _attributes[tokenIdToMint] = piglet;
@@ -197,7 +193,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         // Mint tokens.
         _mint(_req.to, tokenIdToMint, _req.quantity, "");
 
-        emit TokensMintedWithSignature(signer, _req.to, tokenIdToMint, _req);
+        emit TokensMintedWithSignature(signer, _req.to, tokenIdToMint, _req, _receiveAddresses[tokenIdToMint]);
     }
 
     function _deployProxyByImplementation(
@@ -223,7 +219,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
 
         require(thisOwnerBalance != 0, "You must be an owner to withdraw!");
 
-        (bool success, bytes memory returndata) = _attributes[tokenId].piggyBank.call{ value: 0 }(
+        (bool success, bytes memory returndata) = _receiveAddresses[tokenId].call{ value: 0 }(
             abi.encodeWithSignature(
                 "payout(address, uint256, uint256)",
                 msg.sender,
@@ -258,10 +254,12 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
                         abi.encodePacked(
                             '{"name":"',
                             _attributes[tokenId].name,
+                            '","description":"',
+                            _attributes[tokenId].description,
                             '","image_data":"',
                             Utils.getSvg(
                                 _attributes[tokenId].name,
-                                _attributes[tokenId].piggyBank,
+                                _receiveAddresses[tokenId],
                                 _attributes[tokenId].targetBalance,
                                 _attributes[tokenId].unlockTime
                             ),
@@ -272,13 +270,10 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
                                 _attributes[tokenId].unlockTime
                             ),
                             '},{"trait_type":"Target Balance","value":"',
-                            Utils.uint2str(
-                                _attributes[tokenId].targetBalance /
-                                    1 ether
-                            ),
+                            Utils.convertWeiToEthString(_attributes[tokenId].targetBalance),
                             ' ETH"},{"trait_type":"Receive Address","value":"',
                             Utils.toAsciiString(
-                                address(_attributes[tokenId].piggyBank)
+                                address(_receiveAddresses[tokenId])
                             ),
                             '"}',
                             _attributes[tokenId].metadata,
@@ -291,7 +286,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
     }
 
     function setBreakPiggyBps(uint256 tokenId, uint8 bps) public onlyOwner {
-        IPiggyBank(_attributes[tokenId].piggyBank).setBreakPiggyBps(bps);
+        IPiggyBank(_receiveAddresses[tokenId]).setBreakPiggyBps(bps);
     }
 
     /*//////////////////////////////////////////////////////////////
