@@ -261,19 +261,19 @@ library Utils {
     }
 
     function convertWeiToEthString(uint weiValue) internal pure returns (string memory) {
-        // Check if the value is less than 0.0001 ETH (100000000000000 wei)
-        if (weiValue < 100000000000000) {
+        // Check if the value is less than 0.00001 ETH (10000000000000 wei)
+        if (weiValue < 10000000000000) {
             return "0";
         }
         
-        // Truncate the last 15 digits of the wei value
-        uint truncatedWeiValue = weiValue / 100000000000000;
+        // Truncate the last 14 digits of the wei value
+        uint truncatedWeiValue = weiValue / 10000000000000;
 
         string memory str = uint2str(truncatedWeiValue);
 
-        // If the length of the string is less than 4, prepend leading zeros
-        if (bytes(str).length < 4) {
-            uint leadingZeros = 4 - bytes(str).length;
+        // If the length of the string is less than 5, prepend leading zeros
+        if (bytes(str).length < 5) {
+            uint leadingZeros = 5 - bytes(str).length;
             string memory zeros = new string(leadingZeros);
             bytes memory zerosBytes = bytes(zeros);
             for (uint i = 0; i < leadingZeros; i++) {
@@ -284,9 +284,9 @@ library Utils {
 
         uint len = bytes(str).length;
 
-        if (len > 4) {
-            // Insert '.' before the last 4 characters
-            string memory prefix = insertCharAtIndex(str,len-4,'.');
+        if (len > 5) {
+            // Insert '.' before the last 5 characters
+            string memory prefix = insertCharAtIndex(str,len-5,'.');
             return prefix; 
         } else {
             // Prepend '0.' to the start of the string

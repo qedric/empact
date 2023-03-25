@@ -246,6 +246,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
     }
 
     function uri(uint256 tokenId) public view override returns (string memory) {
+        require(totalSupply[tokenId] > 0, "Token data not found");
         return string(
             abi.encodePacked(
                 "data:application/json;base64,",
