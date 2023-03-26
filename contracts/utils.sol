@@ -38,9 +38,7 @@ interface ISignatureMintERC1155 {
     event TokensMintedWithSignature(
         address indexed signer,
         address indexed mintedTo,
-        uint256 indexed tokenIdMinted,
-        MintRequest mintRequest,
-        address indexed receiveAddress
+        uint256 indexed tokenIdMinted
     );
 
     /**

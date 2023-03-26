@@ -193,7 +193,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         // Mint tokens.
         _mint(_req.to, tokenIdToMint, _req.quantity, "");
 
-        emit TokensMintedWithSignature(signer, _req.to, tokenIdToMint, _req, _receiveAddresses[tokenIdToMint]);
+        emit TokensMintedWithSignature(signer, _req.to, tokenIdToMint);
     }
 
     function _deployProxyByImplementation(

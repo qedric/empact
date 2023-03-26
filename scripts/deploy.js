@@ -5,7 +5,6 @@
 // will compile your contracts, add the Hardhat Runtime Environment's members to the
 // global scope, and execute the script.
 
-
 /*
 {
   "owner":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
@@ -32,14 +31,14 @@ function callback(x) {
 
 async function main() {
 
-  const _name = 'PiggiesTEST18'
+  const _name = 'PiggiesTEST19'
   const _symbol = 'CPG'
   const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
   const _royaltyBps = '400'
   const _primarySaleRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C';
 
-  const _libAddress = '0x4eEa97281346D80b5Ef66FC9c7E7d54Af8fC2738' // Goerli deployed via thirdweb
-  const _implAddress = '0x0f8f457e28dEeF3480C9954D7E05a23094DF0DA0' // Goerli deployed PB implementation*/
+  const _libAddress = '0x639044f5b21AB0ee0Ab1A48f02C64F8E48FceE57' // Goerli deployed via thirdweb
+  const _implAddress = '0x6De1F083B9AD801345E6726F947879D12D7347B8' // Goerli deployed PB implementation*/
 
   // get the library if it's already deployed
   const lib = await ethers.getContractAt("Utils", _libAddress );
