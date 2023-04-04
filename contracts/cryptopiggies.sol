@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.11;
-import "@thirdweb-dev/contracts/base/ERC1155Base.sol";
+import { ERC1155 } from "@thirdweb-dev/contracts/eip/ERC1155.sol";
+
+import "@thirdweb-dev/contracts/extension/ContractMetadata.sol";
+import "@thirdweb-dev/contracts/extension/Multicall.sol";
+import "@thirdweb-dev/contracts/extension/Ownable.sol";
+import "@thirdweb-dev/contracts/extension/Royalty.sol";
+import "@thirdweb-dev/contracts/extension/DefaultOperatorFilterer.sol";
+import "@thirdweb-dev/contracts/lib/TWStrings.sol";
+
 import "@thirdweb-dev/contracts/extension/PrimarySale.sol";
 import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
@@ -96,53 +104,135 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     }
 } 
 
-contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, PermissionsEnumerable {
+contract CryptoPiggies is 
+    ERC1155,
+    ContractMetadata,
+    Ownable,
+    Royalty,
+    Multicall,
+    DefaultOperatorFilterer, 
+    PrimarySale,
+    SignaturePiggyMintERC1155,
+    PermissionsEnumerable
+{
+    using TWStrings for uint256;
+
+    /*//////////////////////////////////////////////////////////////
+                        Events
+    //////////////////////////////////////////////////////////////*/
 
     event ProxyDeployed(
-        address piggyBankImplementation,
         address deployedProxy,
         address msgSender
     );
 
+    /*//////////////////////////////////////////////////////////////
+                        State variables
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev The tokenId of the next NFT to mint.
+    uint256 internal nextTokenIdToMint_;
+
+    /// @notice This role is required to mint.
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
+    /// @notice The fee to create a new Piggy.
     uint256 private makePiggy_fee = 0.004 ether;
-    address internal _piggyBankImplementation;
+
+    /// @notice The PiggyBank implementation contract that is cloned for each new piggy
+    address internal piggyBankImplementation;
+
+    /*//////////////////////////////////////////////////////////////
+                        Mappings
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     *  @notice Returns the total supply of NFTs of a given tokenId
+     *  @dev Mapping from tokenId => total circulating supply of NFTs of that tokenId.
+     */
+    mapping(uint256 => uint256) public totalSupply;
+
+    /// @dev Stores the info for each piggy
     mapping(uint256 => IPiggyBank.Attr) internal _attributes;
+
+    /// @dev PiggBaks are mapped to the tokenId of the NFT they are tethered to
     mapping(uint256 => address) internal _receiveAddresses;
 
+    /*//////////////////////////////////////////////////////////////
+                            Constructor
+    //////////////////////////////////////////////////////////////*/
     constructor(
         string memory _name,
         string memory _symbol,
         address _royaltyRecipient,
         uint128 _royaltyBps,
         address _primarySaleRecipient,
-        address __piggyBankImplementation
-    ) ERC1155Base(_name, _symbol, _royaltyRecipient, _royaltyBps) {
+        address _piggyBankImplementation
+    ) ERC1155(_name, _symbol) {
+        _setupOwner(msg.sender);
+        _setupDefaultRoyaltyInfo(_royaltyRecipient, _royaltyBps);
+        _setOperatorRestriction(true);
         _setupPrimarySaleRecipient(_primarySaleRecipient);
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(MINTER_ROLE, msg.sender);
-        _piggyBankImplementation = __piggyBankImplementation;
+        piggyBankImplementation = _piggyBankImplementation;
     }
 
-    function mintTo(
-        address _to,
-        uint256 _tokenId,
-        string memory _tokenURI,
-        uint256 _amount
-    ) public pure override {
-        require(false, "Use mintWithSignature.");
+    /*//////////////////////////////////////////////////////////////
+                    Overriden metadata logic - On-chain
+    //////////////////////////////////////////////////////////////*/
+    function uri(uint256 tokenId) public view override returns (string memory) {
+        require(totalSupply[tokenId] > 0, "Token data not found");
+        return string(
+            abi.encodePacked(
+                "data:application/json;base64,",
+                Base64.encode(
+                    bytes(
+                        abi.encodePacked(
+                            '{"name":"',
+                            _attributes[tokenId].name,
+                            '","description":"',
+                            _attributes[tokenId].description,
+                            '","image_data":"',
+                            Utils.getSvg(
+                                _attributes[tokenId].name,
+                                _receiveAddresses[tokenId],
+                                _attributes[tokenId].targetBalance,
+                                _attributes[tokenId].unlockTime
+                            ),
+                            '","external_url":"',
+                            _attributes[tokenId].externalUrl,
+                            '","attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
+                            Utils.uint2str(
+                                _attributes[tokenId].unlockTime
+                            ),
+                            '},{"trait_type":"Target Balance","value":"',
+                            Utils.convertWeiToEthString(_attributes[tokenId].targetBalance),
+                            ' ETH"},{"trait_type":"Receive Address","value":"',
+                            Utils.toAsciiString(
+                                address(_receiveAddresses[tokenId])
+                            ),
+                            '"}',
+                            _attributes[tokenId].metadata,
+                            ']}'
+                        )
+                    )   
+                )
+            )
+        );
     }
 
-    function batchMintTo(
-        address _to,
-        uint256[] memory _tokenIds,
-        uint256[] memory _amounts,
-        string memory _baseURI
-    ) public pure override {
-        require(false, "Use mintWithSignature.");
-    }
+    /*//////////////////////////////////////////////////////////////
+                        Mint / burn logic
+    //////////////////////////////////////////////////////////////*/
 
+    /**
+     *  @notice          Lets an authorized address mint NFTs to a recipient, via signed mint request
+     *  @dev             - The logic in the `_canSignMintRequest` function determines whether the caller is authorized to mint NFTs.
+     *
+     *  @param _req      The signed mint request.
+     *  @param _signature  The signature of an address with the MINTER role.
+     */
     function mintWithSignature(
         MintRequest calldata _req,
         bytes calldata _signature
@@ -196,6 +286,7 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         emit TokensMintedWithSignature(signer, _req.to, tokenIdToMint);
     }
 
+    /// @dev Every time a new token is minted, a PiggyBank proxy contract is deployed to hold the funds
     function _deployProxyByImplementation(
         IPiggyBank.Attr memory _piggyData,
         bytes32 _salt
@@ -203,15 +294,16 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
 
         bytes32 salthash = keccak256(abi.encodePacked(msg.sender, _salt));
         deployedProxy = Clones.cloneDeterministic(
-            _piggyBankImplementation,
+            piggyBankImplementation,
             salthash
         );
 
         IPiggyBank(deployedProxy).initialize(_piggyData);
 
-        emit ProxyDeployed(_piggyBankImplementation, deployedProxy, msg.sender);
+        emit ProxyDeployed(deployedProxy, msg.sender);
     }
 
+    /// @notice Lets an NFT owner withdraw their proportion of funds once the piggyBank is unlocked
     function payout(uint256 tokenId) external {
         require(totalSupply[tokenId] != 0, "Token data not found");
 
@@ -245,60 +337,125 @@ contract CryptoPiggies is ERC1155Base, PrimarySale, SignaturePiggyMintERC1155, P
         }
     }
 
-    function uri(uint256 tokenId) public view override returns (string memory) {
-        require(totalSupply[tokenId] > 0, "Token data not found");
-        return string(
-            abi.encodePacked(
-                "data:application/json;base64,",
-                Base64.encode(
-                    bytes(
-                        abi.encodePacked(
-                            '{"name":"',
-                            _attributes[tokenId].name,
-                            '","description":"',
-                            _attributes[tokenId].description,
-                            '","image_data":"',
-                            Utils.getSvg(
-                                _attributes[tokenId].name,
-                                _receiveAddresses[tokenId],
-                                _attributes[tokenId].targetBalance,
-                                _attributes[tokenId].unlockTime
-                            ),
-                            '","external_url":"',
-                            _attributes[tokenId].externalUrl,
-                            '","attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
-                            Utils.uint2str(
-                                _attributes[tokenId].unlockTime
-                            ),
-                            '},{"trait_type":"Target Balance","value":"',
-                            Utils.convertWeiToEthString(_attributes[tokenId].targetBalance),
-                            ' ETH"},{"trait_type":"Receive Address","value":"',
-                            Utils.toAsciiString(
-                                address(_receiveAddresses[tokenId])
-                            ),
-                            '"}',
-                            _attributes[tokenId].metadata,
-                            ']}'
-                        )
-                    )   
-                )
-            )
-        );
-    }
-
+    /// @notice Sets the fee for withdrawing the funds from a PiggyBank
     function setBreakPiggyBps(uint256 tokenId, uint8 bps) public onlyOwner {
         IPiggyBank(_receiveAddresses[tokenId]).setBreakPiggyBps(bps);
     }
 
     /*//////////////////////////////////////////////////////////////
-                            Internal functions
+                            ERC165 Logic
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns whether this contract supports the given interface.
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, IERC165) returns (bool) {
+        return
+            interfaceId == 0x01ffc9a7 || // ERC165 Interface ID for ERC165
+            interfaceId == 0xd9b67a26 || // ERC165 Interface ID for ERC1155
+            interfaceId == 0x0e89341c || // ERC165 Interface ID for ERC1155MetadataURI
+            interfaceId == type(IERC2981).interfaceId; // ERC165 ID for ERC2981
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            View functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The tokenId assigned to the next new NFT to be minted.
+    function nextTokenIdToMint() public view virtual returns (uint256) {
+        return nextTokenIdToMint_;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        ERC-1155 overrides
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev See {ERC1155-setApprovalForAll}
+    function setApprovalForAll(address operator, bool approved)
+        public
+        override(ERC1155)
+        onlyAllowedOperatorApproval(operator)
+    {
+        super.setApprovalForAll(operator, approved);
+    }
+
+    /**
+     * @dev See {IERC1155-safeTransferFrom}.
+     */
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 id,
+        uint256 amount,
+        bytes memory data
+    ) public override(ERC1155) onlyAllowedOperator(from) {
+        super.safeTransferFrom(from, to, id, amount, data);
+    }
+
+    /**
+     * @dev See {IERC1155-safeBatchTransferFrom}.
+     */
+    function safeBatchTransferFrom(
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) public override(ERC1155) onlyAllowedOperator(from) {
+        super.safeBatchTransferFrom(from, to, ids, amounts, data);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Internal (overrideable) functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Returns whether contract metadata can be set in the given execution context.
+    function _canSetContractURI() internal view virtual override returns (bool) {
+        return msg.sender == owner();
+    }
 
     /// @dev Returns whether a given address is authorized to sign mint requests.
     function _canSignMintRequest(
         address _signer
     ) internal view virtual override returns (bool) {
         return hasRole(MINTER_ROLE, _signer);
+    }
+
+    /// @dev Returns whether owner can be set in the given execution context.
+    function _canSetOwner() internal view virtual override returns (bool) {
+        return msg.sender == owner();
+    }
+
+    /// @dev Returns whether royalty info can be set in the given execution context.
+    function _canSetRoyaltyInfo() internal view virtual override returns (bool) {
+        return msg.sender == owner();
+    }
+
+    /// @dev Returns whether operator restriction can be set in the given execution context.
+    function _canSetOperatorRestriction() internal virtual override returns (bool) {
+        return msg.sender == owner();
+    }
+
+    /// @dev Runs before every token transfer / mint / burn.
+    function _beforeTokenTransfer(
+        address operator,
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) internal virtual override {
+        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
+
+        if (from == address(0)) {
+            for (uint256 i = 0; i < ids.length; ++i) {
+                totalSupply[ids[i]] += amounts[i];
+            }
+        }
+
+        if (to == address(0)) {
+            for (uint256 i = 0; i < ids.length; ++i) {
+                totalSupply[ids[i]] -= amounts[i];
+            }
+        }
     }
 
     /// @dev Returns whether primary sale recipient can be set in the given execution context.
