@@ -8,8 +8,6 @@ import "@thirdweb-dev/contracts/extension/Ownable.sol";
 import "@thirdweb-dev/contracts/extension/Royalty.sol";
 import "@thirdweb-dev/contracts/extension/DefaultOperatorFilterer.sol";
 import "@thirdweb-dev/contracts/lib/TWStrings.sol";
-
-import "@thirdweb-dev/contracts/extension/PrimarySale.sol";
 import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
@@ -111,7 +109,6 @@ contract CryptoPiggies is
     Royalty,
     Multicall,
     DefaultOperatorFilterer, 
-    PrimarySale,
     SignaturePiggyMintERC1155,
     PermissionsEnumerable
 {
@@ -126,6 +123,9 @@ contract CryptoPiggies is
         address msgSender
     );
 
+    /// @dev Emitted when a new sale recipient is set.
+    event FeeRecipientUpdated(address indexed recipient);
+
     /*//////////////////////////////////////////////////////////////
                         State variables
     //////////////////////////////////////////////////////////////*/
@@ -137,10 +137,13 @@ contract CryptoPiggies is
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     /// @notice The fee to create a new Piggy.
-    uint256 private makePiggy_fee = 0.004 ether;
+    uint256 public makePiggy_fee = 0.004 ether;
 
     /// @notice The PiggyBank implementation contract that is cloned for each new piggy
     address internal piggyBankImplementation;
+
+    /// @dev The address that receives all primary sales value.
+    address internal feeRecipient;
 
     /*//////////////////////////////////////////////////////////////
                         Mappings
@@ -166,15 +169,15 @@ contract CryptoPiggies is
         string memory _symbol,
         address _royaltyRecipient,
         uint128 _royaltyBps,
-        address _primarySaleRecipient,
+        address _feeRecipient,
         address _piggyBankImplementation
     ) ERC1155(_name, _symbol) {
         _setupOwner(msg.sender);
         _setupDefaultRoyaltyInfo(_royaltyRecipient, _royaltyBps);
         _setOperatorRestriction(true);
-        _setupPrimarySaleRecipient(_primarySaleRecipient);
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(MINTER_ROLE, msg.sender);
+        feeRecipient = _feeRecipient;
         piggyBankImplementation = _piggyBankImplementation;
     }
 
@@ -251,7 +254,7 @@ contract CryptoPiggies is
         signer = _processRequest(_req, _signature);
 
         // Collect price
-        _collectMakePiggyFee(primarySaleRecipient());
+        _collectMakePiggyFee();
 
         /*
         struct Attr {
@@ -337,9 +340,27 @@ contract CryptoPiggies is
         }
     }
 
+    /*//////////////////////////////////////////////////////////////
+                       Configuration
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Sets the fee for creating a new piggyBank
+    function setMakePiggyFee(uint256 fee) public onlyOwner {
+        makePiggy_fee = fee;
+    }
+
     /// @notice Sets the fee for withdrawing the funds from a PiggyBank
     function setBreakPiggyBps(uint256 tokenId, uint8 bps) public onlyOwner {
         IPiggyBank(_receiveAddresses[tokenId]).setBreakPiggyBps(bps);
+    }
+
+    /**
+     *  @notice         Updates recipient of make & break piggy fees.
+     *  @param _feeRecipient   Address to be set as new recipient of primary sales.
+     */
+    function setFeeRecipient(address _feeRecipient) public onlyOwner {
+        feeRecipient = _feeRecipient;
+        emit FeeRecipientUpdated(_feeRecipient);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -458,34 +479,18 @@ contract CryptoPiggies is
         }
     }
 
-    /// @dev Returns whether primary sale recipient can be set in the given execution context.
-    function _canSetPrimarySaleRecipient()
-        internal
-        view
-        virtual
-        override
-        returns (bool)
-    {
-        return msg.sender == owner();
-    }
-
     /// @dev Collects and distributes the primary sale value of NFTs being claimed.
-    function _collectMakePiggyFee(
-        address _primarySaleRecipient
-    ) internal virtual {
+    function _collectMakePiggyFee() internal virtual {
         if (makePiggy_fee == 0) {
             return;
         }
 
         require(msg.value == makePiggy_fee, "Must send the fee");
         
-        address saleRecipient = _primarySaleRecipient == address(0)
-            ? primarySaleRecipient()
-            : _primarySaleRecipient;
         CurrencyTransferLib.transferCurrency(
             CurrencyTransferLib.NATIVE_TOKEN,
             msg.sender,
-            saleRecipient,
+            feeRecipient,
             makePiggy_fee
         );
     }

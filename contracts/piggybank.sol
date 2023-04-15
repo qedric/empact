@@ -24,7 +24,10 @@ interface IPiggyBank {
     function payout(address recipient, uint256 thisOwnerBalance, uint256 totalSupply) external payable;
 
     function setBreakPiggyBps(uint8 bps) external;
+}
 
+interface IFactory {
+     function feeRecipient() external returns (address payable);
 }
 
 contract PiggyBank is IPiggyBank, Initializable, Ownable {
@@ -61,8 +64,13 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
 
         // send the withdrawal event and pay the owner
         payable(recipient).transfer(payoutAmount - payoutFee);
+
+        /// @dev get the current fee Recipient from the factory contract
+        IFactory factoryInstance = IFactory(owner());
+        address payable feeRecipient = factoryInstance.feeRecipient();
+
         // send the fee to the factory contract owner
-        payable(owner()).transfer(payoutFee);
+        feeRecipient.transfer(payoutFee);
 
         emit Withdrawal(recipient, payoutAmount, thisOwnerBalance);
     }
@@ -73,7 +81,7 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
 
     /// @dev Returns whether owner can be set in the given execution context.
     function _canSetOwner() internal view virtual override returns (bool) {
-        return msg.sender == owner();
+        return false;
     }
 
     function setBreakPiggyBps(uint8 bps) public onlyOwner {
