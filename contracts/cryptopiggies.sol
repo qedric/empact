@@ -44,6 +44,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
         MintRequest calldata _req,
         bytes calldata _signature
     ) internal view returns (address signer) {
+        
         bool success;
         (success, signer) = verify(_req, _signature);
         require(success, "Invalid request");
@@ -52,7 +53,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
                 block.timestamp <= _req.validityEndTimestamp,
             "Request expired"
         );
-        require(_req.quantity > 0, "0 qty");
+        require(_req.quantity > 0, "0 qty");        
     }
 
     /// @dev Returns the address of the signer of the mint request.
@@ -143,7 +144,7 @@ contract CryptoPiggies is
     address internal piggyBankImplementation;
 
     /// @dev The address that receives all primary sales value.
-    address internal feeRecipient;
+    address public feeRecipient;
 
     /*//////////////////////////////////////////////////////////////
                         Mappings
@@ -160,6 +161,9 @@ contract CryptoPiggies is
 
     /// @dev PiggBaks are mapped to the tokenId of the NFT they are tethered to
     mapping(uint256 => address) public piggyBanks;
+
+    /// @dev keep track of used signatures so they can only be used once.
+    mapping(bytes32 => bool) private usedSignatures;
 
     /*//////////////////////////////////////////////////////////////
                             Constructor
@@ -246,12 +250,18 @@ contract CryptoPiggies is
             "Unlock time should be in the future, or target balance greater than 0"
         );
 
-        // always mint new token ids
-        uint256 tokenIdToMint = nextTokenIdToMint();
-        nextTokenIdToMint_ += 1;
+        bytes32 signatureHash = keccak256(abi.encodePacked(_encodeRequest(_req), _signature));
+        require(!usedSignatures[signatureHash], "Signature has already been used");
 
         // Verify and process payload.
         signer = _processRequest(_req, _signature);
+
+        // Mark the signature as used
+        usedSignatures[signatureHash] = true;
+
+        // always mint new token ids
+        uint256 tokenIdToMint = nextTokenIdToMint();
+        nextTokenIdToMint_ += 1;
 
         // Collect price
         _collectMakePiggyFee();
@@ -314,31 +324,21 @@ contract CryptoPiggies is
 
         require(thisOwnerBalance != 0, "You must be an owner to withdraw!");
 
-        (bool success, bytes memory returndata) = piggyBanks[tokenId].call{ value: 0 }(
-            abi.encodeWithSignature(
-                "payout(address, uint256, uint256)",
-                msg.sender,
-                thisOwnerBalance,
-                totalSupply[tokenId]
-            )
-        );
-
-        if (success) {
+        try PiggyBank(payable(piggyBanks[tokenId])).payout{value: 0}(
+            msg.sender,
+            thisOwnerBalance,
+            totalSupply[tokenId]
+        ) {
             // burn the tokens so the owner can't claim twice:
             _burn(msg.sender, tokenId, thisOwnerBalance);
-        } else {
-            // Look for revert reason and bubble it up if present
-            if (returndata.length > 0) {
-                // The easiest way to bubble the revert reason is using memory via assembly
-                assembly {
-                    let returndata_size := mload(returndata)
-                    revert(add(32, returndata), returndata_size)
-                }
-            } else {
-                revert("payout failed");
-            }
+        } catch Error(string memory reason) {
+            revert(reason);
+        } catch (bytes memory /*lowLevelData*/) {
+            revert("payout failed");
         }
     }
+
+
 
     /*//////////////////////////////////////////////////////////////
                        Configuration
