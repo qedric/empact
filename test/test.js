@@ -55,6 +55,8 @@ async function getTypedData(
   };
 }
 
+
+
 // `describe` is a Mocha function that allows you to organize your tests. It's
 // not actually needed, but having your tests organized makes debugging them
 // easier. All Mocha functions are available in the global scope.
@@ -62,7 +64,7 @@ async function getTypedData(
 // `describe` receives the name of a section of your test suite, and a callback.
 // The callback must define the tests of that section. This callback can't be
 // an async function.
-describe("CryptoPiggies", function () {
+describe("Testing CryptoPiggies", function () {
   // Mocha has four functions that let you hook into the the test runner's
   // lifecyle. These are: `before`, `beforeEach`, `after`, `afterEach`.
 
@@ -78,6 +80,50 @@ describe("CryptoPiggies", function () {
   let minter, newMinter, nonMinter
   let nFTOwner, nonNftOwner
   let newPrimarySaleRecipient
+
+  async function makePiggy() {
+  
+    // Generate a signature for the mint request
+    const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
+      // getBlock returns a block object and it has a timestamp property.
+      ethers.provider.getBlock(blockNumber).then(block => block.timestamp));
+    const endTime = Math.floor(timestamp + 60 * 60 * 24);
+    const unlockTime = Math.floor(timestamp + 60 * 60 * 24 * 99);
+    const targetBalance = ethers.utils.parseUnits("1", "ether").toString();
+    const makePiggyFee = ethers.utils.parseUnits("0.004", "ether");
+
+    const typedData = await getTypedData(
+      cryptoPiggies,
+      nFTOwner.address,
+      4,
+      timestamp,
+      endTime,
+      '4 Little Pigs',
+      'description',
+      'externalUrl',
+      'metadata',
+      unlockTime,
+      targetBalance
+    )
+
+    // Sign the typed data
+    const signature = await minter._signTypedData(
+      typedData.domain,
+      typedData.types,
+      typedData.message
+    );
+
+    // grant MINTER role to signer
+    await cryptoPiggies.grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
+    const tx = await cryptoPiggies.connect(nFTOwner).mintWithSignature(typedData.message, signature, { value: makePiggyFee });
+    const txReceipt = await tx.wait();
+
+    // const mintedEvent = txReceipt.events.find(event => event.event === 'TokensMintedWithSignature');
+    const piggyCreatedEvent = txReceipt.events.find(event => event.event === 'ProxyDeployed');
+
+    return piggyCreatedEvent.args.deployedProxy;
+
+  }
 
   // `beforeEach` will run before each test, re-deploying the contract every
   // time. It receives a callback, which can be async.
@@ -108,6 +154,7 @@ describe("CryptoPiggies", function () {
     
     //console.log('factory address:', cryptoPiggies.address)
     //console.log('piggyBank address:', piggyBankImplementation.address)
+
     // Wait for this transaction to be mined
     await cryptoPiggies.deployed();
 
@@ -122,7 +169,7 @@ describe("CryptoPiggies", function () {
 
     // If the callback function is async, Mocha will `await` it.
     it("Should set the right factory owner", async function () {
-      console.log('expected owner:', owner.address)
+
       // Expect receives a value, and wraps it in an Assertion object. These
       // objects have a lot of utility methods to assert values.
 
@@ -134,19 +181,33 @@ describe("CryptoPiggies", function () {
 
   describe("Permissions", function () {
 
-    /*beforeEach(async function () {
-      await cryptoPiggies.connect(owner).grantRole(DEFAULT_ADMIN_ROLE, owner.address);
-    });*/
+    beforeEach(async function () {
+      //await cryptoPiggies.connect(owner).grantRole(DEFAULT_ADMIN_ROLE, owner.address);
+    });
 
     it("should allow factory contract owner to grant an address the MINTER Role", async function () {
-      await cryptoPiggies.grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
+      await cryptoPiggies.connect(owner).grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
       const isMinter = await cryptoPiggies.hasRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
       assert(isMinter);
     });
 
     it("should fail if non factory contract owner tries to grant an address the MINTER Role", async function () {
-      await expect(cryptoPiggies.connect(newOwner).grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address)).to.be.revertedWith(
+      await expect(cryptoPiggies.connect(nonOwner).grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address)).to.be.revertedWith(
       /Permissions: account .* is missing role .*/);
+    });
+
+    it("should fail if non factory contract owner tries to grant an address the MINTER_ROLE", async function () {
+      const theTrueOwner = await cryptoPiggies.owner();
+      assert.notEqual(nonOwner.address, theTrueOwner, "nonOwner should not be the contract owner");
+
+      // You can also check if nonOwner doesn't have the MINTER_ROLE
+      const minterRole = await cryptoPiggies.MINTER_ROLE();
+      const hasMinterRole = await cryptoPiggies.hasRole(minterRole, nonOwner.address);
+      assert.isFalse(hasMinterRole, "nonOwner should not have the MINTER_ROLE");
+
+      await expect(cryptoPiggies.connect(nonOwner).grantRole(minterRole, minter.address)).to.be.revertedWith(
+        /Permissions: account .* is missing role .*/
+      );
     });
 
     it("should allow factory contract owner to revoke MINTER Role for a given address", async function () {
@@ -164,23 +225,32 @@ describe("CryptoPiggies", function () {
     });
 
     it("should allow factory contract owner to appoint a new owner", async function () {
+      const theTrueFirstOwner = await cryptoPiggies.owner();
+      assert.notEqual(newOwner.address, theTrueFirstOwner, "newOwner should not already be the contract owner");
+
       await cryptoPiggies.setOwner(newOwner.address);
-      const contractOwner = await cryptoPiggies.owner();
-      assert.equal(contractOwner, newOwner.address);
+      const theTrueNewOwner = await cryptoPiggies.owner();
+      assert.equal(theTrueNewOwner, newOwner.address);
     });
 
-    it("should fail if non factory contract owner to appoint a new owner", async function () {
+    it("should fail if non factory contract owner tries to appoint a new owner", async function () {
+      const theTrueFirstOwner = await cryptoPiggies.owner();
+      assert.notEqual(nonOwner.address, theTrueFirstOwner, "nonOwner should not be the contract owner");
      await expect(
         cryptoPiggies.connect(nonOwner).setOwner(newOwner.address),
-      ).to.be.revertedWith("Ownable: caller is not the owner");
+      ).to.be.revertedWith("Not authorized");
     });
 
     it("should fail if any account tries to change owner of a piggyBank", async function () {
+      
       // first make a piggy
+      const piggyAddy = makePiggy(cryptoPiggies, nFTOwner);
+      const PB = await ethers.getContractFactory('PiggyBank');
+      const piggy = await PB.attach(piggyAddy);
       
       await expect(
-        cryptoPiggies.connect(newOwner).setOwner(newOwner.address),
-      ).to.be.revertedWith("Ownable: caller is not the owner");
+        piggy.connect(owner).setOwner(newOwner.address),
+      ).to.be.revertedWith("Not authorized");
     });
 
   });
@@ -199,7 +269,7 @@ describe("CryptoPiggies", function () {
 
       const targetBalance = ethers.utils.parseUnits("1", "ether").toString();
 
-      const typedData = getTypedData(
+      const typedData = await getTypedData(
         cryptoPiggies,
         nFTOwner.address,
         22,
@@ -233,41 +303,47 @@ describe("CryptoPiggies", function () {
     });
 
     it("should allow a user to mint a new token with a signature", async () => {
-      // Generate a signature for the mint request
-      const nonce = await cryptoPiggies.getNonce(user1.address);
-      const digest = await cryptoPiggies.getDigest(
-        {
-          name: "Piggy 1",
-          description: "A cute little piggy",
-          externalUrl: "",
-          metadata: "",
-          targetBalance: 1,
-          unlockTime: Math.floor(Date.now() / 1000) + 86400,
-          quantity: 1,
-          to: user2.address,
-        },
-        nonce
-      );
-      const signature = await user1.signMessage(ethers.utils.arrayify(digest));
 
-      // Mint a new token with the signature
-      await cryptoPiggies.connect(user2).mintWithSignature(
-        {
-          name: "Piggy 1",
-          description: "A cute little piggy",
-          externalUrl: "",
-          metadata: "",
-          targetBalance: 1,
-          unlockTime: Math.floor(Date.now() / 1000) + 86400,
-          quantity: 1,
-          to: user2.address,
-        },
-        signature
+      // Generate a signature for the mint request
+      const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
+        // getBlock returns a block object and it has a timestamp property.
+        ethers.provider.getBlock(blockNumber).then(block => block.timestamp));
+
+      const endTime = Math.floor(timestamp + 60 * 60 * 24);
+      const unlockTime = Math.floor(timestamp + 60 * 60 * 24 * 99);
+      const targetBalance = ethers.utils.parseUnits("1", "ether").toString();
+
+      const makePiggyFee = ethers.utils.parseUnits("0.004", "ether");
+
+      const typedData = await getTypedData(
+        cryptoPiggies,
+        nFTOwner.address,
+        4,
+        timestamp,
+        endTime,
+        '4 Little Pigs',
+        'description',
+        'externalUrl',
+        'metadata',
+        unlockTime,
+        targetBalance
+      )
+
+      // Sign the typed data
+      const signature = await minter._signTypedData(
+        typedData.domain,
+        typedData.types,
+        typedData.message
       );
+
+      // grant MINTER role to signer
+      await cryptoPiggies.grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
+
+      const tx = await cryptoPiggies.connect(nFTOwner).mintWithSignature(typedData.message, signature, { value: makePiggyFee });
 
       // Verify that the token was minted and assigned to the correct recipient
-      const balance = await cryptoPiggies.balanceOf(user2.address, 1);
-      expect(balance).to.equal(1);
+      const balance = await cryptoPiggies.balanceOf(nFTOwner.address, 0);
+      expect(balance).to.equal(4);
     });
 
     it("should allow a user to define custom attributes in their mint request", async function () {});
@@ -314,7 +390,6 @@ describe("CryptoPiggies", function () {
       const metadata = ',{"display_type":"boost_number","trait_type":"Test value","value":40},{"display_type":"boost_percentage","trait_type":"Test percentage","value": 10}';
       const targetBalance = ethers.utils.parseUnits("1", "ether").toString();
       const makePiggyFee = ethers.utils.parseUnits("0.004", "ether");
-      console.log('makePiggyFee:', makePiggyFee)
 
       const typedData = await getTypedData(
         cryptoPiggies,
@@ -349,7 +424,6 @@ describe("CryptoPiggies", function () {
       );
 
       const initialBalance = await ethers.provider.getBalance(owner.address);
-      console.log('initialBalance:', initialBalance)
 
       const tx = await cryptoPiggies.connect(nFTOwner).mintWithSignature(typedData.message, signature, { value: makePiggyFee });
       
@@ -365,7 +439,6 @@ describe("CryptoPiggies", function () {
       console.log('expectedBalanceChange:', expectedBalanceChange)*/
 
       const newBalance = await ethers.provider.getBalance(owner.address);
-      console.log('newBalance:', newBalance)
 
       expect(newBalance.sub(initialBalance)).to.equal(makePiggyFee);
 

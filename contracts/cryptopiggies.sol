@@ -159,7 +159,7 @@ contract CryptoPiggies is
     mapping(uint256 => IPiggyBank.Attr) internal _attributes;
 
     /// @dev PiggBaks are mapped to the tokenId of the NFT they are tethered to
-    mapping(uint256 => address) internal _receiveAddresses;
+    mapping(uint256 => address) public piggyBanks;
 
     /*//////////////////////////////////////////////////////////////
                             Constructor
@@ -199,7 +199,7 @@ contract CryptoPiggies is
                             '","image_data":"',
                             Utils.getSvg(
                                 _attributes[tokenId].name,
-                                _receiveAddresses[tokenId],
+                                piggyBanks[tokenId],
                                 _attributes[tokenId].targetBalance,
                                 _attributes[tokenId].unlockTime
                             ),
@@ -213,7 +213,7 @@ contract CryptoPiggies is
                             Utils.convertWeiToEthString(_attributes[tokenId].targetBalance),
                             ' ETH"},{"trait_type":"Receive Address","value":"',
                             Utils.toAsciiString(
-                                address(_receiveAddresses[tokenId])
+                                address(piggyBanks[tokenId])
                             ),
                             '"}',
                             _attributes[tokenId].metadata,
@@ -278,7 +278,7 @@ contract CryptoPiggies is
         );
     
         // deploy a separate proxy contract to hold the token's ETH; add its address to the attributes
-        _receiveAddresses[tokenIdToMint] = _deployProxyByImplementation(piglet, bytes32(tokenIdToMint));
+        piggyBanks[tokenIdToMint] = _deployProxyByImplementation(piglet, bytes32(tokenIdToMint));
 
         // Set token data
         _attributes[tokenIdToMint] = piglet;
@@ -314,7 +314,7 @@ contract CryptoPiggies is
 
         require(thisOwnerBalance != 0, "You must be an owner to withdraw!");
 
-        (bool success, bytes memory returndata) = _receiveAddresses[tokenId].call{ value: 0 }(
+        (bool success, bytes memory returndata) = piggyBanks[tokenId].call{ value: 0 }(
             abi.encodeWithSignature(
                 "payout(address, uint256, uint256)",
                 msg.sender,
@@ -351,7 +351,7 @@ contract CryptoPiggies is
 
     /// @notice Sets the fee for withdrawing the funds from a PiggyBank
     function setBreakPiggyBps(uint256 tokenId, uint8 bps) public onlyOwner {
-        IPiggyBank(_receiveAddresses[tokenId]).setBreakPiggyBps(bps);
+        IPiggyBank(piggyBanks[tokenId]).setBreakPiggyBps(bps);
     }
 
     /**
