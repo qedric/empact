@@ -159,7 +159,7 @@ contract CryptoPiggies is
     /// @dev Stores the info for each piggy
     mapping(uint256 => IPiggyBank.Attr) internal _attributes;
 
-    /// @dev PiggBaks are mapped to the tokenId of the NFT they are tethered to
+    /// @dev PiggyBanks are mapped to the tokenId of the NFT they are tethered to
     mapping(uint256 => address) public piggyBanks;
 
     /// @dev keep track of used signatures so they can only be used once.
@@ -338,19 +338,22 @@ contract CryptoPiggies is
         }
     }
 
-
-
     /*//////////////////////////////////////////////////////////////
                        Configuration
     //////////////////////////////////////////////////////////////*/
 
+    // Fallback function to prevent accidentally sending ETH
+    receive() external payable {
+        require(false, "Do not send ETH directly to this contract");
+    }
+
     /// @notice Sets the fee for creating a new piggyBank
-    function setMakePiggyFee(uint256 fee) public onlyOwner {
+    function setMakePiggyFee(uint256 fee) external onlyOwner {
         makePiggyFee = fee;
     }
 
     /// @notice Sets the fee for withdrawing the funds from a PiggyBank
-    function setBreakPiggyBps(uint256 tokenId, uint8 bps) public onlyOwner {
+    function setBreakPiggyBps(uint256 tokenId, uint8 bps) external onlyOwner {
         IPiggyBank(piggyBanks[tokenId]).setBreakPiggyBps(bps);
     }
 
@@ -358,7 +361,7 @@ contract CryptoPiggies is
      *  @notice         Updates recipient of make & break piggy fees.
      *  @param _feeRecipient   Address to be set as new recipient of primary sales.
      */
-    function setFeeRecipient(address _feeRecipient) public onlyOwner {
+    function setFeeRecipient(address _feeRecipient) external onlyOwner {
         feeRecipient = _feeRecipient;
         emit FeeRecipientUpdated(_feeRecipient);
     }

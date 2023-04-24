@@ -54,6 +54,14 @@ async function getTypedData(
   };
 }
 
+function getRevertReason(error) {
+  const startIndex = error.message.indexOf("reverted with reason string '") + "reverted with reason string '".length;
+  const endIndex = error.message.length - 1;
+  let errorMessage = error.message.slice(startIndex, endIndex);
+  errorMessage = errorMessage.slice(0, errorMessage.indexOf("'"));
+  return errorMessage;
+}
+
 // `describe` is a Mocha function that allows you to organize your tests. It's
 // not actually needed, but having your tests organized makes debugging them
 // easier. All Mocha functions are available in the global scope.
@@ -772,10 +780,33 @@ describe("Testing CryptoPiggies", function () {
       expect(piggyBalance).to.equal(amountToSend);
     });
 
-    it("should fail when sending non-native tokens to the factory contract", async function () {});
+    it("should fail when sending non-native tokens to the factory contract", async function () {
+      const piggyAddress = await makePiggy();
+      await expect(cryptoPiggies.connect(nftOwner).safeTransferFrom(nftOwner.address, piggyAddress, 0, 2, "0x")).to.be.revertedWith("!ERC1155RECEIVER");
+    });
 
-    it("should transfer a quantity of tokens from one holder to another", async function () {});
+    it("should transfer a quantity of tokens from one holder to another", async function () {
+      const piggyAddress = await makePiggy();
+      await cryptoPiggies.connect(nftOwner).safeTransferFrom(nftOwner.address, newOwner.address, 0, 2, "0x")
+      expect(await cryptoPiggies.balanceOf(newOwner.address, 0)).to.equal(2);
+    });
 
-    it("should withdraw balance of the factory contract to owner's address", async function () {});
+    it("should not allow anyone to send ETH to the cryptoPiggies contract", async function () {
+      try {
+        await owner.sendTransaction({
+          to: cryptoPiggies.address,
+          value: ethers.utils.parseEther("1.2345"),
+        });
+
+        assert.fail("Expected the transaction to revert");
+      } catch (error) {
+        const revertReason = getRevertReason(error);
+        assert.equal(
+          revertReason,
+          "Do not send ETH directly to this contract"
+        );
+      }
+
+    });
   });
 });
