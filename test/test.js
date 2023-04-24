@@ -419,9 +419,7 @@ describe("Testing CryptoPiggies", function () {
       await expect(cryptoPiggies.connect(nftOwner).mintWithSignature(
         typedData.message, signature, { value: makePiggyFee })).to.be.revertedWith("Signature has already been used");
 
-    });
-
-    it("should allow a user to define custom attributes in their mint request", async function () {console.log('NOT IMPLEMENTED')});
+    });    
 
     it("should fail if a user sets unlock date in the past AND targetbalance <= 0", async function () {
       // grant MINTER role to signer
