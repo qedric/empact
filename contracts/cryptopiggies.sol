@@ -138,7 +138,7 @@ contract CryptoPiggies is
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     /// @notice The fee to create a new Piggy.
-    uint256 public makePiggy_fee = 0.004 ether;
+    uint256 public makePiggyFee = 0.004 ether;
 
     /// @notice The PiggyBank implementation contract that is cloned for each new piggy
     address internal piggyBankImplementation;
@@ -346,7 +346,7 @@ contract CryptoPiggies is
 
     /// @notice Sets the fee for creating a new piggyBank
     function setMakePiggyFee(uint256 fee) public onlyOwner {
-        makePiggy_fee = fee;
+        makePiggyFee = fee;
     }
 
     /// @notice Sets the fee for withdrawing the funds from a PiggyBank
@@ -481,17 +481,17 @@ contract CryptoPiggies is
 
     /// @dev Collects and distributes the primary sale value of NFTs being claimed.
     function _collectMakePiggyFee() internal virtual {
-        if (makePiggy_fee == 0) {
+        if (makePiggyFee == 0) {
             return;
         }
 
-        require(msg.value == makePiggy_fee, "Must send the fee");
+        require(msg.value == makePiggyFee, "Must send the correct fee");
         
         CurrencyTransferLib.transferCurrency(
             CurrencyTransferLib.NATIVE_TOKEN,
             msg.sender,
             feeRecipient,
-            makePiggy_fee
+            makePiggyFee
         );
     }
 }

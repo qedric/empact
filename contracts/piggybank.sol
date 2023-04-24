@@ -33,12 +33,12 @@ interface IFactory {
 contract PiggyBank is IPiggyBank, Initializable, Ownable {
     
     Attr public attributes;
-    uint8 public breakPiggy_fee_Bps;
+    uint8 public breakPiggyFeeBps;
 
     function initialize(Attr calldata _data) public initializer {
         _setupOwner(msg.sender);
         attributes = _data;
-        breakPiggy_fee_Bps = 4;
+        breakPiggyFeeBps = 4;
         emit PiggyInitialised(_data);
     }
 
@@ -60,7 +60,7 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
         // calculate the amount owed
         uint256 payoutAmount = (address(this).balance *
             thisOwnerBalance) / totalSupply;
-        uint256 payoutFee = (payoutAmount * breakPiggy_fee_Bps) / 100;
+        uint256 payoutFee = (payoutAmount * breakPiggyFeeBps) / 100;
 
         // send the withdrawal event and pay the owner
         payable(recipient).transfer(payoutAmount - payoutFee);
@@ -86,6 +86,6 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
 
     function setBreakPiggyBps(uint8 bps) public onlyOwner {
         require(bps <= 9, "Don't be greedy!");
-        breakPiggy_fee_Bps = bps;
+        breakPiggyFeeBps = bps;
     }
 }

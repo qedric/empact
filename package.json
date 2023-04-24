@@ -8,7 +8,6 @@
   "devDependencies": {
     "@nomiclabs/hardhat-waffle": "^2.0.3",
     "chai": "^4.3.7",
-    "ethereum-waffle": "^4.0.9",
     "ethers": "^5.4",
     "hardhat": "^2.12.6"
   },
@@ -17,7 +16,7 @@
     "@nomiclabs/hardhat-etherscan": "^3.1.6",
     "@openzeppelin/contracts": "^4.8.1",
     "@openzeppelin/contracts-upgradeable": "^4.8.1",
-    "@thirdweb-dev/contracts": "^3",
+    "@thirdweb-dev/contracts": "^3.4.5",
     "dotenv": "^16.0.3"
   }
 }

@@ -76,7 +76,7 @@ describe("Testing CryptoPiggies", function () {
   let owner, newOwner, nonOwner
   let minter, newMinter, nonMinter
   let nftOwner, nonNftOwner
-  let newPrimarySaleRecipient
+  let feeRecipient, newFeeRecipient
 
   async function makePiggy(
     to = nftOwner.address,
@@ -86,7 +86,8 @@ describe("Testing CryptoPiggies", function () {
     externalUrl = "externalUrl",
     metadata = "metadata",
     unlockTimeDays = 99,
-    targetBalanceETH = "1"
+    targetBalanceETH = "1",
+    feeToSend = "0.004"
   ) {
   
     // Generate a signature for the mint request
@@ -96,7 +97,7 @@ describe("Testing CryptoPiggies", function () {
     const endTime = Math.floor(timestamp + 60); // 1 minute later
     const unlockTime = Math.floor(timestamp + 60 * 60 * 24 * unlockTimeDays);
     const targetBalance = ethers.utils.parseUnits(targetBalanceETH, "ether").toString();
-    const makePiggyFee = ethers.utils.parseUnits("0.004", "ether");
+    const makePiggyFee = ethers.utils.parseUnits(feeToSend, "ether");
 
     const typedData = await getTypedData(
       cryptoPiggies,
@@ -119,8 +120,11 @@ describe("Testing CryptoPiggies", function () {
       typedData.message
     );
 
-    // grant MINTER role to signer
-    await cryptoPiggies.grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
+    const minterRole = cryptoPiggies.MINTER_ROLE()
+    // grant MINTER role to signer (if not already granted)
+    if (!(await cryptoPiggies.hasRole(minterRole, minter.address))) {
+        await cryptoPiggies.grantRole(minterRole, minter.address);
+    }
     const tx = await cryptoPiggies.connect(nftOwner).mintWithSignature(typedData.message, signature, { value: makePiggyFee });
     const txReceipt = await tx.wait();
 
@@ -134,8 +138,6 @@ describe("Testing CryptoPiggies", function () {
     console.log(attributes)*/
 
     return piggyCreatedEvent.args.deployedProxy;
-
-
 
   }
 
@@ -543,7 +545,7 @@ describe("Testing CryptoPiggies", function () {
   describe("Burning", function () {
 
     beforeEach(async function () {
-      const piggyBankAddress = makePiggy(nftOwner.address,100,"Test Burning","100 Piggies",'','',0,'1');
+      const piggyBankAddress = makePiggy(nftOwner.address,100,"Test Burning","100 Piggies",'','',0,'1','0.004');
       //send 1 ETH
       await nftOwner.sendTransaction({ to: piggyBankAddress, value: ethers.utils.parseEther("1") });      
     });
@@ -670,19 +672,105 @@ describe("Testing CryptoPiggies", function () {
 
      });
 
-     it("should pay the BreakPiggyFee to the fee recipient with each payout", async function () {});
+     it("should pay the BreakPiggyFee to the fee recipient with each payout", async function () {
+      const initialFeeRecipientBalance = await ethers.provider.getBalance(feeRecipient.address);
 
-     it("should change the MakePiggyFee", async function () {});
+      // first make a piggy
+      const piggyAddy = makePiggy(
+        nftOwner.address,
+        4,
+        "4 Little Pigs",
+        "description",
+        "externalUrl",
+        "metadata",
+        0,
+        "1"
+      );
 
-     it("should change the BreakPiggyFee", async function () {});
+      // Define the amount of ETH you want to send (in wei)
+      const amountToSend = ethers.utils.parseEther("1"); // 1 ETH
 
-     it("should fail when trying to mint a piggy sending less than the MakePiggyFee", async function () {});
+      // send some ETH to the piggy
+      await nonOwner.sendTransaction({
+        to: piggyAddy,
+        value: amountToSend,
+      });
 
-     it("should fail when trying to set the BreakPiggyFee higher than the max allowed", async function () {});   
+      await cryptoPiggies.connect(nftOwner).payout(0);
+      const newBalance = await cryptoPiggies.balanceOf(nftOwner.address, 0);
+      expect(newBalance).to.equal(0);
+
+      // Calculate the expected BreakPiggyFee paid to the fee recipient
+      const breakPiggyFeeBPS = 400;
+      let expectedFee = amountToSend.mul(breakPiggyFeeBPS).div(10000); // 4% of 1 ETH
+      // don't forget the makePiggyFee
+      expectedFee = expectedFee.add(ethers.utils.parseEther("0.004"));
+
+      // Check the fee recipient's balance after the payout
+      const finalFeeRecipientBalance = await ethers.provider.getBalance(feeRecipient.address);
+      expect(finalFeeRecipientBalance.sub(initialFeeRecipientBalance)).to.equal(expectedFee);
+     });
+
+     it("should change the MakePiggyFee", async function () {
+
+      const newMakePiggyFee = ethers.utils.parseEther("0.02");
+
+      await cryptoPiggies.setMakePiggyFee(newMakePiggyFee);
+      const updatedMakePiggyFee = await cryptoPiggies.makePiggyFee();
+
+      expect(updatedMakePiggyFee).to.equal(newMakePiggyFee);
+     });
+
+     it("should change the BreakPiggyFee", async function () {
+      // Use the helper function to create a new piggy contract
+      const piggyAddress = await makePiggy();
+      const PB = await ethers.getContractFactory('PiggyBank');
+      const piggyBank = await PB.attach(piggyAddress);
+
+      const newBreakPiggyFee = 2;
+
+      await cryptoPiggies.setBreakPiggyBps(0, newBreakPiggyFee);
+      const updatedBreakPiggyFee = await piggyBank.breakPiggyFeeBps();
+
+      expect(updatedBreakPiggyFee).to.equal(newBreakPiggyFee);
+     });
+
+     it("should fail when trying to mint a piggy sending less than the MakePiggyFee", async function () {
+      await expect(makePiggy(nftOwner.address,44,"44 Little Pigs","description","externalUrl","metadata",0,"1","0.003")).to.be.revertedWith("Must send the correct fee");
+     });
+
+     it("should fail when trying to set the BreakPiggyFee higher than the max allowed", async function () {
+      // Use the helper function to create a new piggy contract
+      const piggyAddress = await makePiggy();
+      const PB = await ethers.getContractFactory('PiggyBank');
+      const piggyBank = await PB.attach(piggyAddress);
+
+      const newBreakPiggyFee = 10;
+
+      await expect(cryptoPiggies.setBreakPiggyBps(0, newBreakPiggyFee)).to.be.revertedWith("Don't be greedy!");
+     });   
 
   });
 
   describe("Transactions", function () {
+
+    it("should be able to send ETH to the piggy contract", async function () {
+      // Use the helper function to create a new piggy contract
+      const piggyAddress = await makePiggy();
+
+      // Define the amount of ETH you want to send (in wei)
+      const amountToSend = ethers.utils.parseEther("1.2345");
+
+      // Send the ETH to the piggy contract
+      await nonOwner.sendTransaction({
+        to: piggyAddress,
+        value: amountToSend,
+      });
+
+      // Check the piggy contract balance
+      const piggyBalance = await ethers.provider.getBalance(piggyAddress);
+      expect(piggyBalance).to.equal(amountToSend);
+    });
 
     it("should fail when sending non-native tokens to the factory contract", async function () {});
 
