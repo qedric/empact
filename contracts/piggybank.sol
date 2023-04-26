@@ -34,6 +34,7 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
     
     Attr public attributes;
     uint8 public breakPiggyFeeBps;
+    bool private _targetReached = false;
 
     function initialize(Attr calldata _data) public initializer {
         _setupOwner(msg.sender);
@@ -52,10 +53,9 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
             "You can't withdraw yet"
         );
         require(
-            address(this).balance >= attributes.targetBalance,
+            _targetReached,
             "Piggy is still hungry!"
         );
-        require(address(this).balance > 0, "Piggy has nothing to give!");
 
         // calculate the amount owed
         uint256 payoutAmount = (address(this).balance *
@@ -77,6 +77,9 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
 
     receive() external payable {
         emit Received(msg.sender, msg.value);
+        if (!_targetReached && address(this).balance >= attributes.targetBalance) {
+            _targetReached = true;
+        }
     }
 
     /// @dev Returns whether owner can be set in the given execution context.

@@ -322,7 +322,7 @@ contract CryptoPiggies is
 
         uint256 thisOwnerBalance = balanceOf[msg.sender][tokenId];
 
-        require(thisOwnerBalance != 0, "You must be an owner to withdraw!");
+        require(thisOwnerBalance != 0, "Not authorised!");
 
         try PiggyBank(payable(piggyBanks[tokenId])).payout{value: 0}(
             msg.sender,
