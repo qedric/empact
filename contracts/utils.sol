@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.11;
+import "@openzeppelin/contracts/utils/Base64.sol";
 
 struct Attr { 
     uint256 tokenId;

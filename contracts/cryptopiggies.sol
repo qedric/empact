@@ -264,9 +264,6 @@ contract CryptoPiggies is
         uint256 tokenIdToMint = nextTokenIdToMint();
         nextTokenIdToMint_ += 1;
 
-        // Collect price
-        _collectMakePiggyFee();
-
         /*
         struct Attr {
             uint256 tokenId;
@@ -287,17 +284,20 @@ contract CryptoPiggies is
             _req.unlockTime,
             _req.targetBalance
         );
+
+        // Set token data
+        _attributes[tokenIdToMint] = piglet;
     
         // deploy a separate proxy contract to hold the token's ETH; add its address to the attributes
         piggyBanks[tokenIdToMint] = _deployProxyByImplementation(piglet, bytes32(tokenIdToMint));
 
-        // Set token data
-        _attributes[tokenIdToMint] = piglet;
-
         // Mint tokens.
-        _mint(_req.to, tokenIdToMint, _req.quantity, "");
-
         emit TokensMintedWithSignature(signer, _req.to, tokenIdToMint);
+        _mint(_req.to, tokenIdToMint, _req.quantity, "");
+        
+        // Collect price
+        _collectMakePiggyFee();
+        
     }
 
     /// @dev Every time a new token is minted, a PiggyBank proxy contract is deployed to hold the funds
@@ -325,13 +325,18 @@ contract CryptoPiggies is
 
         require(thisOwnerBalance != 0, "Not authorised!");
 
+        // get the total supply before burning
+        uint256 totalSupplyBeforePayout = totalSupply[tokenId];
+
+        // burn the tokens so the owner can't claim twice
+        _burn(msg.sender, tokenId, thisOwnerBalance);
+
         try PiggyBank(payable(piggyBanks[tokenId])).payout{value: 0}(
             msg.sender,
             thisOwnerBalance,
-            totalSupply[tokenId]
+            totalSupplyBeforePayout
         ) {
-            // burn the tokens so the owner can't claim twice:
-            _burn(msg.sender, tokenId, thisOwnerBalance);
+            
         } catch Error(string memory reason) {
             revert(reason);
         } catch (bytes memory /*lowLevelData*/) {
