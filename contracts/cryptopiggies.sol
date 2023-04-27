@@ -12,6 +12,7 @@ import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
+import "@openzeppelin/contracts/utils/Base64.sol";
 import "./utils.sol";
 import "./piggybank.sol";
 
