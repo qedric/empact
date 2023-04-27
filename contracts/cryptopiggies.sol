@@ -128,6 +128,9 @@ contract CryptoPiggies is
     /// @dev Emitted when a new sale recipient is set.
     event FeeRecipientUpdated(address indexed recipient);
 
+    /// @dev Emitted when the makePiggyFee is updated.
+    event MakePiggyFeeUpdated(uint256 fee);
+
     /*//////////////////////////////////////////////////////////////
                         State variables
     //////////////////////////////////////////////////////////////*/
@@ -142,7 +145,7 @@ contract CryptoPiggies is
     uint256 public makePiggyFee = 0.004 ether;
 
     /// @notice The PiggyBank implementation contract that is cloned for each new piggy
-    address internal piggyBankImplementation;
+    address public immutable piggyBankImplementation;
 
     /// @dev The address that receives all primary sales value.
     address public feeRecipient;
@@ -356,6 +359,7 @@ contract CryptoPiggies is
     /// @notice Sets the fee for creating a new piggyBank
     function setMakePiggyFee(uint256 fee) external onlyOwner {
         makePiggyFee = fee;
+        emit MakePiggyFeeUpdated(fee);
     }
 
     /// @notice Sets the fee for withdrawing the funds from a PiggyBank

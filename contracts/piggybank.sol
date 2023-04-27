@@ -18,6 +18,7 @@ interface IPiggyBank {
     event PiggyInitialised(Attr attributes);
     event Received(address _from, uint _amount);
     event Withdrawal(address who, uint amount, uint balance);
+    event BreakPiggyBpsUpdated(uint8 bps);
 
     function initialize(Attr calldata _data) external;
 
@@ -90,5 +91,6 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
     function setBreakPiggyBps(uint8 bps) public onlyOwner {
         require(bps <= 9, "Don't be greedy!");
         breakPiggyFeeBps = bps;
+        emit BreakPiggyBpsUpdated(bps);
     }
 }
