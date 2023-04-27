@@ -50,7 +50,7 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
         uint256 totalSupply
     ) external payable onlyOwner {
         require(
-            block.timestamp >= attributes.unlockTime,
+            block.timestamp > attributes.unlockTime,
             "You can't withdraw yet"
         );
         require(
@@ -59,11 +59,12 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
         );
 
         // calculate the amount owed
-        uint256 payoutAmount = (address(this).balance *
-            thisOwnerBalance) / totalSupply;
-        uint256 payoutFee = (payoutAmount * breakPiggyFeeBps) / 100;
+        uint256 payoutAmount = address(this).balance * thisOwnerBalance / totalSupply;
+        uint256 payoutFee = payoutAmount * breakPiggyFeeBps / 100;
 
         // send the withdrawal event and pay the owner
+        emit Withdrawal(recipient, payoutAmount, thisOwnerBalance);
+
         payable(recipient).transfer(payoutAmount - payoutFee);
 
         /// @dev get the current fee Recipient from the factory contract
@@ -72,8 +73,7 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
 
         // send the fee to the factory contract owner
         feeRecipient.transfer(payoutFee);
-
-        emit Withdrawal(recipient, payoutAmount, thisOwnerBalance);
+        
     }
 
     receive() external payable {
