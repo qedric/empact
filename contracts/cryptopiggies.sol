@@ -112,7 +112,8 @@ contract CryptoPiggies is
     Multicall,
     DefaultOperatorFilterer, 
     SignaturePiggyMintERC1155,
-    PermissionsEnumerable
+    PermissionsEnumerable,
+    ICPFactory
 {
     using TWStrings for uint256;
 
@@ -121,15 +122,14 @@ contract CryptoPiggies is
     //////////////////////////////////////////////////////////////*/
 
     event ProxyDeployed(
-        address deployedProxy,
-        address msgSender
+        address indexed deployedProxy,
+        address indexed msgSender
     );
 
-    /// @dev Emitted when a new sale recipient is set.
     event FeeRecipientUpdated(address indexed recipient);
-
-    /// @dev Emitted when the makePiggyFee is updated.
     event MakePiggyFeeUpdated(uint256 fee);
+    event BreakPiggyBpsUpdated(uint16 bps);
+    event PiggyBankImplementationUpdated(address indexed implementation);
 
     /*//////////////////////////////////////////////////////////////
                         State variables
@@ -144,11 +144,14 @@ contract CryptoPiggies is
     /// @notice The fee to create a new Piggy.
     uint256 public makePiggyFee = 0.004 ether;
 
+    /// @notice The fee deducted with each withdrawal from a piggybank, in basis points
+    uint16 public breakPiggyFeeBps = 400;
+
     /// @notice The PiggyBank implementation contract that is cloned for each new piggy
-    address public immutable piggyBankImplementation;
+    IPiggyBank public piggyBankImplementation;
 
     /// @dev The address that receives all primary sales value.
-    address public feeRecipient;
+    address payable public feeRecipient;
 
     /*//////////////////////////////////////////////////////////////
                         Mappings
@@ -177,8 +180,7 @@ contract CryptoPiggies is
         string memory _symbol,
         address _royaltyRecipient,
         uint128 _royaltyBps,
-        address _feeRecipient,
-        address _piggyBankImplementation
+        address payable _feeRecipient
     ) ERC1155(_name, _symbol) {
         _setupOwner(msg.sender);
         _setupDefaultRoyaltyInfo(_royaltyRecipient, _royaltyBps);
@@ -186,7 +188,6 @@ contract CryptoPiggies is
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(MINTER_ROLE, msg.sender);
         feeRecipient = _feeRecipient;
-        piggyBankImplementation = _piggyBankImplementation;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -311,11 +312,11 @@ contract CryptoPiggies is
 
         bytes32 salthash = keccak256(abi.encodePacked(msg.sender, _salt));
         deployedProxy = Clones.cloneDeterministic(
-            piggyBankImplementation,
+            address(piggyBankImplementation),
             salthash
         );
 
-        IPiggyBank(deployedProxy).initialize(_piggyData);
+        IPiggyBank(deployedProxy).initialize(_piggyData, breakPiggyFeeBps);
 
         emit ProxyDeployed(deployedProxy, msg.sender);
     }
@@ -358,22 +359,33 @@ contract CryptoPiggies is
 
     /// @notice Sets the fee for creating a new piggyBank
     function setMakePiggyFee(uint256 fee) external onlyOwner {
-        makePiggyFee = fee;
         emit MakePiggyFeeUpdated(fee);
+        makePiggyFee = fee;
     }
 
-    /// @notice Sets the fee for withdrawing the funds from a PiggyBank
-    function setBreakPiggyBps(uint256 tokenId, uint8 bps) external onlyOwner {
-        IPiggyBank(piggyBanks[tokenId]).setBreakPiggyBps(bps);
+    /// @notice Sets the fee for withdrawing the funds from a PiggyBank - does not affect existing piggyBanks
+    function setBreakPiggyBps(uint16 bps) external onlyOwner {
+        require(bps <= 900, "Don't be greedy!");
+        emit BreakPiggyBpsUpdated(bps);
+        breakPiggyFeeBps = bps;
     }
 
     /**
      *  @notice         Updates recipient of make & break piggy fees.
      *  @param _feeRecipient   Address to be set as new recipient of primary sales.
      */
-    function setFeeRecipient(address _feeRecipient) external onlyOwner {
+    function setFeeRecipient(address payable _feeRecipient) external onlyOwner {
         feeRecipient = _feeRecipient;
         emit FeeRecipientUpdated(_feeRecipient);
+    }
+
+    /**
+     *  @notice         Sets an implementation for the piggyBank clones.
+     *                  ** Must be run after deployment! **
+     */
+    function setPiggyBankImplementation(IPiggyBank _piggyBankImplementation) external onlyOwner {
+        emit PiggyBankImplementationUpdated(address(_piggyBankImplementation));
+        piggyBankImplementation = _piggyBankImplementation;
     }
 
     /*//////////////////////////////////////////////////////////////

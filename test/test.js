@@ -165,7 +165,6 @@ describe("Testing CryptoPiggies", function () {
     const Utils = await ethers.getContractFactory("Utils");
     
     utils = await Utils.deploy();
-    piggyBankImplementation = await PiggyBankImplementation.deploy();
 
     const Factory = await ethers.getContractFactory("CryptoPiggies", {
       libraries: {
@@ -180,13 +179,23 @@ describe("Testing CryptoPiggies", function () {
     const _feeRecipient = feeRecipient.address;
 
     // deploy
-    cryptoPiggies = await Factory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _feeRecipient, piggyBankImplementation.address);
+    cryptoPiggies = await Factory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _feeRecipient);
     
+    // init the implementation
+    await cryptoPiggies.deployed();
+
+    piggyBankImplementation = await PiggyBankImplementation.deploy(cryptoPiggies.address);
+    await piggyBankImplementation.deployed();
+
+    //set the implementation in the contract
+    await cryptoPiggies.setPiggyBankImplementation(piggyBankImplementation.address);
+
+
     //console.log('factory address:', cryptoPiggies.address)
     //console.log('piggyBank address:', piggyBankImplementation.address)
 
     // Wait for this transaction to be mined
-    await cryptoPiggies.deployed();
+    
 
     // set permission
 
@@ -281,18 +290,6 @@ describe("Testing CryptoPiggies", function () {
        // Attempt to set a new fee recipient from a non-admin account
       await expect(
         cryptoPiggies.connect(nonOwner).setFeeRecipient(newFeeRecipient.address)
-      ).to.be.revertedWith("Not authorized");
-    });
-
-    it("should fail if any account tries to change owner of a piggyBank", async function () {
-      
-      // first make a piggy
-      const piggyAddy = makePiggy();
-      const PB = await ethers.getContractFactory('PiggyBank');
-      const piggy = await PB.attach(piggyAddy);
-      
-      await expect(
-        piggy.connect(owner).setOwner(newOwner.address),
       ).to.be.revertedWith("Not authorized");
     });
 
@@ -635,8 +632,10 @@ describe("Testing CryptoPiggies", function () {
 
   describe("Burning", function () {
 
+    let piggyBankAddress;
+
     beforeEach(async function () {
-      const piggyBankAddress = makePiggy(nftOwner.address,100,"Test Burning","100 Piggies",'','',0,'1','0.004');
+      piggyBankAddress = makePiggy(nftOwner.address,100,"Test Burning","100 Piggies",'','',0,'1','0.004');
       //send 1 ETH
       await nftOwner.sendTransaction({ to: piggyBankAddress, value: ethers.utils.parseEther("1") });      
     });
@@ -660,7 +659,11 @@ describe("Testing CryptoPiggies", function () {
     */
 
     it("should burn all of a holder's tokens when they execute the payout function", async function () {
+      
+      const piggyBank = await ethers.getContractAt("PiggyBank", piggyBankAddress);
+
       await cryptoPiggies.connect(nftOwner).payout(0);
+
       const newBalance = await cryptoPiggies.balanceOf(nftOwner.address, 0);
       expect(newBalance).to.equal(0);
     });
@@ -714,6 +717,18 @@ describe("Testing CryptoPiggies", function () {
       const gasCost = txReceipt.gasUsed.mul(txReceipt.effectiveGasPrice)
       
       //console.log('gasCost:', gasCost)
+
+      const clonedPiggyBank = await ethers.getContractAt("PiggyBank", piggyAddress);
+      const breakPiggyFeeBps = await clonedPiggyBank.breakPiggyFeeBps();
+      const attr = await clonedPiggyBank.attributes();
+      //console.log(attr);
+      //console.log("breakPiggyFeeBps:", breakPiggyFeeBps.toString());
+
+      const PB = await ethers.getContractFactory('PiggyBank');
+      const piggyBank = await PB.attach(piggyAddress);
+      const breakPiggyFee = await piggyBank.breakPiggyFeeBps();
+
+      //console.log('breakPiggyFeeBPS:', breakPiggyFee)
 
       //holder should receive all funds minus break fee and gas:
       const nftOwnerBalanceAfterPayout = await ethers.provider.getBalance(nftOwner.address);
@@ -1089,14 +1104,14 @@ describe("Testing CryptoPiggies", function () {
 
      it("should change the BreakPiggyFee", async function () {
       // Use the helper function to create a new piggy contract
-      const piggyAddress = await makePiggy();
+      /* const piggyAddress = await makePiggy();
       const PB = await ethers.getContractFactory('PiggyBank');
-      const piggyBank = await PB.attach(piggyAddress);
+      const piggyBank = await PB.attach(piggyAddress);*/
 
-      const newBreakPiggyFee = 2;
+      const newBreakPiggyFee = 200;
 
-      await cryptoPiggies.setBreakPiggyBps(0, newBreakPiggyFee);
-      const updatedBreakPiggyFee = await piggyBank.breakPiggyFeeBps();
+      await cryptoPiggies.setBreakPiggyBps(newBreakPiggyFee);
+      const updatedBreakPiggyFee = await cryptoPiggies.breakPiggyFeeBps();
 
       expect(updatedBreakPiggyFee).to.equal(newBreakPiggyFee);
      });
@@ -1106,14 +1121,9 @@ describe("Testing CryptoPiggies", function () {
      });
 
      it("should fail when trying to set the BreakPiggyFee higher than the max allowed", async function () {
-      // Use the helper function to create a new piggy contract
-      const piggyAddress = await makePiggy();
-      const PB = await ethers.getContractFactory('PiggyBank');
-      const piggyBank = await PB.attach(piggyAddress);
+      const newBreakPiggyFee = 901;
 
-      const newBreakPiggyFee = 10;
-
-      await expect(cryptoPiggies.setBreakPiggyBps(0, newBreakPiggyFee)).to.be.revertedWith("Don't be greedy!");
+      await expect(cryptoPiggies.setBreakPiggyBps(newBreakPiggyFee)).to.be.revertedWith("Don't be greedy!");
      });   
 
   });

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.11; 
-import "@thirdweb-dev/contracts/openzeppelin-presets/proxy/utils/Initializable.sol";
-import "@thirdweb-dev/contracts/extension/Ownable.sol";
+pragma solidity ^0.8.11;
+
+import "@thirdweb-dev/contracts/extension/Initializable.sol";
+
 
 interface IPiggyBank {
 
@@ -18,29 +19,40 @@ interface IPiggyBank {
     event PiggyInitialised(Attr attributes);
     event Received(address _from, uint _amount);
     event Withdrawal(address who, uint amount, uint balance);
-    event BreakPiggyBpsUpdated(uint8 bps);
 
-    function initialize(Attr calldata _data) external;
+    function initialize(Attr calldata _data, uint16 _breakPiggyBps) external;
 
     function payout(address recipient, uint256 thisOwnerBalance, uint256 totalSupply) external payable;
 
-    function setBreakPiggyBps(uint8 bps) external;
 }
 
-interface IFactory {
-     function feeRecipient() external returns (address payable);
+interface ICPFactory {
+     function feeRecipient() external view returns (address payable);
 }
 
-contract PiggyBank is IPiggyBank, Initializable, Ownable {
+contract PiggyBank is IPiggyBank, Initializable {
     
+    bool private _targetReached;
     Attr public attributes;
-    uint8 public breakPiggyFeeBps;
-    bool private _targetReached = false;
+    ICPFactory public immutable factory;
 
-    function initialize(Attr calldata _data) public initializer {
-        _setupOwner(msg.sender);
+    /// @notice Cannot be modified after initialisation
+    uint16 public breakPiggyFeeBps;
+
+    /// @notice Checks that the `msg.sender` is the factory.
+    modifier onlyFactory() {
+        require(msg.sender == address(factory), "onlyFactory");
+        _;
+    }
+
+    constructor(ICPFactory _factory) {
+        factory = _factory;
+        _disableInitializers();
+    }
+
+    function initialize(Attr calldata _data, uint16 _breakPiggyBps) external onlyFactory initializer {
         attributes = _data;
-        breakPiggyFeeBps = 4;
+        breakPiggyFeeBps = _breakPiggyBps;
         emit PiggyInitialised(_data);
     }
 
@@ -48,11 +60,13 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
         address recipient,
         uint256 thisOwnerBalance,
         uint256 totalSupply
-    ) external payable onlyOwner {
+    ) external payable onlyFactory {
+
         require(
             block.timestamp > attributes.unlockTime,
             "You can't withdraw yet"
         );
+        
         require(
             _targetReached,
             "Piggy is still hungry!"
@@ -60,7 +74,7 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
 
         // calculate the amount owed
         uint256 payoutAmount = address(this).balance * thisOwnerBalance / totalSupply;
-        uint256 payoutFee = payoutAmount * breakPiggyFeeBps / 100;
+        uint256 payoutFee = payoutAmount * breakPiggyFeeBps / 10000;
 
         // send the withdrawal event and pay the owner
         emit Withdrawal(recipient, payoutAmount, thisOwnerBalance);
@@ -68,8 +82,7 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
         payable(recipient).transfer(payoutAmount - payoutFee);
 
         /// @dev get the current fee Recipient from the factory contract
-        IFactory factoryInstance = IFactory(owner());
-        address payable feeRecipient = factoryInstance.feeRecipient();
+        address payable feeRecipient = factory.feeRecipient();
 
         // send the fee to the factory contract owner
         feeRecipient.transfer(payoutFee);
@@ -81,16 +94,5 @@ contract PiggyBank is IPiggyBank, Initializable, Ownable {
         if (!_targetReached && address(this).balance >= attributes.targetBalance) {
             _targetReached = true;
         }
-    }
-
-    /// @dev Returns whether owner can be set in the given execution context.
-    function _canSetOwner() internal view virtual override returns (bool) {
-        return false;
-    }
-
-    function setBreakPiggyBps(uint8 bps) public onlyOwner {
-        require(bps <= 9, "Don't be greedy!");
-        breakPiggyFeeBps = bps;
-        emit BreakPiggyBpsUpdated(bps);
     }
 }
