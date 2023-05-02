@@ -3,7 +3,6 @@ pragma solidity ^0.8.11;
 
 import "@thirdweb-dev/contracts/extension/Initializable.sol";
 
-
 interface IPiggyBank {
 
     struct Attr { 
@@ -17,7 +16,9 @@ interface IPiggyBank {
     }
 
     event PiggyInitialised(Attr attributes);
+
     event Received(address _from, uint _amount);
+    
     event Withdrawal(address who, uint amount, uint balance);
 
     function initialize(Attr calldata _data, uint16 _breakPiggyBps) external;
