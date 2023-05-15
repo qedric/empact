@@ -153,6 +153,9 @@ contract CryptoPiggies is
     /// @dev The address that receives all primary sales value.
     address payable public feeRecipient;
 
+    /// @notice the colours used to generate the SVG
+    Colours public svgColours;
+
     /*//////////////////////////////////////////////////////////////
                         Mappings
     //////////////////////////////////////////////////////////////*/
@@ -188,6 +191,12 @@ contract CryptoPiggies is
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(MINTER_ROLE, msg.sender);
         feeRecipient = _feeRecipient;
+        svgColours = Colours(
+            0xc1bfb3, // bg
+            0xf0b5d2, // fg
+            0x332429, // pbg
+            0xbf3a23  // pfg
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -206,11 +215,9 @@ contract CryptoPiggies is
                             '","description":"',
                             _attributes[tokenId].description,
                             '","image_data":"',
-                            Utils.getSvg(
-                                _attributes[tokenId].name,
-                                piggyBanks[tokenId],
-                                _attributes[tokenId].targetBalance,
-                                _attributes[tokenId].unlockTime
+                            Utils.generateSVG(
+                                svgColours,
+                                _getPercentage(tokenId)
                             ),
                             '","external_url":"',
                             _attributes[tokenId].externalUrl,
@@ -271,22 +278,24 @@ contract CryptoPiggies is
         /*
         struct Attr {
             uint256 tokenId;
+            uint256 unlockTime;
+            uint256 startTime;
+            uint256 targetBalance;
             string name;
             string description;
             string externalUrl;
             string metadata;
-            uint256 unlockTime;
-            uint256 targetBalance;
         }
         */
         IPiggyBank.Attr memory piglet = IPiggyBank.Attr(
             tokenIdToMint,
+            _req.unlockTime,
+            block.timestamp,
+            _req.targetBalance,
             _req.name,
             _req.description,
             _req.externalUrl,
-            _req.metadata,
-            _req.unlockTime,
-            _req.targetBalance
+            _req.metadata
         );
 
         // Set token data
@@ -300,8 +309,7 @@ contract CryptoPiggies is
         _mint(_req.to, tokenIdToMint, _req.quantity, "");
         
         // Collect price
-        _collectMakePiggyFee();
-        
+        _collectMakePiggyFee(); 
     }
 
     /// @dev Every time a new token is minted, a PiggyBank proxy contract is deployed to hold the funds
@@ -388,6 +396,17 @@ contract CryptoPiggies is
         piggyBankImplementation = _piggyBankImplementation;
     }
 
+    /**
+     * @dev Sets the SVG colours.
+     * @param bg Background colour.
+     * @param fg Foreground colour.
+     * @param pbg Piggy background colour.
+     * @param pfg Piggy foreground colour.
+     */
+    function setSvgColours(bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public onlyOwner {
+        svgColours = Colours(bg, fg, pbg, pfg);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             ERC165 Logic
     //////////////////////////////////////////////////////////////*/
@@ -450,9 +469,36 @@ contract CryptoPiggies is
     }
 
     /*//////////////////////////////////////////////////////////////
-                    Internal (overrideable) functions
+                    Internal / overrideable functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev calculates the percentage towards unlock based on time and target balance
+    function _getPercentage(uint256 tokenId) internal view returns (uint8 percentage) {
+
+        uint8 percentageBasedOnBalance = 0;
+        uint8 percentageBasedOnTime = 0;
+
+        // First calculate the percentage of targetBalance
+        if (address(piggyBanks[tokenId]).balance > 0) {
+            if (_attributes[tokenId].targetBalance > 0) {
+                uint256 balance = address(piggyBanks[tokenId]).balance;
+                percentageBasedOnBalance = uint8((balance * 100) / _attributes[tokenId].targetBalance);
+            }
+        }
+
+        // Then calculate the percentage to unlock date
+        if (_attributes[tokenId].unlockTime > _attributes[tokenId].startTime) {
+            uint256 currentTime = block.timestamp;
+            uint256 timeElapsed = currentTime - _attributes[tokenId].startTime;
+            uint256 totalTime = _attributes[tokenId].unlockTime - _attributes[tokenId].startTime;
+            percentageBasedOnTime = uint8((timeElapsed * 100) / totalTime);
+        }
+
+        // Return the lower value between percentageBasedOnBalance and percentageBasedOnTime
+        percentage = percentageBasedOnBalance < percentageBasedOnTime ? percentageBasedOnBalance : percentageBasedOnTime;
+    }
+
+    
     /// @dev Returns whether contract metadata can be set in the given execution context.
     function _canSetContractURI() internal view virtual override returns (bool) {
         return msg.sender == owner();

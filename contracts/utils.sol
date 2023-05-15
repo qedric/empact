@@ -2,14 +2,11 @@
 pragma solidity ^0.8.11;
 import "@openzeppelin/contracts/utils/Base64.sol";
 
-struct Attr { 
-    uint256 tokenId;
-    string name;
-    string description;
-    string externalUrl;
-    string metadata;
-    uint256 unlockTime;
-    uint256 targetBalance;
+struct Colours {
+    bytes3 bg;
+    bytes3 fg;
+    bytes3 pbg;
+    bytes3 pfg;
 }
 
 interface ISignatureMintERC1155 { 
@@ -70,104 +67,45 @@ interface ISignatureMintERC1155 {
 
 library Utils {
 
-    function getSvg(
-        string calldata name,
-        address piggyBank,
-        uint256 targetBalance,
-        uint256 unlockTime
-    ) public view returns (bytes memory) {
-        uint256 percentage = 0;
-        if (address(piggyBank).balance > 0 && targetBalance > 0) {
-            percentage = (address(piggyBank).balance * 100) / targetBalance;
-        }
-        string memory daysToGo; 
-        if (block.timestamp < unlockTime) {
-            daysToGo = uint2str(diffDays(block.timestamp, unlockTime));
-        } else {
-            daysToGo = "0";
-        }
-        
+    function generateSVG(Colours calldata c, uint8 percent) public pure returns (bytes memory) {
+
+        // Calculate the 'horizon' based on the percentage value
+        uint256 horizon = 1080 * (100 - percent) / 100;
+
         string memory markup = string(
             abi.encodePacked(
-                '<svg class="piggy" width="350" height="350" viewBox="0 0 512 456" xmlns="http://www.w3.org/2000/svg"><path d="M497.797 199.111H471.574C463.751 181.333 452.373 165.6 438.328 152.444L455.129 85.3333H426.683C400.549 85.3333 377.437 97.3333 361.792 115.822C355.036 114.844 348.369 113.778 341.347 113.778H227.564C158.762 113.778 101.426 162.667 88.1812 227.556H49.7797C36.6237 227.556 26.2233 215.556 28.89 201.956C30.8457 191.822 40.3571 184.889 50.6687 184.889H51.5576C54.491 184.889 56.8911 182.489 56.8911 179.556V161.778C56.8911 158.844 54.491 156.444 51.5576 156.444C26.2233 156.444 3.6446 174.578 0.444472 199.644C-3.46679 230.044 20.1786 256 49.7797 256H85.3367C85.3367 302.4 107.915 343.2 142.228 369.156V440.889C142.228 448.711 148.628 455.111 156.451 455.111H213.342C221.164 455.111 227.564 448.711 227.564 440.889V398.222H341.347V440.889C341.347 448.711 347.747 455.111 355.569 455.111H412.461C420.283 455.111 426.683 448.711 426.683 440.889V369.156C437.173 361.244 446.506 351.911 454.507 341.333H497.797C505.62 341.333 512.02 334.933 512.02 327.111V213.333C512.02 205.511 505.62 199.111 497.797 199.111ZM384.015 256C376.192 256 369.792 249.6 369.792 241.778C369.792 233.956 376.192 227.556 384.015 227.556C391.838 227.556 398.238 233.956 398.238 241.778C398.238 249.6 391.838 256 384.015 256ZM227.564 85.3333H341.347C346.147 85.3333 350.858 85.6889 355.481 86.0444C355.481 85.7778 355.569 85.6 355.569 85.3333C355.569 38.2222 317.346 0 270.233 0C223.12 0 184.896 38.2222 184.896 85.3333C184.896 87.2 185.341 88.9778 185.429 90.8444C198.941 87.3778 212.986 85.3333 227.564 85.3333Z" fill="#ffc0cb;"/><style>svg.piggy{background:linear-gradient(to top, #000 ',
-                uint2str(percentage)
+                '<svg id="Ebene_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080"><defs><style>.cls-1{fill:#',
+                    _bytes3ToHexString(c.bg),
+                    ';}.cls-2{fill:#',
+                    _bytes3ToHexString(c.fg),
+                    ';}.cls-3{fill:#',
+                    _bytes3ToHexString(c.pbg),
+                    ';}.cls-4{fill:#',
+                    _bytes3ToHexString(c.pfg),
+                    ';}</style></defs><rect class="cls-2" y="0" width="1080" height="1080"/><rect class="cls-1" y="',
+                    uint2str(horizon),
+                    '" width="1080" height="',
+                    uint2str(1080 - horizon),
+                    '"/><path class="cls-4" d="m536.13,889.18c-83.07-5.83-163.6-33.51-234.74-89.69-49.89-39.42-79.54-91.78-106.16-147.49-17.86-37.36-23.35-76.95-26.07-117.28-4.63-68.32,9.94-132.28,48.51-189.16,14.06-20.71,31.04-40.23,49.74-56.78,35.63-31.52,74.72-59.75,120.18-74.31,51.64-16.51,104.18-29.11,160.07-25.54,45.1,2.87,89.71,6.19,133.15,18.59,72.96,20.83,131.82,61.03,171.22,127.6,26.85,45.39,45.26,93.98,54.54,145.78,10.41,58.08,5.03,114.13-17.63,169.63-18.52,45.36-42.42,86.31-74.66,122.71-43.35,48.93-98.71,77.88-160.33,96.1-36.4,10.76-73.43,18.21-117.83,19.85"/><path class="cls-3" d="m783.12,513.76c-.95,50.12-45.99,96.71-96.96,98.59-59.39,2.17-104.4-32.33-116.86-67.57-11.65-32.9-13.83-76.75,18.19-107.52,34.97-33.59,73.23-47.55,120.55-34.71,27.83,7.55,47.1,25.83,60.12,50.09,9.99,18.62,17.94,38.79,14.97,61.11"/><path class="cls-3" d="m424.53,608.1c-50.46,7.02-108.91-56.43-110.22-102.51-1.81-64.03,55.07-117.91,119.14-111.34,46.74,4.81,77.2,32.58,88.33,80.6,12.78,55.07-5.46,98.29-52.85,125.13-15.25,8.65-18.95,9.33-44.4,8.12"/></svg>'
             )
         );
 
-        markup = string(abi.encodePacked(markup, "%, #6f397e91 "));
-        // linear-gradient value 2:
-        markup = string(
-            abi.encodePacked(markup, uint2str(percentage + 10))
-        );
-        markup = string(
-            abi.encodePacked(
-                markup,
-                '%);}svg.piggy>path{fill:#ffc0cb;}.a,.b,.c{font-weight:bold;fill:white;}.a{font-size:28px;text-align:center;}.b{font-size:14px;}.c{font-size:10px;}</style><text class="a" x="235" y="50">'
-            )
-        );
-        // percent of target balance
-        markup = string(abi.encodePacked(markup, uint2str(percentage)));
-        markup = string(
-            abi.encodePacked(
-                markup,
-                '%</text><text class="b" x="222" y="75"><tspan>'
-            )
-        );
-        // days to go
-        markup = string(
-            abi.encodePacked(
-                markup,
-                daysToGo
-            )
-        );
-        markup = string(
-            abi.encodePacked(
-                markup,
-                '</tspan><tspan> days to go</tspan></text><text class="a" x="180" y="165">'
-            )
-        );
-        markup = string(abi.encodePacked(markup, name));
-        markup = string(
-            abi.encodePacked(
-                markup,
-                '</text><text class="b" x="180" y="185"><tspan>Maturity Date: </tspan><tspan>'
-            )
-        );
-        markup = string(
-            abi.encodePacked(markup, getDateFromTimestamp(unlockTime))
-        );
-        markup = string(
-            abi.encodePacked(
-                markup,
-                '</tspan></text><text class="b" x="180" y="260">Piggy needs '
-            )
-        );
-        markup = string(
-            abi.encodePacked(
-                markup,
-                convertWeiToEthString(targetBalance - address(piggyBank).balance)
-            )
-        );
-        markup = string(
-            abi.encodePacked(
-                markup,
-                ' ETH</text><text class="b" x="180" y="280">Piggy has ',
-                convertWeiToEthString(address(piggyBank).balance),
-                ' ETH</text><text class="b" x="165" y="335">Piggy needs ETH! Send to:</text><text class="b" x="165" y="355">',
-                toAsciiString(address(piggyBank))
-            )
-        );
-        markup = string(
-            abi.encodePacked(
-                markup,
-                '</text></svg>'
-            )
-        );
-
+        // Build the SVG string using the percentage and the colors
         return abi.encodePacked(
             "data:image/svg+xml;base64,",
             Base64.encode(bytes(markup)));
     }
+
+    function _bytes3ToHexString(bytes3 value) internal pure returns (string memory) {
+        bytes memory result = new bytes(6);
+        bytes16 hexAlphabet = "0123456789abcdef";
+        for (uint256 i = 0; i < 3; ++i) {
+            result[i * 2] = hexAlphabet[uint8(value[i] >> 4)];
+            result[1 + i * 2] = hexAlphabet[uint8(value[i] & 0x0f)];
+        }
+        return string(result);
+    }
+
 
     function _daysToDate(
         uint _days

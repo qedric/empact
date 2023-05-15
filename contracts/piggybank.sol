@@ -7,12 +7,13 @@ interface IPiggyBank {
 
     struct Attr { 
         uint256 tokenId;
+        uint256 unlockTime;
+        uint256 startTime;
+        uint256 targetBalance;
         string name;
         string description;
         string externalUrl;
         string metadata;
-        uint256 unlockTime;
-        uint256 targetBalance;
     }
 
     event PiggyInitialised(Attr attributes);

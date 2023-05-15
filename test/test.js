@@ -702,7 +702,7 @@ describe("Testing CryptoPiggies", function () {
       // Increase block time to after the unlockTime
       await helpers.time.increase(60 * 60 * 24 * 7); // 7 days
 
-      //console.log(await cryptoPiggies.uri(0));
+      console.log(await cryptoPiggies.uri(0));
 
       //get holders balance before payout
       const initialNftOwnerBalance = await ethers.provider.getBalance(nftOwner.address);
