@@ -674,17 +674,30 @@ describe("Testing CryptoPiggies", function () {
 
     it("should payout token holder if the unlock time has passed", async function () {
 
-      // first make a piggy
+      /*// first make a piggy
       const piggyAddress = makePiggy(
         nftOwner.address,
         4,
         "4 Little Pigs",
         "description",
         "externalUrl",
-        "metadata",
+        ',{"trait_type":"Description","value":"fantastic"}',
+        7,
+        "4.44"
+      );*/
+
+      const piggyAddress = makePiggy(
+        nftOwner.address,
+        4,
+        "4 Little Pigs",
+        "description",
+        "externalUrl",
+        '',
         7,
         "4.44"
       );
+
+
 
       //send enough ETH
       const amountToSend = ethers.utils.parseEther("4.44");

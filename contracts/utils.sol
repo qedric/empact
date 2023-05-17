@@ -2,13 +2,6 @@
 pragma solidity ^0.8.11;
 import "@openzeppelin/contracts/utils/Base64.sol";
 
-struct Colours {
-    bytes3 bg;
-    bytes3 fg;
-    bytes3 pbg;
-    bytes3 pfg;
-}
-
 interface ISignatureMintERC1155 { 
     /**
      *  @notice The body of a request to mint tokens.
@@ -65,9 +58,9 @@ interface ISignatureMintERC1155 {
         returns (address signer);
 }
 
-library Utils {
+library CP_Utils_v1 {
 
-    function generateSVG(Colours calldata c, uint8 percent) public pure returns (bytes memory) {
+    function generateSVG(bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg, uint256 percent) public pure returns (bytes memory) {
 
         // Calculate the 'horizon' based on the percentage value
         uint256 horizon = 1080 * (100 - percent) / 100;
@@ -75,13 +68,13 @@ library Utils {
         string memory markup = string(
             abi.encodePacked(
                 '<svg id="Ebene_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080"><defs><style>.cls-1{fill:#',
-                    _bytes3ToHexString(c.bg),
+                    _bytes3ToHexString(bg),
                     ';}.cls-2{fill:#',
-                    _bytes3ToHexString(c.fg),
+                    _bytes3ToHexString(fg),
                     ';}.cls-3{fill:#',
-                    _bytes3ToHexString(c.pbg),
+                    _bytes3ToHexString(pbg),
                     ';}.cls-4{fill:#',
-                    _bytes3ToHexString(c.pfg),
+                    _bytes3ToHexString(pfg),
                     ';}</style></defs><rect class="cls-2" y="0" width="1080" height="1080"/><rect class="cls-1" y="',
                     uint2str(horizon),
                     '" width="1080" height="',

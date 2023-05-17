@@ -2,7 +2,7 @@ const hre = require("hardhat");
 
 async function main() {
 
-  let address = '0xDaeBdd3282CEeE8a9351512C9C46A2EA42F16759'
+  let address = '0xBd109580024630B12BC8FFe6159c66D9AA0fDa0F'
   
   /*const contract = await hre.ethers.getContractAt("PIGGY", address );
 

@@ -16,6 +16,14 @@ import "@openzeppelin/contracts/utils/Base64.sol";
 import "./utils.sol";
 import "./piggybank.sol";
 
+struct Colours {
+    bytes3 bg;
+    bytes3 fg;
+    bytes3 pbg;
+    bytes3 pfg;
+}
+
+
 abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     using ECDSA for bytes32;
 
@@ -215,20 +223,23 @@ contract CryptoPiggies is
                             '","description":"',
                             _attributes[tokenId].description,
                             '","image_data":"',
-                            Utils.generateSVG(
-                                svgColours,
+                            CP_Utils_v1.generateSVG(
+                                svgColours.bg,
+                                svgColours.fg,
+                                svgColours.pbg,
+                                svgColours.pfg,
                                 _getPercentage(tokenId)
                             ),
                             '","external_url":"',
                             _attributes[tokenId].externalUrl,
                             '","attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
-                            Utils.uint2str(
+                            CP_Utils_v1.uint2str(
                                 _attributes[tokenId].unlockTime
                             ),
                             '},{"trait_type":"Target Balance","value":"',
-                            Utils.convertWeiToEthString(_attributes[tokenId].targetBalance),
+                            CP_Utils_v1.convertWeiToEthString(_attributes[tokenId].targetBalance),
                             ' ETH"},{"trait_type":"Receive Address","value":"',
-                            Utils.toAsciiString(
+                            CP_Utils_v1.toAsciiString(
                                 address(piggyBanks[tokenId])
                             ),
                             '"}',
@@ -473,16 +484,16 @@ contract CryptoPiggies is
     //////////////////////////////////////////////////////////////*/
 
     /// @dev calculates the percentage towards unlock based on time and target balance
-    function _getPercentage(uint256 tokenId) internal view returns (uint8 percentage) {
+    function _getPercentage(uint256 tokenId) internal view returns (uint256 percentage) {
 
-        uint8 percentageBasedOnBalance = 0;
-        uint8 percentageBasedOnTime = 0;
+        uint256 percentageBasedOnBalance = 0;
+        uint256 percentageBasedOnTime = 0;
 
         // First calculate the percentage of targetBalance
         if (address(piggyBanks[tokenId]).balance > 0) {
             if (_attributes[tokenId].targetBalance > 0) {
                 uint256 balance = address(piggyBanks[tokenId]).balance;
-                percentageBasedOnBalance = uint8((balance * 100) / _attributes[tokenId].targetBalance);
+                percentageBasedOnBalance = uint256((balance * 100) / _attributes[tokenId].targetBalance);
             }
         }
 
@@ -491,7 +502,7 @@ contract CryptoPiggies is
             uint256 currentTime = block.timestamp;
             uint256 timeElapsed = currentTime - _attributes[tokenId].startTime;
             uint256 totalTime = _attributes[tokenId].unlockTime - _attributes[tokenId].startTime;
-            percentageBasedOnTime = uint8((timeElapsed * 100) / totalTime);
+            percentageBasedOnTime = uint256((timeElapsed * 100) / totalTime);
         }
 
         // Return the lower value between percentageBasedOnBalance and percentageBasedOnTime
