@@ -23,7 +23,6 @@ struct Colours {
     bytes3 pfg;
 }
 
-
 abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     using ECDSA for bytes32;
 
@@ -138,6 +137,7 @@ contract CryptoPiggies is
     event MakePiggyFeeUpdated(uint256 fee);
     event BreakPiggyBpsUpdated(uint16 bps);
     event PiggyBankImplementationUpdated(address indexed implementation);
+
 
     /*//////////////////////////////////////////////////////////////
                         State variables
@@ -440,6 +440,12 @@ contract CryptoPiggies is
         return nextTokenIdToMint_;
     }
 
+    /// @notice returns the lower of % of target balance or % of time left to unlock
+    function percentComplete(uint256 tokenId) external view returns (uint8) {
+        require(totalSupply[tokenId] > 0, "Token data not found");
+        return uint8(_getPercentage(tokenId));
+    }
+
     /*//////////////////////////////////////////////////////////////
                         ERC-1155 overrides
     //////////////////////////////////////////////////////////////*/
@@ -486,30 +492,29 @@ contract CryptoPiggies is
     /// @dev calculates the percentage towards unlock based on time and target balance
     function _getPercentage(uint256 tokenId) internal view returns (uint256 percentage) {
 
-        uint256 percentageBasedOnBalance = 0;
-        uint256 percentageBasedOnTime = 0;
+        uint256 balance = address(piggyBanks[tokenId]).balance;
 
         // First calculate the percentage of targetBalance
-        if (address(piggyBanks[tokenId]).balance > 0) {
-            if (_attributes[tokenId].targetBalance > 0) {
-                uint256 balance = address(piggyBanks[tokenId]).balance;
-                percentageBasedOnBalance = uint256((balance * 100) / _attributes[tokenId].targetBalance);
-            }
-        }
-
-        // Then calculate the percentage to unlock date
-        if (_attributes[tokenId].unlockTime > _attributes[tokenId].startTime) {
-            uint256 currentTime = block.timestamp;
-            uint256 timeElapsed = currentTime - _attributes[tokenId].startTime;
+        uint256 percentageBasedOnTime;
+        if (block.timestamp >= _attributes[tokenId].unlockTime) {
+            percentageBasedOnTime = 100;
+        } else {
             uint256 totalTime = _attributes[tokenId].unlockTime - _attributes[tokenId].startTime;
+            uint256 timeElapsed = block.timestamp - _attributes[tokenId].startTime;
             percentageBasedOnTime = uint256((timeElapsed * 100) / totalTime);
+        }
+        
+        uint256 percentageBasedOnBalance;
+        if (balance >= _attributes[tokenId].targetBalance) {
+            percentageBasedOnBalance = 100;
+        } else if (_attributes[tokenId].targetBalance > 0 && balance > 0) {
+            percentageBasedOnBalance = uint256((balance * 100) / _attributes[tokenId].targetBalance);
         }
 
         // Return the lower value between percentageBasedOnBalance and percentageBasedOnTime
         percentage = percentageBasedOnBalance < percentageBasedOnTime ? percentageBasedOnBalance : percentageBasedOnTime;
     }
 
-    
     /// @dev Returns whether contract metadata can be set in the given execution context.
     function _canSetContractURI() internal view virtual override returns (bool) {
         return msg.sender == owner();

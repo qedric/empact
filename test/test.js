@@ -509,6 +509,7 @@ describe("Testing CryptoPiggies", function () {
       await helpers.time.increase(60 * 60 * 24 * 3); // 3 days
 
       await expect(cryptoPiggies.connect(nftOwner).mintWithSignature(typedData.message, signature, { value: makePiggyFee })).to.be.revertedWith("Request expired");
+
     }); 
 
     it("should fail if a user sets unlock date in the past AND targetbalance <= 0", async function () {
@@ -1155,6 +1156,113 @@ describe("Testing CryptoPiggies", function () {
         to: piggyAddress,
         value: amountToSend,
       });
+
+      // Check the piggy contract balance
+      const piggyBalance = await ethers.provider.getBalance(piggyAddress);
+      expect(piggyBalance).to.equal(amountToSend);
+    });
+
+    it("should be able to send ETH to the piggy contract", async function () {
+      // Use the helper function to create a new piggy contract
+      const piggyAddress = makePiggy(
+        nftOwner.address,
+        4,
+        "4 Little Pigs",
+        "description",
+        "externalUrl",
+        "metadata",
+        0,
+        "4.44",
+        "0.004"
+      );
+
+      // Get the ContractFactory
+      const PiggyBankFactory = await ethers.getContractFactory("PiggyBank");
+
+      // Create a Contract instance
+      const piggyBank = PiggyBankFactory.attach(piggyAddress);
+
+      // Define a filter to catch the PiggyInitialised event
+      const filter = piggyBank.filters.PiggyInitialised();
+
+      // Get the event logs
+      const eventLogs = await piggyBank.queryFilter(filter);
+
+      // Get the unlockTime from the event's data
+      const eventUnlockTime = eventLogs[0].args.attributes.unlockTime;
+
+      // Convert and print the unlockTime
+      const unlockDate = new Date(eventUnlockTime * 1000);
+      console.log('Unlock Time:', unlockDate);      
+
+      // Define the amount of ETH you want to send (in wei)
+      const amountToSend = ethers.utils.parseEther("1.2345");
+
+      // Get attributes for the piggyBank
+      const piggyAttributes = await piggyBank.attributes();
+
+      // Log the target balance
+      console.log('Target balance:', ethers.utils.formatEther(piggyAttributes.targetBalance));
+
+      // Get current timestamp
+      const currentTime = Math.floor(new Date().getTime() / 1000); // Convert from milliseconds to seconds
+
+      // Compute time difference in seconds
+      const timeDifference = piggyAttributes.unlockTime - currentTime;
+
+      // Compute time difference in days and hours
+      const days = Math.floor(timeDifference / (24 * 60 * 60));
+      const hours = Math.floor(timeDifference / (60 * 60)) % 24;
+
+      // Log the unlock date
+      console.log('Unlock Date:', new Date(piggyAttributes.unlockTime * 1000).toLocaleString("en-GB", {
+          day: '2-digit',    // 2 digits for day
+          month: '2-digit',  // 2 digits for month
+          year: 'numeric',   // 4 digits for year
+          hour: '2-digit',   // 2 digits for hour
+          minute: '2-digit', // 2 digits for minute
+          second: '2-digit'  // 2 digits for second
+      }));
+
+      // Log the time until unlock
+      console.log('Time until unlock:', days, 'days and', hours, 'hours');
+
+      /*// Define filters to catch the events
+      const filterBalance = cryptoPiggies.filters.LogBalancePercentage();
+      const filterTime = cryptoPiggies.filters.LogTimePercentage();*/
+      
+
+      // Send the ETH to the piggy contract
+      await nonOwner.sendTransaction({
+        to: piggyAddress,
+        value: amountToSend,
+      });
+
+      // current balance
+      console.log('Current balance:', ethers.utils.formatEther(await ethers.provider.getBalance(piggyAddress)));
+
+      /*// check the percentage increase
+      const tx = await cryptoPiggies.percentComplete(0);  
+
+       // Query the events
+      const eventLogsBalance = await cryptoPiggies.queryFilter(filterBalance);
+      const eventLogsTime = await cryptoPiggies.queryFilter(filterTime);
+
+      // Print the values from the events
+      eventLogsBalance.forEach((log) => {
+          console.log('Balance:', ethers.utils.formatEther(log.args.balance));
+          console.log('Target balance:', ethers.utils.formatEther(log.args.targetBalance));
+          console.log('Balance percentage:', log.args.percent.toNumber());
+      });
+
+      eventLogsTime.forEach((log) => {
+          console.log('Current time:', log.args.timeStamp.toNumber());
+          console.log('Start time:', log.args.startTime.toNumber());
+          console.log('Unlock time:', log.args.unlockTime.toNumber());
+          console.log('Time percentage:', log.args.percent.toNumber());
+      });*/
+
+      console.log(await cryptoPiggies.uri(0))
 
       // Check the piggy contract balance
       const piggyBalance = await ethers.provider.getBalance(piggyAddress);

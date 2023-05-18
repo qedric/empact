@@ -31,23 +31,23 @@ function callback(x) {
 
 async function main() {
 
-  const _name = 'PiggiesTEST21'
+  const _name = 'PiggiesTEST22'
   const _symbol = 'CPG'
   const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
   const _royaltyBps = '400'
   const _primarySaleRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C';
 
-  const _libAddress = '0xf493329Ea5110FFf895f2b5a7D89e0b4287F0dD0' // Goerli deployed via thirdweb
+  const _libAddress = '0x2C8266A18a3dF554f79A61B7bFf63327b2BF68a2' // Goerli deployed via thirdweb
   //const _implAddress = '0x6De1F083B9AD801345E6726F947879D12D7347B8' // Goerli deployed PB implementation*/
 
   // get the library if it's already deployed
-  const lib = await ethers.getContractAt("Utils", _libAddress );
+  const lib = await ethers.getContractAt("CP_Utils_v1", _libAddress );
   console.log('got library at ', lib.address);
   
   // Get contract that we want to deploy
   const PiggyFactory = await hre.ethers.getContractFactory("CryptoPiggies", {
     libraries: {
-      Utils: lib.address,
+      CP_Utils_v1: lib.address,
     }}
   );
 

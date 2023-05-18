@@ -25,7 +25,6 @@ interface IPiggyBank {
     function initialize(Attr calldata _data, uint16 _breakPiggyBps) external;
 
     function payout(address recipient, uint256 thisOwnerBalance, uint256 totalSupply) external payable;
-
 }
 
 interface ICPFactory {
