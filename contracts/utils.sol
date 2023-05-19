@@ -58,7 +58,7 @@ interface ISignatureMintERC1155 {
         returns (address signer);
 }
 
-library CP_Utils_v1 {
+library CP_Utils_v2 {
 
     function generateSVG(bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg, uint256 percent) public pure returns (bytes memory) {
 

@@ -41,13 +41,13 @@ async function main() {
   //const _implAddress = '0x6De1F083B9AD801345E6726F947879D12D7347B8' // Goerli deployed PB implementation*/
 
   // get the library if it's already deployed
-  const lib = await ethers.getContractAt("CP_Utils_v1", _libAddress );
+  const lib = await ethers.getContractAt("CP_Utils_v2", _libAddress );
   console.log('got library at ', lib.address);
   
   // Get contract that we want to deploy
   const PiggyFactory = await hre.ethers.getContractFactory("CryptoPiggies", {
     libraries: {
-      CP_Utils_v1: lib.address,
+      CP_Utils_v2: lib.address,
     }}
   );
 

@@ -223,7 +223,7 @@ contract CryptoPiggies is
                             '","description":"',
                             _attributes[tokenId].description,
                             '","image_data":"',
-                            CP_Utils_v1.generateSVG(
+                            CP_Utils_v2.generateSVG(
                                 svgColours.bg,
                                 svgColours.fg,
                                 svgColours.pbg,
@@ -233,13 +233,13 @@ contract CryptoPiggies is
                             '","external_url":"',
                             _attributes[tokenId].externalUrl,
                             '","attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
-                            CP_Utils_v1.uint2str(
+                            CP_Utils_v2.uint2str(
                                 _attributes[tokenId].unlockTime
                             ),
                             '},{"trait_type":"Target Balance","value":"',
-                            CP_Utils_v1.convertWeiToEthString(_attributes[tokenId].targetBalance),
+                            CP_Utils_v2.convertWeiToEthString(_attributes[tokenId].targetBalance),
                             ' ETH"},{"trait_type":"Receive Address","value":"',
-                            CP_Utils_v1.toAsciiString(
+                            CP_Utils_v2.toAsciiString(
                                 address(piggyBanks[tokenId])
                             ),
                             '"}',
