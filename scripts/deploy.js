@@ -31,7 +31,7 @@ function callback(x) {
 
 async function main() {
 
-  const _name = 'PiggiesTEST22'
+  const _name = 'PiggiesTEST23'
   const _symbol = 'CPG'
   const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
   const _royaltyBps = '400'

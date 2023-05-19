@@ -16,13 +16,6 @@ import "@openzeppelin/contracts/utils/Base64.sol";
 import "./utils.sol";
 import "./piggybank.sol";
 
-struct Colours {
-    bytes3 bg;
-    bytes3 fg;
-    bytes3 pbg;
-    bytes3 pfg;
-}
-
 abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
     using ECDSA for bytes32;
 
@@ -124,20 +117,22 @@ contract CryptoPiggies is
 {
     using TWStrings for uint256;
 
+    struct Colours {
+        bytes3 bg;
+        bytes3 fg;
+        bytes3 pbg;
+        bytes3 pfg;
+    }
+
     /*//////////////////////////////////////////////////////////////
                         Events
     //////////////////////////////////////////////////////////////*/
 
-    event ProxyDeployed(
-        address indexed deployedProxy,
-        address indexed msgSender
-    );
-
+    event PiggyBankDeployed(address indexed piggyBank, address indexed msgSender);
     event FeeRecipientUpdated(address indexed recipient);
     event MakePiggyFeeUpdated(uint256 fee);
     event BreakPiggyBpsUpdated(uint16 bps);
     event PiggyBankImplementationUpdated(address indexed implementation);
-
 
     /*//////////////////////////////////////////////////////////////
                         State variables
@@ -183,6 +178,12 @@ contract CryptoPiggies is
     /// @dev keep track of used signatures so they can only be used once.
     mapping(bytes32 => bool) private usedSignatures;
 
+    /// @notice checks to ensure that the token exists before referencing it
+    modifier tokenExists(uint256 tokenId) {
+        require(totalSupply[tokenId] > 0, "Token data not found");
+        _;
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Constructor
     //////////////////////////////////////////////////////////////*/
@@ -210,8 +211,7 @@ contract CryptoPiggies is
     /*//////////////////////////////////////////////////////////////
                     Overriden metadata logic - On-chain
     //////////////////////////////////////////////////////////////*/
-    function uri(uint256 tokenId) public view override returns (string memory) {
-        require(totalSupply[tokenId] > 0, "Token data not found");
+    function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {
         return string(
             abi.encodePacked(
                 "data:application/json;base64,",
@@ -274,7 +274,7 @@ contract CryptoPiggies is
         );
 
         bytes32 signatureHash = keccak256(abi.encodePacked(_encodeRequest(_req), _signature));
-        require(!usedSignatures[signatureHash], "Signature has already been used");
+        require(!usedSignatures[signatureHash], "Signature already used");
 
         // Verify and process payload.
         signer = _processRequest(_req, _signature);
@@ -337,12 +337,11 @@ contract CryptoPiggies is
 
         IPiggyBank(deployedProxy).initialize(_piggyData, breakPiggyFeeBps);
 
-        emit ProxyDeployed(deployedProxy, msg.sender);
+        emit PiggyBankDeployed(deployedProxy, msg.sender);
     }
 
     /// @notice Lets an NFT owner withdraw their proportion of funds once the piggyBank is unlocked
-    function payout(uint256 tokenId) external {
-        require(totalSupply[tokenId] != 0, "Token data not found");
+    function payout(uint256 tokenId) tokenExists(tokenId) external {
 
         uint256 thisOwnerBalance = balanceOf[msg.sender][tokenId];
 
@@ -373,7 +372,7 @@ contract CryptoPiggies is
 
     // Fallback function to prevent accidentally sending ETH
     receive() external payable {
-        require(false, "Do not send ETH directly to this contract");
+        require(false, "Do not send ETH to this contract");
     }
 
     /// @notice Sets the fee for creating a new piggyBank
@@ -441,8 +440,7 @@ contract CryptoPiggies is
     }
 
     /// @notice returns the lower of % of target balance or % of time left to unlock
-    function percentComplete(uint256 tokenId) external view returns (uint8) {
-        require(totalSupply[tokenId] > 0, "Token data not found");
+    function percentComplete(uint256 tokenId) external view tokenExists(tokenId) returns (uint8) {
         return uint8(_getPercentage(tokenId));
     }
 

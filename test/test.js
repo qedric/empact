@@ -143,15 +143,15 @@ describe("Testing CryptoPiggies", function () {
     const txReceipt = await tx.wait();
 
     // const mintedEvent = txReceipt.events.find(event => event.event === 'TokensMintedWithSignature');
-    const piggyCreatedEvent = txReceipt.events.find(event => event.event === 'ProxyDeployed');
+    const piggyCreatedEvent = txReceipt.events.find(event => event.event === 'PiggyBankDeployed');
 
     const PiggyBank = await ethers.getContractFactory("PiggyBank");
-    const piggyBank = PiggyBank.attach(piggyCreatedEvent.args.deployedProxy);
+    const piggyBank = PiggyBank.attach(piggyCreatedEvent.args.piggyBank);
 
     /*const attributes = await piggyBank.attributes();
     console.log(attributes)*/
 
-    return piggyCreatedEvent.args.deployedProxy;
+    return piggyCreatedEvent.args.piggyBank;
 
   }
 
@@ -428,7 +428,7 @@ describe("Testing CryptoPiggies", function () {
 
       // Try to mint again with the same request:
       await expect(cryptoPiggies.connect(nftOwner).mintWithSignature(
-        typedData.message, signature, { value: makePiggyFee })).to.be.revertedWith("Signature has already been used");
+        typedData.message, signature, { value: makePiggyFee })).to.be.revertedWith("Signature already used");
 
     });
 
@@ -1300,7 +1300,7 @@ describe("Testing CryptoPiggies", function () {
         const revertReason = getRevertReason(error);
         assert.equal(
           revertReason,
-          "Do not send ETH directly to this contract"
+          "Do not send ETH to this contract"
         );
       }
 
