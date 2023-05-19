@@ -37,7 +37,7 @@ async function main() {
   const _royaltyBps = '400'
   const _primarySaleRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C';
 
-  const _libAddress = '0x2C8266A18a3dF554f79A61B7bFf63327b2BF68a2' // Goerli deployed via thirdweb
+  const _libAddress = '0x7a604461584925a1dB6Ec4A9d5A767c05D2a4Cd9' // Goerli deployed via thirdweb
   //const _implAddress = '0x6De1F083B9AD801345E6726F947879D12D7347B8' // Goerli deployed PB implementation*/
 
   // get the library if it's already deployed

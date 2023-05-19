@@ -162,13 +162,13 @@ describe("Testing CryptoPiggies", function () {
     [owner, newOwner, minter, newMinter, nonOwner, nonMinter, nftOwner, nonNftOwner, feeRecipient, newFeeRecipient] = await ethers.getSigners();
 
     const PiggyBankImplementation = await ethers.getContractFactory("PiggyBank");
-    const Utils = await ethers.getContractFactory("CP_Utils_v1");
+    const Utils = await ethers.getContractFactory("CP_Utils_v2");
     
     utils = await Utils.deploy();
 
     const Factory = await ethers.getContractFactory("CryptoPiggies", {
       libraries: {
-        CP_Utils_v1: utils.address,
+        CP_Utils_v2: utils.address,
       }}
     );
 

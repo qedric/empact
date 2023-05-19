@@ -22,6 +22,9 @@ module.exports = {
     },
     hardhat: {
       chainId: 1337,
+      forking: {
+        url: `https://eth-goerli.alchemyapi.io/v2/${ALCHECMY_API_KEY_TEST}`,
+      }
     }
   },
   etherscan: {
