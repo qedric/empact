@@ -153,7 +153,7 @@ contract CryptoPiggies is
     /// @notice The PiggyBank implementation contract that is cloned for each new piggy
     IPiggyBank public piggyBankImplementation;
 
-    /// @dev The address that receives all primary sales value.
+    /// @dev The address that receives all fees.
     address payable public feeRecipient;
 
     /// @notice the colours used to generate the SVG
