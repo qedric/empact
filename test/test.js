@@ -1277,6 +1277,26 @@ describe("Testing CryptoPiggies", function () {
       await expect(cryptoPiggies.connect(nftOwner).safeTransferFrom(nftOwner.address, piggyAddress2, 0, 2, "0x")).to.be.revertedWith("!ERC1155RECEIVER");
     });
 
+    it("should fail when sending random erc20 tokens to a piggyBank", async function () {
+      // Use the helper function to create a new piggy contract
+      const piggyAddress1 = await makePiggy();
+      const piggyAddress2 = await makePiggy();
+
+      await expect(cryptoPiggies.connect(nftOwner).safeTransferFrom(nftOwner.address, piggyAddress2, 0, 2, "0x")).to.be.revertedWith("!fail");
+    });
+
+    it("should succeed when sending Origin Protocol (oETH) to a piggyBank", async function () {
+    });
+
+    it("should include Origin Protocol (oETH) in the balance", async function () {
+    });
+
+    it("should unlock when target balance is reached with 100% Origin Protocol (oETH)", async function () {
+    });
+
+    it("should unlock when target balance is reached with 50% ETH & 50% Origin Protocol (oETH)", async function () {
+    });
+
     it("should fail when sending non-native tokens to the factory contract", async function () {
       const piggyAddress = await makePiggy();
       await expect(cryptoPiggies.connect(nftOwner).safeTransferFrom(nftOwner.address, piggyAddress, 0, 2, "0x")).to.be.revertedWith("!ERC1155RECEIVER");
