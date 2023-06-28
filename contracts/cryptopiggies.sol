@@ -3,11 +3,8 @@ pragma solidity ^0.8.11;
 import { ERC1155 } from "@thirdweb-dev/contracts/eip/ERC1155.sol";
 
 import "@thirdweb-dev/contracts/extension/ContractMetadata.sol";
-import "@thirdweb-dev/contracts/extension/Multicall.sol";
-import "@thirdweb-dev/contracts/extension/Ownable.sol";
 import "@thirdweb-dev/contracts/extension/Royalty.sol";
 import "@thirdweb-dev/contracts/extension/DefaultOperatorFilterer.sol";
-import "@thirdweb-dev/contracts/lib/TWStrings.sol";
 import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
@@ -107,15 +104,12 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
 contract CryptoPiggies is 
     ERC1155,
     ContractMetadata,
-    Ownable,
     Royalty,
-    Multicall,
     DefaultOperatorFilterer, 
     SignaturePiggyMintERC1155,
     PermissionsEnumerable,
     ICPFactory
 {
-    using TWStrings for uint256;
 
     struct Colours {
         bytes3 bg;
@@ -184,6 +178,11 @@ contract CryptoPiggies is
         _;
     }
 
+    modifier onlyAdmin() {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender));
+        _; 
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Constructor
     //////////////////////////////////////////////////////////////*/
@@ -194,7 +193,6 @@ contract CryptoPiggies is
         uint128 _royaltyBps,
         address payable _feeRecipient
     ) ERC1155(_name, _symbol) {
-        _setupOwner(msg.sender);
         _setupDefaultRoyaltyInfo(_royaltyRecipient, _royaltyBps);
         _setOperatorRestriction(true);
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -376,13 +374,13 @@ contract CryptoPiggies is
     }
 
     /// @notice Sets the fee for creating a new piggyBank
-    function setMakePiggyFee(uint256 fee) external onlyOwner {
+    function setMakePiggyFee(uint256 fee) external onlyAdmin {
         emit MakePiggyFeeUpdated(fee);
         makePiggyFee = fee;
     }
 
     /// @notice Sets the fee for withdrawing the funds from a PiggyBank - does not affect existing piggyBanks
-    function setBreakPiggyBps(uint16 bps) external onlyOwner {
+    function setBreakPiggyBps(uint16 bps) external onlyAdmin {
         require(bps <= 900, "Don't be greedy!");
         emit BreakPiggyBpsUpdated(bps);
         breakPiggyFeeBps = bps;
@@ -392,7 +390,7 @@ contract CryptoPiggies is
      *  @notice         Updates recipient of make & break piggy fees.
      *  @param _feeRecipient   Address to be set as new recipient of primary sales.
      */
-    function setFeeRecipient(address payable _feeRecipient) external onlyOwner {
+    function setFeeRecipient(address payable _feeRecipient) external onlyAdmin {
         feeRecipient = _feeRecipient;
         emit FeeRecipientUpdated(_feeRecipient);
     }
@@ -401,7 +399,7 @@ contract CryptoPiggies is
      *  @notice         Sets an implementation for the piggyBank clones.
      *                  ** Must be run after deployment! **
      */
-    function setPiggyBankImplementation(IPiggyBank _piggyBankImplementation) external onlyOwner {
+    function setPiggyBankImplementation(IPiggyBank _piggyBankImplementation) external onlyAdmin {
         emit PiggyBankImplementationUpdated(address(_piggyBankImplementation));
         piggyBankImplementation = _piggyBankImplementation;
     }
@@ -413,7 +411,7 @@ contract CryptoPiggies is
      * @param pbg Piggy background colour.
      * @param pfg Piggy foreground colour.
      */
-    function setSvgColours(bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public onlyOwner {
+    function setSvgColours(bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public onlyAdmin {
         svgColours = Colours(bg, fg, pbg, pfg);
     }
 
@@ -515,7 +513,7 @@ contract CryptoPiggies is
 
     /// @dev Returns whether contract metadata can be set in the given execution context.
     function _canSetContractURI() internal view virtual override returns (bool) {
-        return msg.sender == owner();
+        return hasRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /// @dev Returns whether a given address is authorized to sign mint requests.
@@ -525,19 +523,14 @@ contract CryptoPiggies is
         return hasRole(MINTER_ROLE, _signer);
     }
 
-    /// @dev Returns whether owner can be set in the given execution context.
-    function _canSetOwner() internal view virtual override returns (bool) {
-        return msg.sender == owner();
-    }
-
     /// @dev Returns whether royalty info can be set in the given execution context.
     function _canSetRoyaltyInfo() internal view virtual override returns (bool) {
-        return msg.sender == owner();
+        return hasRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /// @dev Returns whether operator restriction can be set in the given execution context.
     function _canSetOperatorRestriction() internal virtual override returns (bool) {
-        return msg.sender == owner();
+        return hasRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /// @dev Runs before every token transfer / mint / burn.

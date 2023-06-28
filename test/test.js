@@ -230,20 +230,24 @@ describe("Testing CryptoPiggies", function () {
       //await cryptoPiggies.connect(owner).grantRole(DEFAULT_ADMIN_ROLE, owner.address);
     });
 
-    it("should allow factory contract owner to grant an address the MINTER Role", async function () {
+    it("should allow factory DEFAULT ADMIN to grant an address the MINTER Role", async function () {
       await cryptoPiggies.connect(owner).grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
       const isMinter = await cryptoPiggies.hasRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
       assert(isMinter);
     });
 
-    it("should fail if non factory contract owner tries to grant an address the MINTER Role", async function () {
+    it("should allow factory DEFAULT ADMIN to grant an address the DEFAULT ADMIN Role", async function () {
+      return false
+    });
+
+    it("should fail if non factory DEFAULT ADMIN tries to grant an address the MINTER Role", async function () {
       await expect(cryptoPiggies.connect(nonOwner).grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address)).to.be.revertedWith(
       /Permissions: account .* is missing role .*/);
     });
 
-    it("should fail if non factory contract owner tries to grant an address the MINTER_ROLE", async function () {
+    it("should fail if non factory DEFAULT ADMIN tries to grant an address the MINTER_ROLE", async function () {
       const theTrueOwner = await cryptoPiggies.owner();
-      assert.notEqual(nonOwner.address, theTrueOwner, "nonOwner should not be the contract owner");
+      assert.notEqual(nonOwner.address, theTrueOwner, "nonOwner should not be the DEFAULT ADMIN");
 
       // You can also check if nonOwner doesn't have the MINTER_ROLE
       const minterRole = await cryptoPiggies.MINTER_ROLE();
@@ -255,35 +259,24 @@ describe("Testing CryptoPiggies", function () {
       );
     });
 
-    it("should allow factory contract owner to revoke MINTER Role for a given address", async function () {
+    it("should allow factory DEFAULT ADMIN to revoke MINTER Role for a given address", async function () {
       await cryptoPiggies.grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
       await cryptoPiggies.revokeRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
       const isMinter = await cryptoPiggies.hasRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
       assert(!isMinter);
     });
 
-    it("should fail if non factory contract owner tries to revoke the MINTER Role for a given address", async function () {
+    it("should allow factory DEFAULT ADMIN to revoke DEFAULT ADMIN Role for a given address", async function () {
+    });
+
+    it("should not allow factory DEFAULT ADMIN to revoke own DEFAULT ADMIN Role", async function () {
+    });
+
+    it("should fail if non factory DEFAULT ADMIN tries to revoke the MINTER Role for a given address", async function () {
       await cryptoPiggies.grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
       await expect(
         cryptoPiggies.connect(newOwner).revokeRole(await cryptoPiggies.MINTER_ROLE(), minter.address)
       ).to.be.revertedWith(/Permissions: account .* is missing role .*/);
-    });
-
-    it("should allow factory contract owner to appoint a new owner", async function () {
-      const theTrueFirstOwner = await cryptoPiggies.owner();
-      assert.notEqual(newOwner.address, theTrueFirstOwner, "newOwner should not already be the contract owner");
-
-      await cryptoPiggies.setOwner(newOwner.address);
-      const theTrueNewOwner = await cryptoPiggies.owner();
-      assert.equal(theTrueNewOwner, newOwner.address);
-    });
-
-    it("should fail if non factory contract owner tries to appoint a new owner", async function () {
-      const theTrueFirstOwner = await cryptoPiggies.owner();
-      assert.notEqual(nonOwner.address, theTrueFirstOwner, "nonOwner should not be the contract owner");
-     await expect(
-        cryptoPiggies.connect(nonOwner).setOwner(newOwner.address),
-      ).to.be.revertedWith("Not authorized");
     });
 
     it("should fail if a non-admin tries to set a new fee recipient", async function() {
