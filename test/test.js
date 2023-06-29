@@ -1284,10 +1284,13 @@ describe("Testing CryptoPiggies", function () {
     it("should include Origin Protocol (oETH) in the balance", async function () {
     });
 
-    it("should unlock when target balance is reached with 100% Origin Protocol (oETH)", async function () {
+    it("should include supported token in the balance", async function () {
     });
 
-    it("should unlock when target balance is reached with 50% ETH & 50% Origin Protocol (oETH)", async function () {
+    it("should unlock when target balance is reached with 100% non-ETH supported tokens", async function () {
+    });
+
+    it("should unlock when target balance is reached with 50% ETH & 50% supported tokens", async function () {
     });
 
     it("should fail when sending non-native tokens to the factory contract", async function () {
@@ -1295,7 +1298,7 @@ describe("Testing CryptoPiggies", function () {
       await expect(cryptoPiggies.connect(nftOwner).safeTransferFrom(nftOwner.address, piggyAddress, 0, 2, "0x")).to.be.revertedWith("!ERC1155RECEIVER");
     });
 
-    it("should transfer a quantity of tokens from one holder to another", async function () {
+    it("should transfer a quantity of piggy NTFs from one holder to another", async function () {
       const piggyAddress = await makePiggy();
       await cryptoPiggies.connect(nftOwner).safeTransferFrom(nftOwner.address, newOwner.address, 0, 2, "0x")
       expect(await cryptoPiggies.balanceOf(newOwner.address, 0)).to.equal(2);

@@ -127,6 +127,9 @@ contract CryptoPiggies is
     event MakePiggyFeeUpdated(uint256 fee);
     event BreakPiggyBpsUpdated(uint16 bps);
     event PiggyBankImplementationUpdated(address indexed implementation);
+    event OriginProtocolTokenUpdated(address oldAddress, address newAddress);
+    event SupportedTokenAdded(address tokenAddress);
+    event SupportedTokenRemoved(address tokenAddress);
 
     /*//////////////////////////////////////////////////////////////
                         State variables
@@ -147,14 +150,17 @@ contract CryptoPiggies is
     /// @notice The PiggyBank implementation contract that is cloned for each new piggy
     IPiggyBank public piggyBankImplementation;
 
-    /// @dev The address that receives all fees.
+    /// @notice The address that receives all fees.
     address payable public feeRecipient;
 
     /// @notice the colours used to generate the SVG
     Colours public svgColours;
 
+    /// @notice the address of Origin Protocol OETH token
+    address payable public oEthContractAddress;
+
     /*//////////////////////////////////////////////////////////////
-                        Mappings
+                        Mappings & Arrays
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -171,6 +177,15 @@ contract CryptoPiggies is
 
     /// @dev keep track of used signatures so they can only be used once.
     mapping(bytes32 => bool) private usedSignatures;
+
+    /// @notice the addresses of tokens that will count toward the ETH balance
+    /// @notice this is intended to contain supported ETH PoS Liquid Staking tokens only.
+    mapping(address => uint256) private supportedTokensIndex;
+    address[] public supportedTokens;
+
+    /*//////////////////////////////////////////////////////////////
+                        Modifiers
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice checks to ensure that the token exists before referencing it
     modifier tokenExists(uint256 tokenId) {
@@ -368,7 +383,6 @@ contract CryptoPiggies is
                        Configuration
     //////////////////////////////////////////////////////////////*/
 
-    // Fallback function to prevent accidentally sending ETH
     receive() external payable {
         require(false, "Do not send ETH to this contract");
     }
@@ -413,6 +427,45 @@ contract CryptoPiggies is
      */
     function setSvgColours(bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public onlyAdmin {
         svgColours = Colours(bg, fg, pbg, pfg);
+    }
+
+    /**
+     *  @notice         Set the contract address for Origin Protocol staked token
+     */
+    function setOEthContractAddress(address _oEthContractAddress) external onlyAdmin {
+        emit OriginProtocolTokenUpdated(address(oEthContractAddress), address(_oEthContractAddress));
+        oEthContractAddress = _oEthContractAddress;
+    }
+
+    /**
+     *  @notice         Add a supported token address
+     */
+    function addSupportedToken(address token) external onlyAdmin {
+        require(supportedTokensIndex[token] == 0, "Address already exists");
+        supportedTokens.push(token);
+        supportedTokensIndex[token] = addresses.length;
+        emit SupportedTokenAdded(address(token));
+    }
+
+    /**
+     *  @notice         Remove a supported token address
+     */
+    function removeSupportedToken(address token) external onlyAdmin {
+        require(supportedTokensIndex[token] != 0, "Address doesn't exist");
+
+        uint256 indexToRemove = supportedTokensIndex[token] - 1;
+        uint256 lastIndex = supportedTokens.length - 1;
+
+        if (indexToRemove != lastIndex) {
+            address lastToken = supportedTokens[lastIndex];
+            supportedTokens[indexToRemove] = lastToken;
+            supportedTokensIndex[lastToken] = indexToRemove + 1;
+        }
+
+        supportedTokens.pop()
+        delete supportedTokensIndex[token];
+
+        emit SupportedTokenRemoved(address(token));
     }
 
     /*//////////////////////////////////////////////////////////////
