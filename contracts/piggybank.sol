@@ -51,10 +51,23 @@ contract PiggyBank is IPiggyBank, Initializable {
         _disableInitializers();
     }
 
-    function initialize(Attr calldata _data, uint16 _breakPiggyBps) external onlyFactory initializer {
+    function initialize(Attr calldata _data, uint16 _breakPiggyBps, address oEthContract) external onlyFactory initializer {
         attributes = _data;
         breakPiggyFeeBps = _breakPiggyBps;
         emit PiggyInitialised(_data);
+        /// @notice external call to register with Origin Protocal for rebasing of oETH
+        optInForOethRebasing();
+    }
+
+    function updateBalance() public view {
+        
+    }
+
+    function optInForOethRebasing(address oEthContractAddress) internal {
+        require(oEthContractAddress != address(0), "OETH contract address is not set");
+        // Make the call to the OETH contract
+        (bool success, bytes memory returnData) = oethContractAddress.call(abi.encodeWithSignature("rebaseOptIn()"));
+        require(success, "Opt-in to OETH rebasing failed");
     }
 
     function payout(
