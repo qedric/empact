@@ -17,29 +17,25 @@ interface IPiggyBank {
     }
 
     event PiggyInitialised(Attr attributes);
-
     event Received(address _from, uint _amount);
-    
     event Withdrawal(address who, uint amount, uint balance);
-
+    event SupportedTokenWithdrawal(address indexed token, address who, uint amount, uint balance);
     event TargetReached();
-
     event OptedInForOriginProtocolRebasing();
 
     function initialize(Attr calldata _data, uint16 _breakPiggyBps) external;
 
-    function payout(address recipient, uint256 thisOwnerBalance, uint256 totalSupply) external payable;
+    function payout(address recipient, address payable feeRecipient, uint256 thisOwnerBalance, uint256 totalSupply, address[] memory supportedTokens) external payable;
 }
 
 interface ICPFactory {
-    function feeRecipient() external view returns (address payable);
     function oETHTokenAddress() external view returns (address payable);
-    function supportedTokens() external view returns (address[] payable);
-    function supportedTokensIndex() external view returns (mapping(address => uint256) payable);
+    function getSupportedTokens() external view returns (address[] memory);
 }
 
-interface IStakeToken {
+interface ISupportedToken {
     function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
 }
 
 interface IOETHToken {
@@ -47,7 +43,7 @@ interface IOETHToken {
 }
 
 contract PiggyBank is IPiggyBank, Initializable {
-    
+
     bool private _targetReached;
     bool public oETHRebasingEnabled = false;
     Attr public attributes;
@@ -79,6 +75,7 @@ contract PiggyBank is IPiggyBank, Initializable {
         require(getStakedTokenBalance() + address(this).balance >= attributes.targetBalance,
             'Piggy is still hungry!');
         _targetReached = true;
+        emit TargetReached();
     }
 
     /// @notice Supported staked tokens can contribute to the target balance.
@@ -87,9 +84,9 @@ contract PiggyBank is IPiggyBank, Initializable {
     }
 
     function getStakedTokenBalance() internal view returns(uint256 totalStakedTokenBalance) {
-        for (uint256 i = 0; i < factory.supportedTokens().length; i++) {
-            IStakeToken stakedToken = IStakeToken(factory.supportedTokens[i]);
-            totalBalance += stakedToken.balanceOf(address(this));
+        for (uint256 i = 0; i < factory.getSupportedTokens().length; i++) {
+            ISupportedToken token = ISupportedToken(factory.getSupportedTokens()[i]);
+            totalStakedTokenBalance += token.balanceOf(address(this));
         }
     }
 
@@ -106,8 +103,10 @@ contract PiggyBank is IPiggyBank, Initializable {
 
     function payout(
         address recipient,
+        address payable feeRecipient,
         uint256 thisOwnerBalance,
-        uint256 totalSupply
+        uint256 totalSupply,
+        address[] memory supportedTokens
     ) external payable onlyFactory {
 
         require(
@@ -120,7 +119,7 @@ contract PiggyBank is IPiggyBank, Initializable {
             "Piggy is still hungry!"
         );
 
-        // calculate the amount owed
+        // calculate the ETH amount owed
         uint256 payoutAmount = address(this).balance * thisOwnerBalance / totalSupply;
         uint256 payoutFee = payoutAmount * breakPiggyFeeBps / 10000;
 
@@ -129,11 +128,26 @@ contract PiggyBank is IPiggyBank, Initializable {
 
         payable(recipient).transfer(payoutAmount - payoutFee);
 
-        /// @dev get the current fee Recipient from the factory contract
-        address payable feeRecipient = factory.feeRecipient();
-
         // send the fee to the factory contract owner
-        feeRecipient.transfer(payoutFee);  
+        feeRecipient.transfer(payoutFee);
+
+        // Withdraw supported tokens and calculate the amounts
+        for (uint256 i = 0; i < supportedTokens.length; i++) {
+            address tokenAddress = supportedTokens[i];
+            ISupportedToken token = ISupportedToken(tokenAddress);
+            uint256 tokenBalance = token.balanceOf(address(this));
+
+            // Calculate the amount of supported tokens to be withdrawn
+            uint256 tokenPayoutAmount = tokenBalance * thisOwnerBalance / totalSupply;
+            uint256 tokenPayoutFee = tokenPayoutAmount * breakPiggyFeeBps / 10000;
+
+            // Send the withdrawal event and pay the owner with supported tokens
+            emit SupportedTokenWithdrawal(tokenAddress, recipient, tokenPayoutAmount, thisOwnerBalance);
+            token.transfer(recipient, tokenPayoutAmount - tokenPayoutFee);
+
+            // send the fee to the factory contract owner
+            token.transfer(feeRecipient, tokenPayoutFee);
+        }
     }
 
     receive() external payable {
@@ -143,4 +157,5 @@ contract PiggyBank is IPiggyBank, Initializable {
             emit TargetReached();
         }
     }
+
 }

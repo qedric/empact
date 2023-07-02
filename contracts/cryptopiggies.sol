@@ -157,7 +157,7 @@ contract CryptoPiggies is
     Colours public svgColours;
 
     /// @notice the address of Origin Protocol OETH token
-    address payable public oEthContractAddress;
+    address payable public oETHTokenAddress;
 
     /*//////////////////////////////////////////////////////////////
                         Mappings & Arrays
@@ -180,8 +180,8 @@ contract CryptoPiggies is
 
     /// @notice the addresses of tokens that will count toward the ETH balance
     /// @notice this is intended to contain supported ETH PoS Liquid Staking tokens only.
-    mapping(address => uint256) private supportedTokensIndex;
-    address[] public supportedTokens;
+    mapping(address => uint256) public supportedTokensIndex;
+    address[] private supportedTokens;
 
     /*//////////////////////////////////////////////////////////////
                         Modifiers
@@ -368,8 +368,10 @@ contract CryptoPiggies is
 
         try PiggyBank(payable(piggyBanks[tokenId])).payout{value: 0}(
             msg.sender,
+            feeRecipient,
             thisOwnerBalance,
-            totalSupplyBeforePayout
+            totalSupplyBeforePayout,
+            supportedTokens
         ) {
             
         } catch Error(string memory reason) {
@@ -432,9 +434,13 @@ contract CryptoPiggies is
     /**
      *  @notice         Set the contract address for Origin Protocol staked token
      */
-    function setOEthContractAddress(address _oEthContractAddress) external onlyAdmin {
-        emit OriginProtocolTokenUpdated(address(oEthContractAddress), address(_oEthContractAddress));
-        oEthContractAddress = _oEthContractAddress;
+    function setOETHContractAddress(address payable _oETHTokenAddress) external onlyAdmin {
+        emit OriginProtocolTokenUpdated(address(oETHTokenAddress), address(_oETHTokenAddress));
+        oETHTokenAddress = _oETHTokenAddress;
+    }
+
+    function getSupportedTokens() external view returns(address[] memory) {
+        return supportedTokens;
     }
 
     /**
@@ -443,7 +449,7 @@ contract CryptoPiggies is
     function addSupportedToken(address token) external onlyAdmin {
         require(supportedTokensIndex[token] == 0, "Address already exists");
         supportedTokens.push(token);
-        supportedTokensIndex[token] = addresses.length;
+        supportedTokensIndex[token] = supportedTokens.length;
         emit SupportedTokenAdded(address(token));
     }
 
@@ -462,7 +468,7 @@ contract CryptoPiggies is
             supportedTokensIndex[lastToken] = indexToRemove + 1;
         }
 
-        supportedTokens.pop()
+        supportedTokens.pop();
         delete supportedTokensIndex[token];
 
         emit SupportedTokenRemoved(address(token));

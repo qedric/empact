@@ -104,7 +104,8 @@ describe("Testing CryptoPiggies", function () {
     unlockTimeDays = 99,
     targetBalanceETH = "1",
     feeToSend = "0.004"
-  ) {
+    )
+  {
   
     // Generate a signature for the mint request
     const timestamp = await getCurrentBlockTime();
@@ -1282,6 +1283,45 @@ describe("Testing CryptoPiggies", function () {
     });
 
     it("should include Origin Protocol (oETH) in the balance", async function () {
+    });
+
+    it("should handle non-ETH token transfers and emit TokenReceived event", async function () {
+      // Use the helper function to create a new piggy contract
+      const piggyAddress = await makePiggy();
+
+      // Deploy a mock ERC20 token for testing
+      const MockToken = await ethers.getContractFactory("MockToken");
+      const token = await MockToken.deploy("Mock Token", "MOCK");
+      await token.deployed();
+
+      // Transfer some tokens to the piggy contract
+      const tokenAmount = ethers.utils.parseUnits("100", 18);
+      await token.transfer(piggyAddress, tokenAmount);
+
+      // Get the contract instance
+      const cryptoPiggiesContract = await ethers.getContractAt("CryptoPiggies", cryptoPiggies.address);
+
+      // Check the token balance before the transfer
+      const initialTokenBalance = await token.balanceOf(cryptoPiggies.address);
+
+      // Send a non-ETH token to the piggy contract
+      await token.transfer(cryptoPiggies.address, tokenAmount);
+
+      // Check the token balance after the transfer
+      const finalTokenBalance = await token.balanceOf(cryptoPiggies.address);
+
+      // Check if the fallback function was invoked
+      // You can assert any desired logic here, such as checking the token balance mapping
+      // assert(...);
+
+      // Check if the TokenReceived event was emitted
+      const eventFilter = cryptoPiggiesContract.filters.TokenReceived();
+      const events = await cryptoPiggiesContract.queryFilter(eventFilter);
+      expect(events.length).to.equal(1);
+
+      // Access the emitted event data if needed
+      const event = events[0];
+      // assert(...);
     });
 
     it("should include supported token in the balance", async function () {
