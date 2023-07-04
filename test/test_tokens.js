@@ -193,7 +193,7 @@ describe("Testing CryptoPiggies", function () {
 
   });
 
-  describe("Transactions", function () {
+  describe("Supported Token Transactions", function () {
 
     it("getTotalBalance() should return correct sum of native ETH and supported tokens", async function () {
       // Use the helper function to create a new piggy contract

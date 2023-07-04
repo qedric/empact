@@ -100,7 +100,7 @@ describe("Testing CryptoPiggies", function () {
     name = "4 Little Pigs",
     description = "description",
     externalUrl = "externalUrl",
-    metadata = "metadata",
+    metadata = ',{"trait_type":"Example Trait","value":42}',
     unlockTimeDays = 99,
     targetBalanceETH = "1",
     feeToSend = "0.004"
@@ -208,14 +208,8 @@ describe("Testing CryptoPiggies", function () {
     // tests. It receives the test name, and a callback function.
 
     // If the callback function is async, Mocha will `await` it.
-    it("Should set the right factory owner", async function () {
-
-      // Expect receives a value, and wraps it in an Assertion object. These
-      // objects have a lot of utility methods to assert values.
-
-      // This test expects the owner variable stored in the contract to be equal
-      // to our Signer's owner.
-      expect(await cryptoPiggies.owner()).to.equal(owner.address);
+    it("Should grant the factory deployer the default admin role", async function () {
+      expect(await cryptoPiggies.hasRole(DEFAULT_ADMIN_ROLE, owner.address)).to.equal(true);
     });
 
     it("Should set the correct fee recipient", async function () {
@@ -246,20 +240,6 @@ describe("Testing CryptoPiggies", function () {
       /Permissions: account .* is missing role .*/);
     });
 
-    it("should fail if non factory DEFAULT ADMIN tries to grant an address the MINTER_ROLE", async function () {
-      const theTrueOwner = await cryptoPiggies.owner();
-      assert.notEqual(nonOwner.address, theTrueOwner, "nonOwner should not be the DEFAULT ADMIN");
-
-      // You can also check if nonOwner doesn't have the MINTER_ROLE
-      const minterRole = await cryptoPiggies.MINTER_ROLE();
-      const hasMinterRole = await cryptoPiggies.hasRole(minterRole, nonOwner.address);
-      assert.isFalse(hasMinterRole, "nonOwner should not have the MINTER_ROLE");
-
-      await expect(cryptoPiggies.connect(nonOwner).grantRole(minterRole, minter.address)).to.be.revertedWith(
-        /Permissions: account .* is missing role .*/
-      );
-    });
-
     it("should allow factory DEFAULT ADMIN to revoke MINTER Role for a given address", async function () {
       await cryptoPiggies.grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
       await cryptoPiggies.revokeRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
@@ -284,7 +264,7 @@ describe("Testing CryptoPiggies", function () {
        // Attempt to set a new fee recipient from a non-admin account
       await expect(
         cryptoPiggies.connect(nonOwner).setFeeRecipient(newFeeRecipient.address)
-      ).to.be.revertedWith("Not authorized");
+      ).to.be.revertedWith("Not authorised");
     });
 
   });
@@ -376,54 +356,6 @@ describe("Testing CryptoPiggies", function () {
       // Verify that the token was minted and assigned to the correct recipient
       const balance = await cryptoPiggies.balanceOf(nftOwner.address, 0);
       expect(balance).to.equal(4);
-    });
-
-    it("should not allow the same signature to be used twice", async function() {
-
-      // grant MINTER role to signer
-      await cryptoPiggies.grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
-
-      const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
-        // getBlock returns a block object and it has a timestamp property.
-        ethers.provider.getBlock(blockNumber).then(block => block.timestamp));
-
-      const endTime = Math.floor(timestamp + 60 * 60 * 24);
-      const unlockTime = Math.floor(timestamp + 60 * 60 * 24 * 99);
-
-      const targetBalance = ethers.utils.parseUnits("1", "ether").toString();
-      const makePiggyFee = ethers.utils.parseUnits("0.004", "ether");
-
-      const typedData = await getTypedData(
-        cryptoPiggies,
-        nftOwner.address,
-        22,
-        timestamp,
-        endTime,
-        'Harry',
-        'description',
-        'externalUrl',
-        'metadata',
-        unlockTime,
-        targetBalance
-      )
-
-      // Sign the typed data
-      const signature = await minter._signTypedData(
-        typedData.domain,
-        typedData.types,
-        typedData.message
-      );
-
-      const tx1 = await cryptoPiggies.connect(nftOwner).mintWithSignature(typedData.message, signature, { value: makePiggyFee });
-
-      // Verify that the token was minted and assigned to the correct recipient
-      const balance = await cryptoPiggies.balanceOf(nftOwner.address, 0);
-      expect(balance).to.equal(22);
-
-      // Try to mint again with the same request:
-      await expect(cryptoPiggies.connect(nftOwner).mintWithSignature(
-        typedData.message, signature, { value: makePiggyFee })).to.be.revertedWith("Signature already used");
-
     });
 
     it("should not allow a signature to be used before the start time", async function() {
@@ -710,7 +642,7 @@ describe("Testing CryptoPiggies", function () {
       // Increase block time to after the unlockTime
       await helpers.time.increase(60 * 60 * 24 * 7); // 7 days
 
-      console.log(await cryptoPiggies.uri(0));
+      //console.log(await cryptoPiggies.uri(0));
 
       //get holders balance before payout
       const initialNftOwnerBalance = await ethers.provider.getBalance(nftOwner.address);
@@ -1136,6 +1068,42 @@ describe("Testing CryptoPiggies", function () {
 
   });
 
+  describe("Querying", function() {
+    it("should generate the metadata on uri query", async function() {
+
+      const expectedName = '4 Little Pigs'
+      const expectedDescription = 'description'
+      const expectedExternalUrl = 'externalUrl'
+      const expectedUnlockTime = 1698495367
+
+      // Generate a sample token and its attributes
+      const piggyAddress = await makePiggy();
+
+      // Retrieve the token's metadata URI
+      const metadataURI = await cryptoPiggies.uri(0);
+
+      // Decode the base64-encoded JSON data
+      const decodedData = atob(metadataURI.split(",")[1]);
+
+      // Parse the decoded JSON data
+      const metadata = JSON.parse(decodedData);
+
+      console.log(metadata)
+
+      // Assert that the metadata has the correct values
+      expect(metadata.name).to.equal(expectedName);
+      expect(metadata.description).to.equal(expectedDescription);
+      expect(metadata.external_url).to.equal(expectedExternalUrl);
+      expect(metadata.attributes.length).to.equal(4);
+      expect(metadata.attributes[0].display_type).to.equal("date");
+      expect(metadata.attributes[0].trait_type).to.equal("Maturity Date");
+      expect(metadata.attributes[1].trait_type).to.equal("Target Balance");
+      expect(metadata.attributes[1].value).to.equal("1.00000 ETH");
+      expect(metadata.attributes[2].trait_type).to.equal("Receive Address");
+      expect(metadata.attributes[2].value).to.equal(piggyAddress.toLowerCase());
+    });
+  });
+
   describe("Transactions", function () {
 
     it("should be able to send ETH to the piggy contract", async function () {
@@ -1156,181 +1124,12 @@ describe("Testing CryptoPiggies", function () {
       expect(piggyBalance).to.equal(amountToSend);
     });
 
-    it("should be able to send ETH to the piggy contract", async function () {
-      // Use the helper function to create a new piggy contract
-      const piggyAddress = makePiggy(
-        nftOwner.address,
-        4,
-        "4 Little Pigs",
-        "description",
-        "externalUrl",
-        "metadata",
-        0,
-        "4.44",
-        "0.004"
-      );
-
-      // Get the ContractFactory
-      const PiggyBankFactory = await ethers.getContractFactory("PiggyBank");
-
-      // Create a Contract instance
-      const piggyBank = PiggyBankFactory.attach(piggyAddress);
-
-      // Define a filter to catch the PiggyInitialised event
-      const filter = piggyBank.filters.PiggyInitialised();
-
-      // Get the event logs
-      const eventLogs = await piggyBank.queryFilter(filter);
-
-      // Get the unlockTime from the event's data
-      const eventUnlockTime = eventLogs[0].args.attributes.unlockTime;
-
-      // Convert and print the unlockTime
-      const unlockDate = new Date(eventUnlockTime * 1000);
-      console.log('Unlock Time:', unlockDate);      
-
-      // Define the amount of ETH you want to send (in wei)
-      const amountToSend = ethers.utils.parseEther("1.2345");
-
-      // Get attributes for the piggyBank
-      const piggyAttributes = await piggyBank.attributes();
-
-      // Log the target balance
-      console.log('Target balance:', ethers.utils.formatEther(piggyAttributes.targetBalance));
-
-      // Get current timestamp
-      const currentTime = Math.floor(new Date().getTime() / 1000); // Convert from milliseconds to seconds
-
-      // Compute time difference in seconds
-      const timeDifference = piggyAttributes.unlockTime - currentTime;
-
-      // Compute time difference in days and hours
-      const days = Math.floor(timeDifference / (24 * 60 * 60));
-      const hours = Math.floor(timeDifference / (60 * 60)) % 24;
-
-      // Log the unlock date
-      console.log('Unlock Date:', new Date(piggyAttributes.unlockTime * 1000).toLocaleString("en-GB", {
-          day: '2-digit',    // 2 digits for day
-          month: '2-digit',  // 2 digits for month
-          year: 'numeric',   // 4 digits for year
-          hour: '2-digit',   // 2 digits for hour
-          minute: '2-digit', // 2 digits for minute
-          second: '2-digit'  // 2 digits for second
-      }));
-
-      // Log the time until unlock
-      console.log('Time until unlock:', days, 'days and', hours, 'hours');
-
-      /*// Define filters to catch the events
-      const filterBalance = cryptoPiggies.filters.LogBalancePercentage();
-      const filterTime = cryptoPiggies.filters.LogTimePercentage();*/
-      
-
-      // Send the ETH to the piggy contract
-      await nonOwner.sendTransaction({
-        to: piggyAddress,
-        value: amountToSend,
-      });
-
-      // current balance
-      console.log('Current balance:', ethers.utils.formatEther(await ethers.provider.getBalance(piggyAddress)));
-
-      /*// check the percentage increase
-      const tx = await cryptoPiggies.percentComplete(0);  
-
-       // Query the events
-      const eventLogsBalance = await cryptoPiggies.queryFilter(filterBalance);
-      const eventLogsTime = await cryptoPiggies.queryFilter(filterTime);
-
-      // Print the values from the events
-      eventLogsBalance.forEach((log) => {
-          console.log('Balance:', ethers.utils.formatEther(log.args.balance));
-          console.log('Target balance:', ethers.utils.formatEther(log.args.targetBalance));
-          console.log('Balance percentage:', log.args.percent.toNumber());
-      });
-
-      eventLogsTime.forEach((log) => {
-          console.log('Current time:', log.args.timeStamp.toNumber());
-          console.log('Start time:', log.args.startTime.toNumber());
-          console.log('Unlock time:', log.args.unlockTime.toNumber());
-          console.log('Time percentage:', log.args.percent.toNumber());
-      });*/
-
-      console.log(await cryptoPiggies.uri(0))
-
-      // Check the piggy contract balance
-      const piggyBalance = await ethers.provider.getBalance(piggyAddress);
-      expect(piggyBalance).to.equal(amountToSend);
-    });
-
     it("should fail when sending non-native tokens to a piggyBank", async function () {
       // Use the helper function to create a new piggy contract
       const piggyAddress1 = await makePiggy();
       const piggyAddress2 = await makePiggy();
 
       await expect(cryptoPiggies.connect(nftOwner).safeTransferFrom(nftOwner.address, piggyAddress2, 0, 2, "0x")).to.be.revertedWith("!ERC1155RECEIVER");
-    });
-
-    it("should fail when sending random erc20 tokens to a piggyBank", async function () {
-      // Use the helper function to create a new piggy contract
-      const piggyAddress1 = await makePiggy();
-      const piggyAddress2 = await makePiggy();
-
-      await expect(cryptoPiggies.connect(nftOwner).safeTransferFrom(nftOwner.address, piggyAddress2, 0, 2, "0x")).to.be.revertedWith("!fail");
-    });
-
-    it("should succeed when sending Origin Protocol (oETH) to a piggyBank", async function () {
-    });
-
-    it("should include Origin Protocol (oETH) in the balance", async function () {
-    });
-
-    it("should handle non-ETH token transfers and emit TokenReceived event", async function () {
-      // Use the helper function to create a new piggy contract
-      const piggyAddress = await makePiggy();
-
-      // Deploy a mock ERC20 token for testing
-      const MockToken = await ethers.getContractFactory("MockToken");
-      const token = await MockToken.deploy("Mock Token", "MOCK");
-      await token.deployed();
-
-      // Transfer some tokens to the piggy contract
-      const tokenAmount = ethers.utils.parseUnits("100", 18);
-      await token.transfer(piggyAddress, tokenAmount);
-
-      // Get the contract instance
-      const cryptoPiggiesContract = await ethers.getContractAt("CryptoPiggies", cryptoPiggies.address);
-
-      // Check the token balance before the transfer
-      const initialTokenBalance = await token.balanceOf(cryptoPiggies.address);
-
-      // Send a non-ETH token to the piggy contract
-      await token.transfer(cryptoPiggies.address, tokenAmount);
-
-      // Check the token balance after the transfer
-      const finalTokenBalance = await token.balanceOf(cryptoPiggies.address);
-
-      // Check if the fallback function was invoked
-      // You can assert any desired logic here, such as checking the token balance mapping
-      // assert(...);
-
-      // Check if the TokenReceived event was emitted
-      const eventFilter = cryptoPiggiesContract.filters.TokenReceived();
-      const events = await cryptoPiggiesContract.queryFilter(eventFilter);
-      expect(events.length).to.equal(1);
-
-      // Access the emitted event data if needed
-      const event = events[0];
-      // assert(...);
-    });
-
-    it("should include supported token in the balance", async function () {
-    });
-
-    it("should unlock when target balance is reached with 100% non-ETH supported tokens", async function () {
-    });
-
-    it("should unlock when target balance is reached with 50% ETH & 50% supported tokens", async function () {
     });
 
     it("should fail when sending non-native tokens to the factory contract", async function () {

@@ -6,7 +6,6 @@ import "@thirdweb-dev/contracts/extension/ContractMetadata.sol";
 import "@thirdweb-dev/contracts/extension/Royalty.sol";
 import "@thirdweb-dev/contracts/extension/DefaultOperatorFilterer.sol";
 import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
-import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
@@ -175,9 +174,6 @@ contract CryptoPiggies is
     /// @dev PiggyBanks are mapped to the tokenId of the NFT they are tethered to
     mapping(uint256 => address) public piggyBanks;
 
-    /// @dev keep track of used signatures so they can only be used once.
-    mapping(bytes32 => bool) private usedSignatures;
-
     /// @notice the addresses of tokens that will count toward the ETH balance
     /// @notice this is intended to contain supported ETH PoS Liquid Staking tokens only.
     mapping(address => uint256) public supportedTokensIndex;
@@ -194,7 +190,7 @@ contract CryptoPiggies is
     }
 
     modifier onlyAdmin() {
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender));
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Not authorised");
         _; 
     }
 
@@ -251,7 +247,7 @@ contract CryptoPiggies is
                             ),
                             '},{"trait_type":"Target Balance","value":"',
                             CP_Utils_v2.convertWeiToEthString(_attributes[tokenId].targetBalance),
-                            ' ETH"},{"trait_type":"Receive Address","value":"',
+                            ' ETH"},{"trait_type":"Receive Address","value":"0x',
                             CP_Utils_v2.toAsciiString(
                                 address(piggyBanks[tokenId])
                             ),
@@ -286,14 +282,8 @@ contract CryptoPiggies is
             "Unlock time should be in the future, or target balance greater than 0"
         );
 
-        bytes32 signatureHash = keccak256(abi.encodePacked(_encodeRequest(_req), _signature));
-        require(!usedSignatures[signatureHash], "Signature already used");
-
         // Verify and process payload.
         signer = _processRequest(_req, _signature);
-
-        // Mark the signature as used
-        usedSignatures[signatureHash] = true;
 
         // always mint new token ids
         uint256 tokenIdToMint = nextTokenIdToMint();
@@ -547,10 +537,9 @@ contract CryptoPiggies is
     /// @dev calculates the percentage towards unlock based on time and target balance
     function _getPercentage(uint256 tokenId) internal view returns (uint256 percentage) {
 
-        uint256 balance = address(piggyBanks[tokenId]).balance;
-
-        // First calculate the percentage of targetBalance
         uint256 percentageBasedOnTime;
+        uint256 percentageBasedOnBalance;
+
         if (block.timestamp >= _attributes[tokenId].unlockTime) {
             percentageBasedOnTime = 100;
         } else {
@@ -558,8 +547,8 @@ contract CryptoPiggies is
             uint256 timeElapsed = block.timestamp - _attributes[tokenId].startTime;
             percentageBasedOnTime = uint256((timeElapsed * 100) / totalTime);
         }
-        
-        uint256 percentageBasedOnBalance;
+
+        uint256 balance = IPiggyBank(address(piggyBanks[tokenId])).getTotalBalance();
         if (balance >= _attributes[tokenId].targetBalance) {
             percentageBasedOnBalance = 100;
         } else if (_attributes[tokenId].targetBalance > 0 && balance > 0) {
@@ -602,13 +591,11 @@ contract CryptoPiggies is
         bytes memory data
     ) internal virtual override {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
-
         if (from == address(0)) {
             for (uint256 i = 0; i < ids.length; ++i) {
                 totalSupply[ids[i]] += amounts[i];
             }
         }
-
         if (to == address(0)) {
             for (uint256 i = 0; i < ids.length; ++i) {
                 totalSupply[ids[i]] -= amounts[i];
@@ -621,14 +608,7 @@ contract CryptoPiggies is
         if (makePiggyFee == 0) {
             return;
         }
-
         require(msg.value == makePiggyFee, "Must send the correct fee");
-        
-        CurrencyTransferLib.transferCurrency(
-            CurrencyTransferLib.NATIVE_TOKEN,
-            msg.sender,
-            feeRecipient,
-            makePiggyFee
-        );
+        feeRecipient.transfer(msg.value);
     }
 }
