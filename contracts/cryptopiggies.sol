@@ -200,20 +200,19 @@ contract CryptoPiggies is
     constructor(
         string memory _name,
         string memory _symbol,
-        address _royaltyRecipient,
-        uint128 _royaltyBps,
-        address payable _feeRecipient
+        address payable _feeRecipient,
+        uint128 _royaltyBps
     ) ERC1155(_name, _symbol) {
-        _setupDefaultRoyaltyInfo(_royaltyRecipient, _royaltyBps);
+        _setupDefaultRoyaltyInfo(_feeRecipient, _royaltyBps);
         _setOperatorRestriction(true);
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(MINTER_ROLE, msg.sender);
         feeRecipient = _feeRecipient;
         svgColours = Colours(
-            0xc1bfb3, // bg
-            0xf0b5d2, // fg
+            0xb8abd4, // bg
+            0xbccdc7, // fg
             0x332429, // pbg
-            0xbf3a23  // pfg
+            0xecedab  // pfg
         );
     }
 
@@ -403,7 +402,7 @@ contract CryptoPiggies is
 
     /**
      *  @notice         Sets an implementation for the piggyBank clones.
-     *                  ** Must be run after deployment! **
+     *                  ** Ensure this is called before using this contract! **
      */
     function setPiggyBankImplementation(IPiggyBank _piggyBankImplementation) external onlyAdmin {
         emit PiggyBankImplementationUpdated(address(_piggyBankImplementation));

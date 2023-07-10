@@ -1,10 +1,3 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-//
-// You can also run a script with `npx hardhat run <script>`. If you do that, Hardhat
-// will compile your contracts, add the Hardhat Runtime Environment's members to the
-// global scope, and execute the script.
-
 /*
 {
   "owner":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
@@ -31,11 +24,10 @@ function callback(x) {
 
 async function main() {
 
-  const _name = 'PiggiesTEST23'
+  const _name = 'cryptopiggies'
   const _symbol = 'CPG'
   const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
   const _royaltyBps = '400'
-  const _primarySaleRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C';
 
   const _libAddress = '0x7a604461584925a1dB6Ec4A9d5A767c05D2a4Cd9' // Goerli deployed via thirdweb
   //const _implAddress = '0x6De1F083B9AD801345E6726F947879D12D7347B8' // Goerli deployed PB implementation*/
@@ -52,15 +44,13 @@ async function main() {
   );
 
   // deploy
-  const deployedFactory = await PiggyFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient);
+  const deployedFactory = await PiggyFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps);
 
   // Wait for this transaction to be mined
   await deployedFactory.deployed();
 
   // Get contract address
-  console.log("Owner is: ", await deployedFactory.owner())
-
-  console.log('PiggyFactory address:', deployedFactory.address)
+  console.log('Factory address:', deployedFactory.address)
 
   /*// then deploy the implementation piggy bank that the factory can then clone:
   const Piggy = await hre.ethers.getContractFactory("PiggyBank");
