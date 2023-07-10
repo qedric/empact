@@ -7,7 +7,7 @@ function callback(x) {
 
 async function main() {
 
-  const _facAddress = '0xB4aB04Fb48Cc1833402b67D4C94708e366472C37' // Goerli deployed via thirdweb
+  const _facAddress = '0x90ca6c4390b80f5c83c29751438d61d6c2e1c0b6' // Goerli deployed
 
   // Get contract that we want to deploy
   const PB = await hre.ethers.getContractFactory("PiggyBank");
