@@ -7,6 +7,7 @@ import "@thirdweb-dev/contracts/extension/Royalty.sol";
 import "@thirdweb-dev/contracts/extension/DefaultOperatorFilterer.sol";
 import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "./utils.sol";
@@ -107,7 +108,8 @@ contract CryptoPiggies is
     DefaultOperatorFilterer, 
     SignaturePiggyMintERC1155,
     PermissionsEnumerable,
-    ICPFactory
+    ICPFactory,
+    Ownable
 {
 
     struct Colours {
@@ -137,7 +139,10 @@ contract CryptoPiggies is
     /// @dev The tokenId of the next NFT to mint.
     uint256 internal nextTokenIdToMint_;
 
-    /// @notice This role is required to mint.
+    /// @dev prefix for the token url
+    string private _tokenUrlPrefix = 'https://cryptopiggies.io/'
+
+    /// @notice This role signs mint requsts.
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     /// @notice The fee to create a new Piggy.
@@ -189,11 +194,6 @@ contract CryptoPiggies is
         _;
     }
 
-    modifier onlyAdmin() {
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Not authorised");
-        _; 
-    }
-
     /*//////////////////////////////////////////////////////////////
                             Constructor
     //////////////////////////////////////////////////////////////*/
@@ -220,6 +220,10 @@ contract CryptoPiggies is
                     Overriden metadata logic - On-chain
     //////////////////////////////////////////////////////////////*/
     function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {
+        bytes3 bg = svgColours.bg;
+        if (_getPercentage(tokenId) == 100) {
+            bg = 0xffd700;
+        }
         return string(
             abi.encodePacked(
                 "data:application/json;base64,",
@@ -228,18 +232,23 @@ contract CryptoPiggies is
                         abi.encodePacked(
                             '{"name":"',
                             _attributes[tokenId].name,
+                            ' - ',
+                            CP_Utils_v2.convertWeiToEthString(balance);
                             '","description":"',
                             _attributes[tokenId].description,
-                            '","image_data":"',
+                            '<br><br>',
+                            _attributes[tokenId].externalUrl,
+                            ","image_data":"',
                             CP_Utils_v2.generateSVG(
-                                svgColours.bg,
+                                bg,
                                 svgColours.fg,
                                 svgColours.pbg,
                                 svgColours.pfg,
                                 _getPercentage(tokenId)
                             ),
                             '","external_url":"',
-                            _attributes[tokenId].externalUrl,
+                            _tokenUrlPrefix,
+                            tokenId,
                             '","attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
                             CP_Utils_v2.uint2str(
                                 _attributes[tokenId].unlockTime
@@ -250,7 +259,9 @@ contract CryptoPiggies is
                             CP_Utils_v2.toAsciiString(
                                 address(piggyBanks[tokenId])
                             ),
-                            '"}',
+                            '"},{"display_type":"boost_percentage","trait_type": "Percent Complete","value":',
+                            _getPercentage(tokenId),
+                            '}',
                             _attributes[tokenId].metadata,
                             ']}'
                         )
@@ -378,14 +389,19 @@ contract CryptoPiggies is
         require(false, "Do not send ETH to this contract");
     }
 
+    /// @notice this will display in NFT metadata
+    function setTokenUrlPrefix(string tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _tokenUrlPrefix = tokenUrlPrefix;
+    }
+
     /// @notice Sets the fee for creating a new piggyBank
-    function setMakePiggyFee(uint256 fee) external onlyAdmin {
+    function setMakePiggyFee(uint256 fee) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit MakePiggyFeeUpdated(fee);
         makePiggyFee = fee;
     }
 
     /// @notice Sets the fee for withdrawing the funds from a PiggyBank - does not affect existing piggyBanks
-    function setBreakPiggyBps(uint16 bps) external onlyAdmin {
+    function setBreakPiggyBps(uint16 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(bps <= 900, "Don't be greedy!");
         emit BreakPiggyBpsUpdated(bps);
         breakPiggyFeeBps = bps;
@@ -395,7 +411,7 @@ contract CryptoPiggies is
      *  @notice         Updates recipient of make & break piggy fees.
      *  @param _feeRecipient   Address to be set as new recipient of primary sales.
      */
-    function setFeeRecipient(address payable _feeRecipient) external onlyAdmin {
+    function setFeeRecipient(address payable _feeRecipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
         feeRecipient = _feeRecipient;
         emit FeeRecipientUpdated(_feeRecipient);
     }
@@ -404,7 +420,7 @@ contract CryptoPiggies is
      *  @notice         Sets an implementation for the piggyBank clones.
      *                  ** Ensure this is called before using this contract! **
      */
-    function setPiggyBankImplementation(IPiggyBank _piggyBankImplementation) external onlyAdmin {
+    function setPiggyBankImplementation(IPiggyBank _piggyBankImplementation) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit PiggyBankImplementationUpdated(address(_piggyBankImplementation));
         piggyBankImplementation = _piggyBankImplementation;
     }
@@ -416,14 +432,14 @@ contract CryptoPiggies is
      * @param pbg Piggy background colour.
      * @param pfg Piggy foreground colour.
      */
-    function setSvgColours(bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public onlyAdmin {
+    function setSvgColours(bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public onlyRole(DEFAULT_ADMIN_ROLE) {
         svgColours = Colours(bg, fg, pbg, pfg);
     }
 
     /**
      *  @notice         Set the contract address for Origin Protocol staked token
      */
-    function setOETHContractAddress(address payable _oETHTokenAddress) external onlyAdmin {
+    function setOETHContractAddress(address payable _oETHTokenAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit OriginProtocolTokenUpdated(address(oETHTokenAddress), address(_oETHTokenAddress));
         oETHTokenAddress = _oETHTokenAddress;
     }
@@ -435,7 +451,7 @@ contract CryptoPiggies is
     /**
      *  @notice         Add a supported token address
      */
-    function addSupportedToken(address token) external onlyAdmin {
+    function addSupportedToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(supportedTokensIndex[token] == 0, "Address already exists");
         supportedTokens.push(token);
         supportedTokensIndex[token] = supportedTokens.length;
@@ -445,7 +461,7 @@ contract CryptoPiggies is
     /**
      *  @notice         Remove a supported token address
      */
-    function removeSupportedToken(address token) external onlyAdmin {
+    function removeSupportedToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(supportedTokensIndex[token] != 0, "Address doesn't exist");
 
         uint256 indexToRemove = supportedTokensIndex[token] - 1;
