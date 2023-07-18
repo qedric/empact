@@ -19,8 +19,6 @@ interface ISignatureMintERC1155 {
         uint128 validityEndTimestamp;
         string name;
         string description;
-        string externalUrl;
-        string metadata;
         uint256 unlockTime;
         uint256 targetBalance;
     }

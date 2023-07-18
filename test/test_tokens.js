@@ -13,8 +13,6 @@ async function getTypedData(
   validityEndTimestamp,
   name,
   description,
-  externalUrl,
-  metadata,
   unlockTime,
   targetBalance
 ) {
@@ -27,8 +25,6 @@ async function getTypedData(
         { name: "validityEndTimestamp", type: "uint128" },
         { name: "name", type: "string" },
         { name: "description", type: "string" },
-        { name: "externalUrl", type: "string" },
-        { name: "metadata", type: "string" },
         { name: "unlockTime", type: "uint256" },
         { name: "targetBalance", type: "uint256" }
       ],
@@ -47,8 +43,6 @@ async function getTypedData(
       validityEndTimestamp: validityEndTimestamp,
       name: name,
       description: description,
-      externalUrl: externalUrl,
-      metadata: metadata,
       unlockTime: unlockTime,
       targetBalance: targetBalance
     },
@@ -99,8 +93,6 @@ describe("Testing CryptoPiggies", function () {
     quantity = 4,
     name = "4 Little Pigs",
     description = "description",
-    externalUrl = "externalUrl",
-    metadata = "metadata",
     unlockTimeDays = 99,
     targetBalanceETH = "1",
     feeToSend = "0.004"
@@ -122,8 +114,6 @@ describe("Testing CryptoPiggies", function () {
       endTime,
       name,
       description,
-      externalUrl,
-      metadata,
       unlockTime,
       targetBalance
     )
@@ -175,12 +165,12 @@ describe("Testing CryptoPiggies", function () {
 
     const _name = 'CryptoPiggies_HH_TEST'
     const _symbol = 'CPG'
-    const _royaltyRecipient = owner.address
+    const _feeRecipient = feeRecipient.address
     const _royaltyBps = '400'
-    const _feeRecipient = feeRecipient.address;
+    
 
     // deploy
-    cryptoPiggies = await Factory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _feeRecipient);
+    cryptoPiggies = await Factory.deploy(_name, _symbol, _feeRecipient, _royaltyBps);
     
     // init the implementation
     await cryptoPiggies.deployed();
@@ -234,8 +224,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         0,
         "4.44"
       );
@@ -271,8 +259,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         0,
         "100"
       );
@@ -329,8 +315,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         0,
         "100"
       );
@@ -371,8 +355,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         0,
         "100"
       );
@@ -415,8 +397,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         0,
         "100"
       );
@@ -503,8 +483,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         0,
         "100"
       );

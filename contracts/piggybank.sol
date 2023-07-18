@@ -12,8 +12,6 @@ interface IPiggyBank {
         uint256 targetBalance;
         string name;
         string description;
-        string externalUrl;
-        string metadata;
     }
 
     event PiggyInitialised(Attr attributes);

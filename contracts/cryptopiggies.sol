@@ -18,7 +18,7 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
 
     bytes32 internal constant TYPEHASH =
         keccak256(
-            "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string name,string description,string externalUrl,string metadata,uint256 unlockTime,uint256 targetBalance)"
+            "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string name,string description,uint256 unlockTime,uint256 targetBalance)"
         );
 
     constructor() EIP712("SignatureMintERC1155", "1") {}
@@ -73,8 +73,6 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
         uint128 validityEndTimestamp;
         string name;
         string description;
-        string externalUrl;
-        string metadata;
         uint256 unlockTime;
         uint256 targetBalance;
     }
@@ -93,8 +91,6 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
                 _req.validityEndTimestamp,
                 keccak256(bytes(_req.name)),
                 keccak256(bytes(_req.description)),
-                keccak256(bytes(_req.externalUrl)),
-                keccak256(bytes(_req.metadata)),
                 _req.unlockTime,
                 _req.targetBalance
             );
@@ -307,8 +303,6 @@ contract CryptoPiggies is
             uint256 targetBalance;
             string name;
             string description;
-            string externalUrl;
-            string metadata;
         }
         */
         IPiggyBank.Attr memory piglet = IPiggyBank.Attr(
@@ -317,9 +311,7 @@ contract CryptoPiggies is
             block.timestamp,
             _req.targetBalance,
             _req.name,
-            _req.description,
-            _req.externalUrl,
-            _req.metadata
+            _req.description
         );
 
         // Set token data

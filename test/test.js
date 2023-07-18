@@ -13,8 +13,6 @@ async function getTypedData(
   validityEndTimestamp,
   name,
   description,
-  externalUrl,
-  metadata,
   unlockTime,
   targetBalance
 ) {
@@ -27,8 +25,6 @@ async function getTypedData(
         { name: "validityEndTimestamp", type: "uint128" },
         { name: "name", type: "string" },
         { name: "description", type: "string" },
-        { name: "externalUrl", type: "string" },
-        { name: "metadata", type: "string" },
         { name: "unlockTime", type: "uint256" },
         { name: "targetBalance", type: "uint256" }
       ],
@@ -47,8 +43,6 @@ async function getTypedData(
       validityEndTimestamp: validityEndTimestamp,
       name: name,
       description: description,
-      externalUrl: externalUrl,
-      metadata: metadata,
       unlockTime: unlockTime,
       targetBalance: targetBalance
     },
@@ -99,8 +93,6 @@ describe("Testing CryptoPiggies", function () {
     quantity = 4,
     name = "4 Little Pigs",
     description = "description",
-    externalUrl = "externalUrl",
-    metadata = ',{"trait_type":"Example Trait","value":42}',
     unlockTimeDays = 99,
     targetBalanceETH = "1",
     feeToSend = "0.004"
@@ -122,8 +114,6 @@ describe("Testing CryptoPiggies", function () {
       endTime,
       name,
       description,
-      externalUrl,
-      metadata,
       unlockTime,
       targetBalance
     )
@@ -291,8 +281,6 @@ describe("Testing CryptoPiggies", function () {
         endTime,
         'Harry',
         'description',
-        'externalUrl',
-        'metadata',
         unlockTime,
         targetBalance
       )
@@ -335,8 +323,6 @@ describe("Testing CryptoPiggies", function () {
         endTime,
         '4 Little Pigs',
         'description',
-        'externalUrl',
-        'metadata',
         unlockTime,
         targetBalance
       )
@@ -377,8 +363,6 @@ describe("Testing CryptoPiggies", function () {
         endTime,
         '4 Little Pigs',
         'description',
-        'externalUrl',
-        'metadata',
         unlockTime,
         targetBalance
       )
@@ -415,8 +399,6 @@ describe("Testing CryptoPiggies", function () {
         endTime,
         '4 Little Pigs',
         'description',
-        'externalUrl',
-        'metadata',
         unlockTime,
         targetBalance
       )
@@ -461,8 +443,6 @@ describe("Testing CryptoPiggies", function () {
         endTime,
         'Harry',
         'description',
-        'externalUrl',
-        'metadata',
         unlockTime,
         targetBalance
       )
@@ -499,8 +479,6 @@ describe("Testing CryptoPiggies", function () {
         endTime,
         '4 Little Pigs',
         'description',
-        'externalUrl',
-        'metadata',
         unlockTime,
         targetBalance
       )
@@ -536,8 +514,6 @@ describe("Testing CryptoPiggies", function () {
         endTime,
         '4 Little Pigs',
         'description',
-        'externalUrl',
-        'metadata',
         unlockTime,
         targetBalance
       )
@@ -607,8 +583,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        ',{"trait_type":"Description","value":"fantastic"}',
         7,
         "4.44"
       );*/
@@ -618,8 +592,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        '',
         7,
         "4.44"
       );
@@ -688,8 +660,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         0,
         "4.44"
       );
@@ -747,8 +717,6 @@ describe("Testing CryptoPiggies", function () {
         100,
         "100 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         0,
         "100"
       );
@@ -817,8 +785,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         7,
         "4.44"
       );
@@ -848,8 +814,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         0,
         "10"
       );
@@ -874,8 +838,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         0,
         "10"
       );
@@ -900,8 +862,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         1,
         "0",
         "0.004"
@@ -936,7 +896,6 @@ describe("Testing CryptoPiggies", function () {
 
       const endTime = Math.floor(timestamp + 60 * 60 * 24);
       const unlockTime = Math.floor(timestamp + 60 * 60 * 24 * 99);
-      const metadata = ',{"display_type":"boost_number","trait_type":"Test value","value":40},{"display_type":"boost_percentage","trait_type":"Test percentage","value": 10}';
       const targetBalance = ethers.utils.parseUnits("1", "ether").toString();
       const makePiggyFee = ethers.utils.parseUnits("0.004", "ether");
 
@@ -948,8 +907,6 @@ describe("Testing CryptoPiggies", function () {
         endTime,
         "Sam the Pig",
         "An accurate description",
-        "https://awebsite.org",
-        metadata,
         unlockTime,
         targetBalance
       );
@@ -1002,8 +959,6 @@ describe("Testing CryptoPiggies", function () {
         4,
         "4 Little Pigs",
         "description",
-        "externalUrl",
-        "metadata",
         0,
         "1"
       );
@@ -1057,7 +1012,7 @@ describe("Testing CryptoPiggies", function () {
      });
 
      it("should fail when trying to mint a piggy sending less than the MakePiggyFee", async function () {
-      await expect(makePiggy(nftOwner.address,44,"44 Little Pigs","description","externalUrl","metadata",0,"1","0.003")).to.be.revertedWith("Must send the correct fee");
+      await expect(makePiggy(nftOwner.address,44,"44 Little Pigs","description",0,"1","0.003")).to.be.revertedWith("Must send the correct fee");
      });
 
      it("should fail when trying to set the BreakPiggyFee higher than the max allowed", async function () {
@@ -1073,7 +1028,6 @@ describe("Testing CryptoPiggies", function () {
 
       const expectedName = '4 Little Pigs'
       const expectedDescription = 'description'
-      const expectedExternalUrl = 'externalUrl'
       const expectedUnlockTime = 1698495367
 
       // Generate a sample token and its attributes
@@ -1093,7 +1047,6 @@ describe("Testing CryptoPiggies", function () {
       // Assert that the metadata has the correct values
       expect(metadata.name).to.equal(expectedName);
       expect(metadata.description).to.equal(expectedDescription);
-      expect(metadata.external_url).to.equal(expectedExternalUrl);
       expect(metadata.attributes.length).to.equal(4);
       expect(metadata.attributes[0].display_type).to.equal("date");
       expect(metadata.attributes[0].trait_type).to.equal("Maturity Date");
