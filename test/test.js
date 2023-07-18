@@ -165,12 +165,11 @@ describe("Testing CryptoPiggies", function () {
 
     const _name = 'CryptoPiggies_HH_TEST'
     const _symbol = 'CPG'
-    const _royaltyRecipient = owner.address
+    const _feeRecipient = feeRecipient.address
     const _royaltyBps = '400'
-    const _feeRecipient = feeRecipient.address;
 
     // deploy
-    cryptoPiggies = await Factory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _feeRecipient);
+    cryptoPiggies = await Factory.deploy(_name, _symbol, _feeRecipient, _royaltyBps);
     
     // init the implementation
     await cryptoPiggies.deployed();
