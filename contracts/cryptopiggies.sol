@@ -108,13 +108,6 @@ contract CryptoPiggies is
     Ownable
 {
 
-    struct Colours {
-        bytes3 bg;
-        bytes3 fg;
-        bytes3 pbg;
-        bytes3 pfg;
-    }
-
     /*//////////////////////////////////////////////////////////////
                         Events
     //////////////////////////////////////////////////////////////*/
@@ -136,7 +129,7 @@ contract CryptoPiggies is
     uint256 internal nextTokenIdToMint_;
 
     /// @dev prefix for the token url
-    string private _tokenUrlPrefix = 'https://cryptopiggies.io/'
+    string private _tokenUrlPrefix = 'https://cryptopiggies.io/';
 
     /// @notice This role signs mint requsts.
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -205,6 +198,7 @@ contract CryptoPiggies is
         _setupRole(MINTER_ROLE, msg.sender);
         feeRecipient = _feeRecipient;
         svgColours = Colours(
+            0xffcc00, // fbg
             0xb8abd4, // bg
             0xbccdc7, // fg
             0x332429, // pbg
@@ -216,10 +210,6 @@ contract CryptoPiggies is
                     Overriden metadata logic - On-chain
     //////////////////////////////////////////////////////////////*/
     function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {
-        bytes3 bg = svgColours.bg;
-        if (_getPercentage(tokenId) == 100) {
-            bg = 0xffd700;
-        }
         return string(
             abi.encodePacked(
                 "data:application/json;base64,",
@@ -229,37 +219,19 @@ contract CryptoPiggies is
                             '{"name":"',
                             _attributes[tokenId].name,
                             ' - ',
-                            CP_Utils_v2.convertWeiToEthString(balance);
+                            CP_Utils_v2.convertWeiToEthString(IPiggyBank(address(piggyBanks[tokenId])).getTotalBalance()),
                             '","description":"',
                             _attributes[tokenId].description,
-                            '<br><br>',
-                            _attributes[tokenId].externalUrl,
-                            ","image_data":"',
+                            '","image_data":"',
                             CP_Utils_v2.generateSVG(
-                                bg,
-                                svgColours.fg,
-                                svgColours.pbg,
-                                svgColours.pfg,
+                                svgColours.fbg, svgColours.bg, svgColours.fg, svgColours.pbg, svgColours.pfg,
                                 _getPercentage(tokenId)
                             ),
                             '","external_url":"',
                             _tokenUrlPrefix,
                             tokenId,
-                            '","attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
-                            CP_Utils_v2.uint2str(
-                                _attributes[tokenId].unlockTime
-                            ),
-                            '},{"trait_type":"Target Balance","value":"',
-                            CP_Utils_v2.convertWeiToEthString(_attributes[tokenId].targetBalance),
-                            ' ETH"},{"trait_type":"Receive Address","value":"0x',
-                            CP_Utils_v2.toAsciiString(
-                                address(piggyBanks[tokenId])
-                            ),
-                            '"},{"display_type":"boost_percentage","trait_type": "Percent Complete","value":',
-                            _getPercentage(tokenId),
-                            '}',
-                            _attributes[tokenId].metadata,
-                            ']}'
+                            '","',
+                            CP_Utils_v2.generateAttributes(_attributes[tokenId].unlockTime, _attributes[tokenId].targetBalance, address(piggyBanks[tokenId]), _getPercentage(tokenId))
                         )
                     )   
                 )
@@ -382,7 +354,7 @@ contract CryptoPiggies is
     }
 
     /// @notice this will display in NFT metadata
-    function setTokenUrlPrefix(string tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setTokenUrlPrefix(string memory tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _tokenUrlPrefix = tokenUrlPrefix;
     }
 
@@ -424,8 +396,8 @@ contract CryptoPiggies is
      * @param pbg Piggy background colour.
      * @param pfg Piggy foreground colour.
      */
-    function setSvgColours(bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        svgColours = Colours(bg, fg, pbg, pfg);
+    function setSvgColours(bytes3 fbg, bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        svgColours = Colours(fbg, bg, fg, pbg, pfg);
     }
 
     /**
