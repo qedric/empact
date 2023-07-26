@@ -64,24 +64,9 @@ async function getCurrentBlockTime() {
   return timestamp;
 }
 
-// `describe` is a Mocha function that allows you to organize your tests. It's
-// not actually needed, but having your tests organized makes debugging them
-// easier. All Mocha functions are available in the global scope.
-
-// `describe` receives the name of a section of your test suite, and a callback.
-// The callback must define the tests of that section. This callback can't be
-// an async function.
 describe("Testing CryptoPiggies", function () {
-  // Mocha has four functions that let you hook into the the test runner's
-  // lifecyle. These are: `before`, `beforeEach`, `after`, `afterEach`.
 
-  // They're very useful to setup the environment for tests, and to clean it
-  // up after they run.
-
-  // A common pattern is to declare some variables, and assign them in the
-  // `before` and `beforeEach` callbacks.
-
-  let utils, piggyBankImplementation, cryptoPiggies;
+  let utils, generator, piggyBankImplementation, cryptoPiggies
 
   let owner, newOwner, nonOwner
   let minter, newMinter, nonMinter
@@ -150,18 +135,14 @@ describe("Testing CryptoPiggies", function () {
   // time. It receives a callback, which can be async.
   beforeEach(async function () {
     
-    [owner, newOwner, minter, newMinter, nonOwner, nonMinter, nftOwner, nonNftOwner, feeRecipient, newFeeRecipient] = await ethers.getSigners();
+    [owner, newOwner, minter, newMinter, nonOwner, nonMinter, nftOwner, nonNftOwner, feeRecipient, newFeeRecipient] = await ethers.getSigners()
 
-    const PiggyBankImplementation = await ethers.getContractFactory("PiggyBank");
-    const Utils = await ethers.getContractFactory("CP_Utils_v2");
+    const PiggyBankImplementation = await ethers.getContractFactory("PiggyBank")
+    const Generator = await ethers.getContractFactory("Generator_v1")
     
-    utils = await Utils.deploy();
+    generator = await Generator.deploy()
 
-    const Factory = await ethers.getContractFactory("CryptoPiggies", {
-      libraries: {
-        CP_Utils_v2: utils.address,
-      }}
-    );
+    const Factory = await ethers.getContractFactory("CryptoPiggies")
 
     const _name = 'CryptoPiggies_HH_TEST'
     const _symbol = 'CPG'
@@ -169,32 +150,27 @@ describe("Testing CryptoPiggies", function () {
     const _royaltyBps = '400'
 
     // deploy
-    cryptoPiggies = await Factory.deploy(_name, _symbol, _feeRecipient, _royaltyBps);
+    cryptoPiggies = await Factory.deploy(_name, _symbol, _feeRecipient, _royaltyBps)
     
     // init the implementation
-    await cryptoPiggies.deployed();
+    await cryptoPiggies.deployed()
 
-    piggyBankImplementation = await PiggyBankImplementation.deploy(cryptoPiggies.address);
-    await piggyBankImplementation.deployed();
+    piggyBankImplementation = await PiggyBankImplementation.deploy(cryptoPiggies.address)
+    await piggyBankImplementation.deployed()
 
     //set the implementation in the contract
-    await cryptoPiggies.setPiggyBankImplementation(piggyBankImplementation.address);
+    await cryptoPiggies.setPiggyBankImplementation(piggyBankImplementation.address)
 
+    //set the generator in the contract
+    await cryptoPiggies.setGenerator(generator.address)
 
     //console.log('factory address:', cryptoPiggies.address)
     //console.log('piggyBank address:', piggyBankImplementation.address)
 
-    // Wait for this transaction to be mined
-    
-
-    // set permission
-
-  });
+  })
 
   // You can nest describe calls to create subsections.
   describe("Deployment", function () {
-    // `it` is another Mocha function. This is the one you use to define your
-    // tests. It receives the test name, and a callback function.
 
     // If the callback function is async, Mocha will `await` it.
     it("Should grant the factory deployer the default admin role", async function () {
@@ -206,7 +182,7 @@ describe("Testing CryptoPiggies", function () {
       expect(actualFeeRecipient).to.equal(feeRecipient.address);
     });
 
-  });
+  })
 
   describe("Permissions", function () {
 
@@ -220,26 +196,16 @@ describe("Testing CryptoPiggies", function () {
       assert(isMinter);
     });
 
-    it("should allow factory DEFAULT ADMIN to grant an address the DEFAULT ADMIN Role", async function () {
-      return false
-    });
-
     it("should fail if non factory DEFAULT ADMIN tries to grant an address the MINTER Role", async function () {
       await expect(cryptoPiggies.connect(nonOwner).grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address)).to.be.revertedWith(
-      /Permissions: account .* is missing role .*/);
+      /Permissions: account .* is missing role .*/)
     });
 
     it("should allow factory DEFAULT ADMIN to revoke MINTER Role for a given address", async function () {
       await cryptoPiggies.grantRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
       await cryptoPiggies.revokeRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
       const isMinter = await cryptoPiggies.hasRole(await cryptoPiggies.MINTER_ROLE(), minter.address);
-      assert(!isMinter);
-    });
-
-    it("should allow factory DEFAULT ADMIN to revoke DEFAULT ADMIN Role for a given address", async function () {
-    });
-
-    it("should not allow factory DEFAULT ADMIN to revoke own DEFAULT ADMIN Role", async function () {
+      assert(!isMinter)
     });
 
     it("should fail if non factory DEFAULT ADMIN tries to revoke the MINTER Role for a given address", async function () {
@@ -253,10 +219,26 @@ describe("Testing CryptoPiggies", function () {
        // Attempt to set a new fee recipient from a non-admin account
       await expect(
         cryptoPiggies.connect(nonOwner).setFeeRecipient(newFeeRecipient.address)
-      ).to.be.revertedWith("Not authorised");
+      ).to.be.revertedWith(
+        new RegExp(`Permissions: account ${nonOwner.address} is missing role ${DEFAULT_ADMIN_ROLE}`,"i")
+      )
     });
 
-  });
+    it("should allow DEFAULT_ADMIN_ROLE to change the generator", async function() {
+      await cryptoPiggies.connect(owner).setGenerator(newFeeRecipient.address)
+      let newGen = await cryptoPiggies.generator()
+      expect(newGen).to.equal(newFeeRecipient.address)
+    })
+
+    it("should not allow non DEFAULT_ADMIN_ROLE to change the generator", async function() {
+      await expect(
+        cryptoPiggies.connect(nonOwner).setGenerator(newFeeRecipient.address)
+      ).to.be.revertedWith(
+        new RegExp(`Permissions: account ${nonOwner.address} is missing role ${DEFAULT_ADMIN_ROLE}`,"i")
+      )
+    })
+
+  })
 
   describe("Minting", function () {
 
@@ -530,14 +512,14 @@ describe("Testing CryptoPiggies", function () {
         typedData.message, signature, { value: makePiggyFee })).to.be.revertedWith("Minting zero tokens.");
 
     });
-  });
+  })
 
   describe("Burning", function () {
 
     let piggyBankAddress;
 
     beforeEach(async function () {
-      piggyBankAddress = makePiggy(nftOwner.address,100,"Test Burning","100 Piggies",'','',0,'1','0.004');
+      piggyBankAddress = makePiggy(nftOwner.address,100,"Test Burning","100 Piggies",0,'1','0.004');
       //send 1 ETH
       await nftOwner.sendTransaction({ to: piggyBankAddress, value: ethers.utils.parseEther("1") });      
     });
@@ -570,7 +552,7 @@ describe("Testing CryptoPiggies", function () {
       expect(newBalance).to.equal(0);
     });
 
-  });
+  })
 
   describe("Payout", function() {
 
@@ -873,7 +855,7 @@ describe("Testing CryptoPiggies", function () {
       await expect(cryptoPiggies.connect(nftOwner).payout(0)).to.be.revertedWith("Piggy is still hungry!");
 
     });
-  });
+  })
 
   describe("Fees", function() {
 
@@ -1020,7 +1002,7 @@ describe("Testing CryptoPiggies", function () {
       await expect(cryptoPiggies.setBreakPiggyBps(newBreakPiggyFee)).to.be.revertedWith("Don't be greedy!");
      });   
 
-  });
+  })
 
   describe("Querying", function() {
     it("should generate the metadata on uri query", async function() {
@@ -1030,30 +1012,187 @@ describe("Testing CryptoPiggies", function () {
       const expectedUnlockTime = 1698495367
 
       // Generate a sample token and its attributes
-      const piggyAddress = await makePiggy();
+      const piggyAddress = await makePiggy()
 
       // Retrieve the token's metadata URI
-      const metadataURI = await cryptoPiggies.uri(0);
+      const metadataURI = await cryptoPiggies.uri(0)
 
       // Decode the base64-encoded JSON data
-      const decodedData = atob(metadataURI.split(",")[1]);
+      const decodedData = atob(metadataURI.split(",")[1])
 
       // Parse the decoded JSON data
-      const metadata = JSON.parse(decodedData);
+      const metadata = JSON.parse(decodedData)
 
       console.log(metadata)
 
       // Assert that the metadata has the correct values
-      expect(metadata.name).to.equal(expectedName);
-      expect(metadata.description).to.equal(expectedDescription);
-      expect(metadata.attributes.length).to.equal(4);
-      expect(metadata.attributes[0].display_type).to.equal("date");
-      expect(metadata.attributes[0].trait_type).to.equal("Maturity Date");
-      expect(metadata.attributes[1].trait_type).to.equal("Target Balance");
-      expect(metadata.attributes[1].value).to.equal("1.00000 ETH");
-      expect(metadata.attributes[2].trait_type).to.equal("Receive Address");
-      expect(metadata.attributes[2].value).to.equal(piggyAddress.toLowerCase());
-    });
+      expect(metadata.name).to.equal(expectedName)
+      expect(metadata.description).to.equal(expectedDescription)
+      expect(metadata.attributes.length).to.equal(5)
+      expect(metadata.attributes[0].display_type).to.equal("date")
+      expect(metadata.attributes[0].trait_type).to.equal("Maturity Date")
+      expect(metadata.attributes[1].trait_type).to.equal("Target Balance")
+      expect(metadata.attributes[1].value).to.equal("1.00000 ETH")
+      expect(metadata.attributes[2].trait_type).to.equal("Current Balance")
+      expect(metadata.attributes[2].value).to.equal("0 ETH")
+      expect(metadata.attributes[3].trait_type).to.equal("Receive Address")
+      expect(metadata.attributes[3].value).to.equal(piggyAddress.toLowerCase())
+    })
+
+    it("should return correct metadata for piggy with 50% time up", async function() {
+      const expectedName = '4 Little Pigs';
+      const expectedDescription = 'The description';
+      const expectedUnlockTime = 1698495367;
+
+      // Generate a sample token and its attributes with 50% of unlock time passed
+      const piggyAddress = await makePiggy(
+        nftOwner.address,
+        4,
+        '4 Little Pigs',
+        'The description',
+        100, // unlock days
+        '0',
+        '0.004'
+      );
+
+      // Simulate waiting for 50 days
+      const fiftyDaysInSeconds = 60 * 60 * 24 * 50
+      await network.provider.send("evm_increaseTime", [fiftyDaysInSeconds])
+      await network.provider.send("evm_mine")
+
+      // Retrieve the token's metadata URI
+      const metadataURI = await cryptoPiggies.uri(0)
+
+      // Decode the base64-encoded JSON data
+      const decodedData = atob(metadataURI.split(",")[1])
+
+      // Parse the decoded JSON data
+      const metadata = JSON.parse(decodedData)
+
+      console.log(metadata)
+
+      // Assert that the metadata has the correct values
+      expect(metadata.name).to.equal(expectedName)
+      expect(metadata.description).to.equal(expectedDescription)
+      expect(metadata.attributes.length).to.equal(5)
+      expect(metadata.attributes[0].display_type).to.equal("date")
+      expect(metadata.attributes[0].trait_type).to.equal("Maturity Date")
+      expect(metadata.attributes[1].trait_type).to.equal("Target Balance")
+      expect(metadata.attributes[1].value).to.equal("0 ETH")
+      expect(metadata.attributes[2].trait_type).to.equal("Current Balance")
+      expect(metadata.attributes[2].value).to.equal("0 ETH")
+      expect(metadata.attributes[3].trait_type).to.equal("Receive Address")
+      expect(metadata.attributes[3].value).to.equal(piggyAddress.toLowerCase())
+      expect(metadata.attributes[4].display_type).to.equal("boost_percentage")
+      expect(metadata.attributes[4].trait_type).to.equal("Percent Complete")
+      expect(metadata.attributes[4].value).to.equal(50)
+    })
+
+    it("should return correct metadata for piggy with 50 balance", async function() {
+      const expectedName = '4 Little Pigs';
+      const expectedDescription = 'The description';
+      const expectedUnlockTime = 0;
+
+      // Generate a sample token and its attributes
+      const piggyAddress = await makePiggy(
+        nftOwner.address,
+        4,
+        '4 Little Pigs',
+        'The description',
+        0, // unlock days
+        '10', // target balance
+        '0.004'
+      )
+
+      //send enough ETH
+      const amountToSend = ethers.utils.parseEther("5");
+
+      // Send the ETH to the piggy contract
+      await nonOwner.sendTransaction({
+        to: piggyAddress,
+        value: amountToSend,
+      });
+
+      // Retrieve the token's metadata URI
+      const metadataURI = await cryptoPiggies.uri(0)
+
+      // Decode the base64-encoded JSON data
+      const decodedData = atob(metadataURI.split(",")[1])
+
+      // Parse the decoded JSON data
+      const metadata = JSON.parse(decodedData)
+
+      console.log(metadata)
+
+      // Assert that the metadata has the correct values
+      expect(metadata.name).to.equal(expectedName)
+      expect(metadata.description).to.equal(expectedDescription)
+      expect(metadata.attributes.length).to.equal(5)
+      expect(metadata.attributes[0].display_type).to.equal("date")
+      expect(metadata.attributes[0].trait_type).to.equal("Maturity Date")
+      expect(metadata.attributes[1].trait_type).to.equal("Target Balance")
+      expect(metadata.attributes[1].value).to.equal("10.00000 ETH")
+      expect(metadata.attributes[2].trait_type).to.equal("Current Balance")
+      expect(metadata.attributes[2].value).to.equal("5.00000 ETH")
+      expect(metadata.attributes[3].trait_type).to.equal("Receive Address")
+      expect(metadata.attributes[3].value).to.equal(piggyAddress.toLowerCase())
+      expect(metadata.attributes[4].display_type).to.equal("boost_percentage")
+      expect(metadata.attributes[4].trait_type).to.equal("Percent Complete")
+      expect(metadata.attributes[4].value).to.equal(50)
+    })
+
+    it("should return correct metadata for unlocked piggy", async function() {
+      const expectedName = '4 Little Pigs';
+      const expectedDescription = 'The description';
+      const expectedUnlockTime = 0;
+
+      // Generate a sample token and its attributes
+      const piggyAddress = await makePiggy(
+        nftOwner.address,
+        4,
+        '4 Little Pigs',
+        'The description',
+        0, // unlock days
+        '10', // target balance
+        '0.004'
+      )
+
+      //send enough ETH
+      const amountToSend = ethers.utils.parseEther("10");
+
+      // Send the ETH to the piggy contract
+      await nonOwner.sendTransaction({
+        to: piggyAddress,
+        value: amountToSend,
+      });
+
+      // Retrieve the token's metadata URI
+      const metadataURI = await cryptoPiggies.uri(0)
+
+      // Decode the base64-encoded JSON data
+      const decodedData = atob(metadataURI.split(",")[1])
+
+      // Parse the decoded JSON data
+      const metadata = JSON.parse(decodedData)
+
+      console.log(metadata)
+
+      // Assert that the metadata has the correct values
+      expect(metadata.name).to.equal(expectedName)
+      expect(metadata.description).to.equal(expectedDescription)
+      expect(metadata.attributes.length).to.equal(5)
+      expect(metadata.attributes[0].display_type).to.equal("date")
+      expect(metadata.attributes[0].trait_type).to.equal("Maturity Date")
+      expect(metadata.attributes[1].trait_type).to.equal("Target Balance")
+      expect(metadata.attributes[1].value).to.equal("10.00000 ETH")
+      expect(metadata.attributes[2].trait_type).to.equal("Current Balance")
+      expect(metadata.attributes[2].value).to.equal("10.00000 ETH")
+      expect(metadata.attributes[3].trait_type).to.equal("Receive Address")
+      expect(metadata.attributes[3].value).to.equal(piggyAddress.toLowerCase())
+      expect(metadata.attributes[4].display_type).to.equal("boost_percentage")
+      expect(metadata.attributes[4].trait_type).to.equal("Percent Complete")
+      expect(metadata.attributes[4].value).to.equal(100)
+    })
   });
 
   describe("Transactions", function () {

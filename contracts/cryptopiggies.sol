@@ -10,10 +10,11 @@ import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.s
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
-import "./utils.sol";
 import "./piggybank.sol";
+import "./IPiggyGenerator.sol";
+import "./IPiggySignatureMintERC1155.sol";
 
-abstract contract SignaturePiggyMintERC1155 is EIP712, ISignatureMintERC1155 {
+abstract contract SignaturePiggyMintERC1155 is EIP712, IPiggySignatureMintERC1155 {
     using ECDSA for bytes32;
 
     bytes32 internal constant TYPEHASH =
@@ -104,12 +105,11 @@ contract CryptoPiggies is
     DefaultOperatorFilterer, 
     SignaturePiggyMintERC1155,
     PermissionsEnumerable,
-    ICPFactory,
     Ownable
 {
 
     /*//////////////////////////////////////////////////////////////
-                        Events
+    Events
     //////////////////////////////////////////////////////////////*/
 
     event PiggyBankDeployed(address indexed piggyBank, address indexed msgSender);
@@ -117,12 +117,13 @@ contract CryptoPiggies is
     event MakePiggyFeeUpdated(uint256 fee);
     event BreakPiggyBpsUpdated(uint16 bps);
     event PiggyBankImplementationUpdated(address indexed implementation);
+    event GeneratorUpdated(address indexed generator);
     event OriginProtocolTokenUpdated(address oldAddress, address newAddress);
     event SupportedTokenAdded(address tokenAddress);
     event SupportedTokenRemoved(address tokenAddress);
 
     /*//////////////////////////////////////////////////////////////
-                        State variables
+    State variables
     //////////////////////////////////////////////////////////////*/
 
     /// @dev The tokenId of the next NFT to mint.
@@ -143,17 +144,17 @@ contract CryptoPiggies is
     /// @notice The PiggyBank implementation contract that is cloned for each new piggy
     IPiggyBank public piggyBankImplementation;
 
+    /// @notice The contract that generates the on-chain metadata
+    IPiggyGenerator public generator;
+
     /// @notice The address that receives all fees.
     address payable public feeRecipient;
-
-    /// @notice the colours used to generate the SVG
-    Colours public svgColours;
 
     /// @notice the address of Origin Protocol OETH token
     address payable public oETHTokenAddress;
 
     /*//////////////////////////////////////////////////////////////
-                        Mappings & Arrays
+    Mappings & Arrays
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -174,7 +175,7 @@ contract CryptoPiggies is
     address[] private supportedTokens;
 
     /*//////////////////////////////////////////////////////////////
-                        Modifiers
+    Modifiers
     //////////////////////////////////////////////////////////////*/
 
     /// @notice checks to ensure that the token exists before referencing it
@@ -184,7 +185,7 @@ contract CryptoPiggies is
     }
 
     /*//////////////////////////////////////////////////////////////
-                            Constructor
+    Constructor
     //////////////////////////////////////////////////////////////*/
     constructor(
         string memory _name,
@@ -197,50 +198,24 @@ contract CryptoPiggies is
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(MINTER_ROLE, msg.sender);
         feeRecipient = _feeRecipient;
-        svgColours = Colours(
-            0xffcc00, // fbg
-            0xb8abd4, // bg
-            0xbccdc7, // fg
-            0x332429, // pbg
-            0xecedab  // pfg
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
-                    Overriden metadata logic - On-chain
+    Overriden metadata logic - On-chain
     //////////////////////////////////////////////////////////////*/
-    function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {
-        return string(
-            abi.encodePacked(
-                "data:application/json;base64,",
-                Base64.encode(
-                    bytes(
-                        abi.encodePacked(
-                            '{"name":"',
-                            _attributes[tokenId].name,
-                            ' - ',
-                            CP_Utils_v2.convertWeiToEthString(IPiggyBank(address(piggyBanks[tokenId])).getTotalBalance()),
-                            '","description":"',
-                            _attributes[tokenId].description,
-                            '","image_data":"',
-                            CP_Utils_v2.generateSVG(
-                                svgColours.fbg, svgColours.bg, svgColours.fg, svgColours.pbg, svgColours.pfg,
-                                _getPercentage(tokenId)
-                            ),
-                            '","external_url":"',
-                            _tokenUrlPrefix,
-                            tokenId,
-                            '","',
-                            CP_Utils_v2.generateAttributes(_attributes[tokenId].unlockTime, _attributes[tokenId].targetBalance, address(piggyBanks[tokenId]), _getPercentage(tokenId))
-                        )
-                    )   
-                )
-            )
+    function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {    
+        return generator.uri(
+            _attributes[tokenId],
+            address(piggyBanks[tokenId]),
+            _getPercent(tokenId),
+            IPiggyBank(address(piggyBanks[tokenId])).getTotalBalance(),
+            _tokenUrlPrefix,
+            tokenId
         );
     }
 
     /*//////////////////////////////////////////////////////////////
-                        Mint / burn logic
+    Mint / burn logic
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -346,7 +321,7 @@ contract CryptoPiggies is
     }
 
     /*//////////////////////////////////////////////////////////////
-                       Configuration
+    Configuration
     //////////////////////////////////////////////////////////////*/
 
     receive() external payable {
@@ -384,20 +359,18 @@ contract CryptoPiggies is
      *  @notice         Sets an implementation for the piggyBank clones.
      *                  ** Ensure this is called before using this contract! **
      */
-    function setPiggyBankImplementation(IPiggyBank _piggyBankImplementation) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit PiggyBankImplementationUpdated(address(_piggyBankImplementation));
-        piggyBankImplementation = _piggyBankImplementation;
+    function setPiggyBankImplementation(IPiggyBank _piggyBankImplementationAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit PiggyBankImplementationUpdated(address(_piggyBankImplementationAddress));
+        piggyBankImplementation = _piggyBankImplementationAddress;
     }
 
     /**
-     * @dev Sets the SVG colours.
-     * @param bg Background colour.
-     * @param fg Foreground colour.
-     * @param pbg Piggy background colour.
-     * @param pfg Piggy foreground colour.
+     *  @notice         Sets an implementation for generator contract.
+     *                  This allows us to change the metadata and artwork of the NFTs
      */
-    function setSvgColours(bytes3 fbg, bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        svgColours = Colours(fbg, bg, fg, pbg, pfg);
+    function setGenerator(IPiggyGenerator _generatorAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit GeneratorUpdated(address(_generatorAddress));
+        generator = _generatorAddress;
     }
 
     /**
@@ -444,7 +417,7 @@ contract CryptoPiggies is
     }
 
     /*//////////////////////////////////////////////////////////////
-                            ERC165 Logic
+    ERC165 Logic
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Returns whether this contract supports the given interface.
@@ -457,7 +430,7 @@ contract CryptoPiggies is
     }
 
     /*//////////////////////////////////////////////////////////////
-                            View functions
+    View functions
     //////////////////////////////////////////////////////////////*/
 
     /// @notice The tokenId assigned to the next new NFT to be minted.
@@ -465,13 +438,8 @@ contract CryptoPiggies is
         return nextTokenIdToMint_;
     }
 
-    /// @notice returns the lower of % of target balance or % of time left to unlock
-    function percentComplete(uint256 tokenId) external view tokenExists(tokenId) returns (uint8) {
-        return uint8(_getPercentage(tokenId));
-    }
-
     /*//////////////////////////////////////////////////////////////
-                        ERC-1155 overrides
+    ERC-1155 overrides
     //////////////////////////////////////////////////////////////*/
 
     /// @dev See {ERC1155-setApprovalForAll}
@@ -510,11 +478,11 @@ contract CryptoPiggies is
     }
 
     /*//////////////////////////////////////////////////////////////
-                    Internal / overrideable functions
+    Internal / overrideable functions
     //////////////////////////////////////////////////////////////*/
 
     /// @dev calculates the percentage towards unlock based on time and target balance
-    function _getPercentage(uint256 tokenId) internal view returns (uint256 percentage) {
+    function _getPercent(uint256 tokenId) internal view returns (uint256 percentage) {
 
         uint256 percentageBasedOnTime;
         uint256 percentageBasedOnBalance;

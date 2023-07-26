@@ -1,72 +1,67 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.11;
+
 import "@openzeppelin/contracts/utils/Base64.sol";
+import "./IPiggyGenerator.sol";
+import "./IPiggyBank.sol";
 
-struct Colours {
-    bytes3 fbg;
-    bytes3 bg;
-    bytes3 fg;
-    bytes3 pbg;
-    bytes3 pfg;
-}
+contract Generator_v1 is IPiggyGenerator {
 
-interface ISignatureMintERC1155 { 
-    /**
-     *  @notice The body of a request to mint tokens.
-     *
-     *  @param to The receiver of the tokens to mint.
-     *  @param quantity The quantity of tokens to mint.
-     *  @param validityStartTimestamp The unix timestamp after which the payload is valid.
-     *  @param validityEndTimestamp The unix timestamp at which the payload expires.
-     *  @param uri The metadata URI of the token to mint. (Not applicable for ERC20 tokens)
-     */
-    struct MintRequest {
-        address to;
-        uint256 quantity;
-        uint128 validityStartTimestamp;
-        uint128 validityEndTimestamp;
-        string name;
-        string description;
-        uint256 unlockTime;
-        uint256 targetBalance;
+    struct Colours {
+        bytes3 fbg;
+        bytes3 bg;
+        bytes3 fg;
+        bytes3 pbg;
+        bytes3 pfg;
     }
 
-    /// @dev Emitted when tokens are minted.
-    event TokensMintedWithSignature(
-        address indexed signer,
-        address indexed mintedTo,
-        uint256 indexed tokenIdMinted
-    );
+    /// @notice the colours used to generate the SVG
+    Colours public svgColours;
 
-    /**
-     *  @notice Verifies that a mint request is signed by an account holding
-     *          MINTER_ROLE (at the time of the function call).
-     *
-     *  @param req The payload / mint request.
-     *  @param signature The signature produced by an account signing the mint request.
-     *
-     *  returns (success, signer) Result of verification and the recovered address.
-     */
-    function verify(MintRequest calldata req, bytes calldata signature)
-        external
-        view
-        returns (bool success, address signer);
+	constructor() {
+        svgColours = Colours(
+            0xffcc00, // fbg
+            0xb8abd4, // bg
+            0xbccdc7, // fg
+            0x332429, // pbg
+            0xecedab  // pfg
+        );
+	}
 
-    /**
-     *  @notice Mints tokens according to the provided mint request.
-     *
-     *  @param req The payload / mint request.
-     *  @param signature The signature produced by an account signing the mint request.
-     */
-    function mintWithSignature(MintRequest calldata req, bytes calldata signature)
-        external
-        payable
-        returns (address signer);
-}
+    function uri(IPiggyBank.Attr calldata attributes, address piggyAddress, uint256 percent, uint256 balance, string memory tokenUrl, uint256 tokenId) external view returns (string memory) {    
+        return string(
+            abi.encodePacked(
+                "data:application/json;base64,",
+                Base64.encode(
+                    bytes(
+                        abi.encodePacked(
+                            '{"name":"',
+                            attributes.name,
+                            '","description":"',
+                            attributes.description,
+                            '","image_data":"',
+                            generateSVG(
+                                percent
+                            ),
+                            '","external_url":"',
+                            tokenUrl,
+                            uint2str(tokenId),
+                            '","',
+                            generateAttributes(
+                            	attributes,
+                            	piggyAddress,
+                            	percent,
+                            	balance
+                            ),
+                            '}'
+                        )
+                    )   
+                )
+            )
+        );
+    }
 
-library CP_Utils_v2 {
-
-    function generateSVG(bytes3 fbg, bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg, uint256 percent) public pure returns (bytes memory) {
+    function generateSVG(uint256 percent) internal view returns (bytes memory) {
 
         // Build the SVG string using the percentage and the colors
         return abi.encodePacked(
@@ -74,13 +69,13 @@ library CP_Utils_v2 {
             Base64.encode(bytes(string(
                 abi.encodePacked(
                     '<svg id="Ebene_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080"><defs><style>.cls-1{fill:#',
-                    _bytes3ToHexString(percent == 100 ? fbg : bg),
+                    bytes3ToHexString(percent == 100 ? svgColours.fbg : svgColours.bg),
                     ';}.cls-2{fill:#',
-                    _bytes3ToHexString(fg),
+                    bytes3ToHexString(svgColours.fg),
                     ';}.cls-3{fill:#',
-                    _bytes3ToHexString(pbg),
+                    bytes3ToHexString(svgColours.pbg),
                     ';}.cls-4{fill:#',
-                    _bytes3ToHexString(pfg),
+                    bytes3ToHexString(svgColours.pfg),
                     ';}</style></defs><rect class="cls-2" y="0" width="1080" height="1080"/><rect class="cls-1" y="',
                     uint2str(10800 - (108 * percent)),
                     '" width="1080" height="',
@@ -91,21 +86,38 @@ library CP_Utils_v2 {
         );
     }
 
-    function generateAttributes(uint256 unlockTime, uint256 targetBalance, address receiveAddress, uint256 percent) internal pure returns(string memory) {
+    function generateAttributes(IPiggyBank.Attr calldata attributes, address receiveAddress, uint256 percent, uint256 balance) internal pure returns(string memory) {
         return string(abi.encodePacked(
             'attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
-            uint2str(unlockTime),
+            uint2str(attributes.unlockTime),
             '},{"trait_type":"Target Balance","value":"',
-            convertWeiToEthString(targetBalance),
+            convertWeiToEthString(attributes.targetBalance),
+            ' ETH"},{"trait_type":"Current Balance","value":"',
+            convertWeiToEthString(balance),
             ' ETH"},{"trait_type":"Receive Address","value":"0x',
             toAsciiString(receiveAddress),
             '"},{"display_type":"boost_percentage","trait_type":"Percent Complete","value":',
-            percent,
-            ']}'
+            uint2str(percent),
+            '}]'
         ));
     }
 
-    function _bytes3ToHexString(bytes3 value) internal pure returns (string memory) {
+    /**
+     * @notice Sets the SVG colours.
+     * @param bg Background colour.
+     * @param fg Foreground colour.
+     * @param pbg Piggy background colour.
+     * @param pfg Piggy foreground colour.
+     */
+    function setSvgColours(bytes3 fbg, bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public {
+        svgColours = Colours(fbg, bg, fg, pbg, pfg);
+    }
+
+    /*
+        UTILS
+    */
+
+    function bytes3ToHexString(bytes3 value) internal pure returns (string memory) {
         bytes memory result = new bytes(6);
         bytes16 hexAlphabet = "0123456789abcdef";
         for (uint256 i = 0; i < 3; ++i) {
@@ -113,53 +125,6 @@ library CP_Utils_v2 {
             result[1 + i * 2] = hexAlphabet[uint8(value[i] & 0x0f)];
         }
         return string(result);
-    }
-
-
-    function _daysToDate(
-        uint _days
-    ) internal pure returns (uint year, uint month, uint day) {
-        int __days = int(_days);
-        int L = __days + 2509157;
-        int N = (4 * L) / 146097;
-        L = L - (146097 * N + 3) / 4;
-        int _year = (4000 * (L + 1)) / 1461001;
-        L = L - (1461 * _year) / 4 + 31;
-        int _month = (80 * L) / 2447;
-        int _day = L - (2447 * _month) / 80;
-        L = _month / 11;
-        _month = _month + 2 - 12 * L;
-        _year = 100 * (N - 49) + _year + L;
-        year = uint(_year);
-        month = uint(_month);
-        day = uint(_day);
-    }
-
-    function getDateFromTimestamp(
-        uint timestamp
-    ) internal pure returns (string memory) {
-        uint year;
-        uint month;
-        uint day;
-        (year, month, day) = _daysToDate(timestamp / 86400);
-        return
-            string(
-                abi.encodePacked(
-                    uint2str(day),
-                    "/",
-                    uint2str(month),
-                    "/",
-                    uint2str(year)
-                )
-            );
-    }
-
-    function diffDays(
-        uint fromTimestamp,
-        uint toTimestamp
-    ) internal pure returns (uint _days) {
-        require(fromTimestamp <= toTimestamp);
-        _days = (toTimestamp - fromTimestamp) / 86400;
     }
 
     function uint2str(
@@ -259,4 +224,4 @@ library CP_Utils_v2 {
         
         return string(result);
     }
-}
+} 
