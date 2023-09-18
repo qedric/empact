@@ -67,7 +67,7 @@ We welcome contributions from the community to make cryptopiggies even better! I
 
 ## Contact
 
-If you have any questions or need assistance, feel free to contact us at [contact@cryptopiggies.io](mailto:hello@cryptopiggies.io).
+If you have any questions or need assistance, feel free to contact us at [hello@cryptopiggies.io](mailto:hello@cryptopiggies.io).
 
 Thank you for being a part of the cryptopiggies community!
 
