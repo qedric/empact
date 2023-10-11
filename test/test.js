@@ -139,8 +139,11 @@ describe("Testing CryptoPiggies", function () {
 
     const PiggyBankImplementation = await ethers.getContractFactory("PiggyBank")
     const Generator = await ethers.getContractFactory("Generator_v1")
+    const Treasury = await ethers.getContractFactory("Treasury")
     
     generator = await Generator.deploy()
+
+    treasury = await Treasury.deploy()
 
     const Factory = await ethers.getContractFactory("CryptoPiggies")
 
@@ -164,9 +167,11 @@ describe("Testing CryptoPiggies", function () {
     //set the generator in the contract
     await cryptoPiggies.setGenerator(generator.address)
 
+    //set the generator in the contract
+    await cryptoPiggies.setTreasury(treasury.address)
+
     //console.log('factory address:', cryptoPiggies.address)
     //console.log('piggyBank address:', piggyBankImplementation.address)
-
   })
 
   // You can nest describe calls to create subsections.
@@ -181,7 +186,6 @@ describe("Testing CryptoPiggies", function () {
       const actualFeeRecipient = await cryptoPiggies.feeRecipient();
       expect(actualFeeRecipient).to.equal(feeRecipient.address);
     });
-
   })
 
   describe("Permissions", function () {
@@ -237,6 +241,24 @@ describe("Testing CryptoPiggies", function () {
         new RegExp(`Permissions: account ${nonOwner.address} is missing role ${DEFAULT_ADMIN_ROLE}`,"i")
       )
     })
+
+    it("should allow DEFAULT_ADMIN_ROLE to change the treasury", async function() {
+      await cryptoPiggies.connect(owner).setTreasury(newFeeRecipient.address)
+      let newGen = await cryptoPiggies.treasury()
+      expect(newGen).to.equal(newFeeRecipient.address)
+    })
+
+    it("should not allow non DEFAULT_ADMIN_ROLE to change the treasury", async function() {
+      await expect(
+        cryptoPiggies.connect(nonOwner).setTreasury(newFeeRecipient.address)
+      ).to.be.revertedWith(
+        new RegExp(`Permissions: account ${nonOwner.address} is missing role ${DEFAULT_ADMIN_ROLE}`,"i")
+      )
+    })
+
+  })
+
+  describe("Configuration", function() {
 
   })
 
@@ -551,7 +573,6 @@ describe("Testing CryptoPiggies", function () {
       const newBalance = await cryptoPiggies.balanceOf(nftOwner.address, 0);
       expect(newBalance).to.equal(0);
     });
-
   })
 
   describe("Payout", function() {
@@ -630,7 +651,6 @@ describe("Testing CryptoPiggies", function () {
       const expectedBalanceChange = amountToSend.sub(payoutFee).sub(gasCost);
 
       expect(nftOwnerBalanceAfterPayout).to.equal(initialNftOwnerBalance.add(expectedBalanceChange));
-
     });
 
     it("should payout token holder if the target balance is reached", async function () {
@@ -809,7 +829,6 @@ describe("Testing CryptoPiggies", function () {
 
       // should not allow payout
       await expect(cryptoPiggies.connect(nftOwner).payout(0)).to.be.revertedWith("Piggy is still hungry!");
-
     });
 
     it("should fail if non token holder attempts payout", async function () {
@@ -853,7 +872,15 @@ describe("Testing CryptoPiggies", function () {
 
       // should not allow payout
       await expect(cryptoPiggies.connect(nftOwner).payout(0)).to.be.revertedWith("Piggy is still hungry!");
+    });
 
+    it("should set the state to unlocked on 1 to n-1 payouts", async function () {
+      return false
+    });
+
+    it("should set the state to open on last payout", async function () {
+
+      return false
     });
   })
 
@@ -1001,7 +1028,6 @@ describe("Testing CryptoPiggies", function () {
 
       await expect(cryptoPiggies.setBreakPiggyBps(newBreakPiggyFee)).to.be.revertedWith("Don't be greedy!");
      });   
-
   })
 
   describe("Querying", function() {
@@ -1195,6 +1221,20 @@ describe("Testing CryptoPiggies", function () {
     })
   });
 
+  describe("Events", function() {
+    it("should emit SendETHToTreasury event with treasury and amount params when calling sendToTreasury()", async function() {
+      expect(true).to.equal(false)
+    })
+
+    it("should emit SendSupportedTokenToTreasury w treasury, address, and amount params when calling sendToTreasury()", async function() {
+      expect(true).to.equal(false)
+    })
+
+    it("should emit TreasuryUpdated when changing the treasury contract", async function() {
+      expect(true).to.equal(false)
+    })
+  }
+
   describe("Transactions", function () {
 
     it("should be able to send ETH to the piggy contract", async function () {
@@ -1213,6 +1253,16 @@ describe("Testing CryptoPiggies", function () {
       // Check the piggy contract balance
       const piggyBalance = await ethers.provider.getBalance(piggyAddress);
       expect(piggyBalance).to.equal(amountToSend);
+    });
+
+    it("should fail when sending native tokens to the factory", async function () {
+      // Define the amount of ETH you want to send (in wei)
+      const amountToSend = ethers.utils.parseEther("1.2345");
+
+      await expect(nonOwner.sendTransaction({
+        to: factory,
+        value: amountToSend,
+      })).to.be.revertedWith("!ERC1155RECEIVER");
     });
 
     it("should fail when sending non-native tokens to a piggyBank", async function () {
@@ -1249,7 +1299,22 @@ describe("Testing CryptoPiggies", function () {
           "Do not send ETH to this contract"
         );
       }
+    });
 
+    it("should revert when calling sendToTreasury if fund state is not Open", async function () {
+       expect(true).to.equal(false)
+    });
+
+    it("should revert when calling sendToTreasury when caller is not the treasury", async function () {
+       expect(true).to.equal(false)
+    });
+
+    it("should send full native token balance to treasury when calling sendToTreasury", async function () {
+       expect(true).to.equal(false)
+    });
+
+    it("should send full supported token balances to treasury when calling sendToTreasury", async function () {
+       expect(true).to.equal(false)
     });
   });
 });

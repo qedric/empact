@@ -3,10 +3,12 @@ pragma solidity ^0.8.11;
 
 import "@thirdweb-dev/contracts/extension/Initializable.sol";
 import "./IPiggyBank.sol";
+import "@ITreasury.sol";
 
-interface ICPFactory {
+interface IFactory {
     function oETHTokenAddress() external view returns (address payable);
     function getSupportedTokens() external view returns (address[] memory);
+    function getTreasuryAddress() external view returns (address payable);
 }
 
 interface ISupportedToken {
@@ -20,10 +22,11 @@ interface IOETHToken {
 
 contract PiggyBank is IPiggyBank, Initializable {
 
+    State public currentState = State.Locked; // Initialize as locked
     bool private _targetReached;
     bool public oETHRebasingEnabled = false;
     Attr public attributes;
-    ICPFactory public immutable factory;
+    IFactory public immutable factory;
 
     /// @notice Cannot be modified after initialisation
     uint16 public breakPiggyFeeBps;
@@ -34,7 +37,13 @@ contract PiggyBank is IPiggyBank, Initializable {
         _;
     }
 
-    constructor(ICPFactory _factory) {
+    /// @notice Checks that the `msg.sender` is the treasury.
+    modifier onlyTreasury() {
+        require(msg.sender == factory.getTreasuryAddress(), "onlyTreasury");
+        _;
+    }
+
+    constructor(IFactory _factory) {
         factory = _factory;
         _disableInitializers();
     }
@@ -77,6 +86,8 @@ contract PiggyBank is IPiggyBank, Initializable {
         oETHRebasingEnabled = true;
     }
 
+    /// @notice transfers the share of available funds to the recipient and fee recipient
+    /// @notice If this is the last payout, set state to Open, otherwise set to unlocked
     function payout(
         address recipient,
         address payable feeRecipient,
@@ -98,6 +109,9 @@ contract PiggyBank is IPiggyBank, Initializable {
         // calculate the ETH amount owed
         uint256 payoutAmount = address(this).balance * thisOwnerBalance / totalSupply;
         uint256 payoutFee = payoutAmount * breakPiggyFeeBps / 10000;
+
+        // set the state to unlocked
+        currentState = totalSupply - thisOwnerBalance == 0 ? State.Open : State.Unlocked;
 
         // send the withdrawal event and pay the owner
         emit Withdrawal(recipient, payoutAmount, thisOwnerBalance);
@@ -123,6 +137,31 @@ contract PiggyBank is IPiggyBank, Initializable {
 
             // send the fee to the factory contract owner
             token.transfer(feeRecipient, tokenPayoutFee);
+        }
+    }
+
+    /// @notice transfers all supported tokens to the treasury. Can only be called when the state is Open
+    function sendToTreasury() external payable onlyTreasury {
+
+        require(
+            currentState == State.Open,
+            'Fund must be Open'
+        );
+
+        emit SendETHToTreasury(msg.sender, address(this).balance);
+
+        // Transfer native ETH balance to the treasury
+        payable(msg.sender).transfer(address(this).balance);
+
+        // Transfer all tokens to the treasury
+        for (uint256 i = 0; i < supportedTokens.length; i++) {
+            address tokenAddress = supportedTokens[i];
+            ISupportedToken token = ISupportedToken(tokenAddress);
+            uint256 tokenBalance = token.balanceOf(address(this));
+            if (tokenBalance > 0) {
+                emit SendSupportedTokenToTreasury(msg.sender, tokenAddress, tokenBalance);
+                token.transfer(msg.sender, tokenBalance);
+            }
         }
     }
 

@@ -10,9 +10,10 @@ import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.s
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
-import "./piggybank.sol";
-import "./IPiggyGenerator.sol";
-import "./IPiggySignatureMintERC1155.sol";
+import "@piggybank.sol";
+import "@IPiggyGenerator.sol";
+import "@ITreasury.sol";
+import "@IPiggySignatureMintERC1155.sol";
 
 abstract contract SignaturePiggyMintERC1155 is EIP712, IPiggySignatureMintERC1155 {
     using ECDSA for bytes32;
@@ -146,6 +147,9 @@ contract CryptoPiggies is
 
     /// @notice The contract that generates the on-chain metadata
     IPiggyGenerator public generator;
+
+    /// @notice The contract that handles open funds
+    ITreasury public treasury;
 
     /// @notice The address that receives all fees.
     address payable public feeRecipient;
@@ -292,8 +296,8 @@ contract CryptoPiggies is
         emit PiggyBankDeployed(deployedProxy, msg.sender);
     }
 
-    /// @notice Lets an NFT owner withdraw their proportion of funds once the piggyBank is unlocked
-    function payout(uint256 tokenId) tokenExists(tokenId) external {
+    /// @dev If sender balance > 0 then burn sender balance and call payout function in the piggy contract
+    function payout(uint256 tokenId) external tokenExists(tokenId) {
 
         uint256 thisOwnerBalance = balanceOf[msg.sender][tokenId];
 
@@ -305,7 +309,7 @@ contract CryptoPiggies is
         // burn the tokens so the owner can't claim twice
         _burn(msg.sender, tokenId, thisOwnerBalance);
 
-        try PiggyBank(payable(piggyBanks[tokenId])).payout{value: 0}(
+        try PiggyBank(payable(piggyBanks[tokenId])).payout{value: 0} (
             msg.sender,
             feeRecipient,
             thisOwnerBalance,
@@ -323,10 +327,6 @@ contract CryptoPiggies is
     /*//////////////////////////////////////////////////////////////
     Configuration
     //////////////////////////////////////////////////////////////*/
-
-    receive() external payable {
-        require(false, "Do not send ETH to this contract");
-    }
 
     /// @notice this will display in NFT metadata
     function setTokenUrlPrefix(string memory tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -347,7 +347,7 @@ contract CryptoPiggies is
     }
 
     /**
-     *  @notice         Updates recipient of make & break piggy fees.
+     *  @notice         Updates recipient of make & break piggy fees
      *  @param _feeRecipient   Address to be set as new recipient of primary sales.
      */
     function setFeeRecipient(address payable _feeRecipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -356,7 +356,7 @@ contract CryptoPiggies is
     }
 
     /**
-     *  @notice         Sets an implementation for the piggyBank clones.
+     *  @notice         Sets an implementation for the piggyBank clones
      *                  ** Ensure this is called before using this contract! **
      */
     function setPiggyBankImplementation(IPiggyBank _piggyBankImplementationAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -365,12 +365,20 @@ contract CryptoPiggies is
     }
 
     /**
-     *  @notice         Sets an implementation for generator contract.
+     *  @notice         Sets an implementation for generator contract
      *                  This allows us to change the metadata and artwork of the NFTs
      */
     function setGenerator(IPiggyGenerator _generatorAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit GeneratorUpdated(address(_generatorAddress));
         generator = _generatorAddress;
+    }
+
+    /**
+     *  @notice         Sets an implementation for treasury contract
+     */
+    function setTreasury(ITreasury _treasuryAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit TreasuryUpdated(address(_treasuryAddress));
+        treasury = _treasuryAddress;
     }
 
     /**
@@ -383,6 +391,10 @@ contract CryptoPiggies is
 
     function getSupportedTokens() external view returns(address[] memory) {
         return supportedTokens;
+    }
+
+    function getTreasuryAddress() external view returns(address) {
+        return (address) treasury;
     }
 
     /**
