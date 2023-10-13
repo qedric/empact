@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.11;
 
-import "@IPiggyBank.sol";
+import "@IFund.sol";
 import "@ITreasury.sol";
 
 contract Treasury is ITreasury {
 
-    /// @notice The PiggyBank implementation contract that is cloned for each new piggy
-    IPiggyBank public piggyBankImplementation;
+    /// @notice The Fund implementation contract that is cloned for each new fund
+    IFund public fundImplementation;
 
     /**
      *  @notice Iterates through all the funds and calls the sendToTreasury() method on them
      */
     function collect() external {
-
     }
 
     /**
@@ -23,21 +22,21 @@ contract Treasury is ITreasury {
     */
     function distribute(uint256 tokenId) external onlyRole(TREASURER_ROLE) {
         for (uint256 tokenId = 0; tokenId <= nextTokenIdToMint_; tokenId++) {
-            if (_isPiggyLocked(tokenId)) {
-                address piggyAddress = piggyBanks[tokenId];
-                IPiggyBank piggy = IPiggyBank(piggyAddress);
+            if (_isFundLocked(tokenId)) {
+                address fundAddress = funds[tokenId];
+                IFund fund = IFund(fundAddress);
 
-                if (piggy.getPiggyState() == IPiggyBank.State.Unlocked) {
-                    // Transfer native ETH balance to the piggy contract
-                    payable(piggyAddress).transfer(address(this).balance);
+                if (fund.getFundState() == IFund.State.Unlocked) {
+                    // Transfer native ETH balance to the fund contract
+                    payable(fundAddress).transfer(address(this).balance);
 
-                    // Transfer supported tokens to the piggy contract
+                    // Transfer supported tokens to the fund contract
                     for (uint256 i = 0; i < supportedTokens.length; i++) {
                         address tokenAddress = supportedTokens[i];
                         ISupportedToken token = ISupportedToken(tokenAddress);
                         uint256 tokenBalance = token.balanceOf(address(this));
                         if (tokenBalance > 0) {
-                            token.transfer(piggyAddress, tokenBalance);
+                            token.transfer(fundAddress, tokenBalance);
                         }
                     }
                 }
@@ -45,8 +44,8 @@ contract Treasury is ITreasury {
         }
     }
 
-    function isPiggyLocked(uint256 tokenId) external view tokenExists(tokenId) returns (bool) {
-        // Check if the piggy is in the "Locked" state
-        return currentState == (IPiggyBank(piggyBanks[tokenId]).currentState() == IPiggyBank.State.Locked);
+    function isFundLocked(uint256 tokenId) external view tokenExists(tokenId) returns (bool) {
+        // Check if the fund is in the "Locked" state
+        return currentState == (IFund(funds[tokenId]).currentState() == IFund.State.Locked);
     }
 }

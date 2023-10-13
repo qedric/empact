@@ -5,14 +5,14 @@ const contract = await sdk.getContract("0xe7f1725e7734ce288f8367e1bb143e90bb3f05
 
 console.log(contract)
 
-//const { data: piggyContractAddress } = useContractRead(contract, "contracts", address);
+//const { data: fundContractAddress } = useContractRead(contract, "contracts", address);
 
 const mintRequest = {
       to: authorAddress,
       quantity: ethers.BigNumber.from(12),
       validityStartTimestamp: startTime,
       validityEndTimestamp: endTime,
-      name: "TwelveLittlePiggies",
+      name: "TwelveLittleFunds",
       metadata: '',
       unlockTime: 1697889467,
       targetBalance: ethers.BigNumber.from(12)

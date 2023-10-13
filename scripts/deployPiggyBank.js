@@ -10,23 +10,23 @@ async function main() {
   const _facAddress = '0x90ca6c4390b80f5c83c29751438d61d6c2e1c0b6' // Goerli deployed
 
   // Get contract that we want to deploy
-  const PB = await hre.ethers.getContractFactory("PiggyBank");
+  const PB = await hre.ethers.getContractFactory("Fund");
 
   // deploy
-  const deployedPiggy = await PB.deploy(_facAddress);
+  const deployedFund = await PB.deploy(_facAddress);
 
   // Wait for this transaction to be mined
-  await deployedPiggy.deployed();
+  await deployedFund.deployed();
 
-  console.log('deployedPiggy address:', deployedPiggy.address)
+  console.log('deployedFund address:', deployedFund.address)
 
-  /*// then deploy the implementation piggy bank that the factory can then clone:
-  const Piggy = await hre.ethers.getContractFactory("PiggyBank");
+  /*// then deploy the implementation fund bank that the factory can then clone:
+  const Fund = await hre.ethers.getContractFactory("Fund");
 
-  const deployedPiggy = await Piggy.deploy();
+  const deployedFund = await Fund.deploy();
 
-  await deployedPiggy.deployed();
-  console.log(deployedPiggy);*/
+  await deployedFund.deployed();
+  console.log(deployedFund);*/
 
   /*const data = {
     owner: owner,
@@ -35,16 +35,16 @@ async function main() {
     supply: 1,
     externalUrl: '',
     targetBalance: ethers.BigNumber.from(99),
-    piggyBank: owner
+    fund: owner
   }*/
 
 
-/*  // deploy piggybank implementation
-  const PiggyBank = await ethers.getContractFactory("PiggyBank");
-  const deployedPiggyBankImplementation = await PiggyBank.deploy();
-  await deployedPiggyBankImplementation.deployed();
+/*  // deploy fundbank implementation
+  const Fund = await ethers.getContractFactory("Fund");
+  const deployedFundImplementation = await Fund.deploy();
+  await deployedFundImplementation.deployed();
 
-  //console.log('deployed PiggyBank:', deployedPiggyBankImplementation)
+  //console.log('deployed Fund:', deployedFundImplementation)
 
   //https://portal.thirdweb.com/typescript/sdk.erc1155signaturemintable
 

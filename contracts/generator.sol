@@ -2,10 +2,10 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/utils/Base64.sol";
-import "./IPiggyGenerator.sol";
-import "./IPiggyBank.sol";
+import "./IGenerator.sol";
+import "./IFund.sol";
 
-contract Generator_v1 is IPiggyGenerator {
+contract Generator_v1 is IFundGenerator {
 
     struct Colours {
         bytes3 fbg;
@@ -28,7 +28,7 @@ contract Generator_v1 is IPiggyGenerator {
         );
 	}
 
-    function uri(IPiggyBank.Attr calldata attributes, address piggyAddress, uint256 percent, uint256 balance, string memory tokenUrl, uint256 tokenId) external view returns (string memory) {    
+    function uri(IFund.Attr calldata attributes, address fundAddress, uint256 percent, uint256 balance, string memory tokenUrl, uint256 tokenId) external view returns (string memory) {    
         return string(
             abi.encodePacked(
                 "data:application/json;base64,",
@@ -49,7 +49,7 @@ contract Generator_v1 is IPiggyGenerator {
                             '","',
                             generateAttributes(
                             	attributes,
-                            	piggyAddress,
+                            	fundAddress,
                             	percent,
                             	balance
                             ),
@@ -86,7 +86,7 @@ contract Generator_v1 is IPiggyGenerator {
         );
     }
 
-    function generateAttributes(IPiggyBank.Attr calldata attributes, address receiveAddress, uint256 percent, uint256 balance) internal pure returns(string memory) {
+    function generateAttributes(IFund.Attr calldata attributes, address receiveAddress, uint256 percent, uint256 balance) internal pure returns(string memory) {
         return string(abi.encodePacked(
             'attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
             uint2str(attributes.unlockTime),
@@ -106,8 +106,8 @@ contract Generator_v1 is IPiggyGenerator {
      * @notice Sets the SVG colours.
      * @param bg Background colour.
      * @param fg Foreground colour.
-     * @param pbg Piggy background colour.
-     * @param pfg Piggy foreground colour.
+     * @param pbg Fund background colour.
+     * @param pfg Fund foreground colour.
      */
     function setSvgColours(bytes3 fbg, bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public {
         svgColours = Colours(fbg, bg, fg, pbg, pfg);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.11;
 
-interface IPiggySignatureMintERC1155 { 
+interface ISignatureMint { 
     /**
      *  @notice The body of a request to mint tokens.
      *

@@ -10,12 +10,12 @@ import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.s
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
-import "@piggybank.sol";
-import "@IPiggyGenerator.sol";
+import "@fund.sol";
+import "@IGenerator.sol";
 import "@ITreasury.sol";
-import "@IPiggySignatureMintERC1155.sol";
+import "@ISignatureMint.sol";
 
-abstract contract SignaturePiggyMintERC1155 is EIP712, IPiggySignatureMintERC1155 {
+abstract contract SignatureMint is EIP712, ISignatureMint {
     using ECDSA for bytes32;
 
     bytes32 internal constant TYPEHASH =
@@ -99,12 +99,12 @@ abstract contract SignaturePiggyMintERC1155 is EIP712, IPiggySignatureMintERC115
     }
 } 
 
-contract CryptoPiggies is 
+contract cryptofunds is
     ERC1155,
     ContractMetadata,
     Royalty,
-    DefaultOperatorFilterer, 
-    SignaturePiggyMintERC1155,
+    DefaultOperatorFilterer,
+    SignatureMint,
     PermissionsEnumerable,
     Ownable
 {
@@ -113,11 +113,11 @@ contract CryptoPiggies is
     Events
     //////////////////////////////////////////////////////////////*/
 
-    event PiggyBankDeployed(address indexed piggyBank, address indexed msgSender);
+    event FundDeployed(address indexed fund, address indexed msgSender);
     event FeeRecipientUpdated(address indexed recipient);
-    event MakePiggyFeeUpdated(uint256 fee);
-    event BreakPiggyBpsUpdated(uint16 bps);
-    event PiggyBankImplementationUpdated(address indexed implementation);
+    event MakeFundFeeUpdated(uint256 fee);
+    event BreakFundBpsUpdated(uint16 bps);
+    event FundImplementationUpdated(address indexed implementation);
     event GeneratorUpdated(address indexed generator);
     event OriginProtocolTokenUpdated(address oldAddress, address newAddress);
     event SupportedTokenAdded(address tokenAddress);
@@ -131,22 +131,22 @@ contract CryptoPiggies is
     uint256 internal nextTokenIdToMint_;
 
     /// @dev prefix for the token url
-    string private _tokenUrlPrefix = 'https://cryptopiggies.io/';
+    string private _tokenUrlPrefix = 'https://cryptofunds.io/';
 
     /// @notice This role signs mint requsts.
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    /// @notice The fee to create a new Piggy.
-    uint256 public makePiggyFee = 0.004 ether;
+    /// @notice The fee to create a new Fund.
+    uint256 public makeFundFee = 0.004 ether;
 
-    /// @notice The fee deducted with each withdrawal from a piggybank, in basis points
-    uint16 public breakPiggyFeeBps = 400;
+    /// @notice The fee deducted with each withdrawal from a fund, in basis points
+    uint16 public breakFundFeeBps = 400;
 
-    /// @notice The PiggyBank implementation contract that is cloned for each new piggy
-    IPiggyBank public piggyBankImplementation;
+    /// @notice The Fund implementation contract that is cloned for each new fund
+    IFund public fundImplementation;
 
     /// @notice The contract that generates the on-chain metadata
-    IPiggyGenerator public generator;
+    IFundGenerator public generator;
 
     /// @notice The contract that handles open funds
     ITreasury public treasury;
@@ -167,11 +167,11 @@ contract CryptoPiggies is
      */
     mapping(uint256 => uint256) public totalSupply;
 
-    /// @dev Stores the info for each piggy
-    mapping(uint256 => IPiggyBank.Attr) internal _attributes;
+    /// @dev Stores the info for each fund
+    mapping(uint256 => IFund.Attr) internal _attributes;
 
-    /// @dev PiggyBanks are mapped to the tokenId of the NFT they are tethered to
-    mapping(uint256 => address) public piggyBanks;
+    /// @dev Funds are mapped to the tokenId of the NFT they are tethered to
+    mapping(uint256 => address) public funds;
 
     /// @notice the addresses of tokens that will count toward the ETH balance
     /// @notice this is intended to contain supported ETH PoS Liquid Staking tokens only.
@@ -210,9 +210,9 @@ contract CryptoPiggies is
     function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {    
         return generator.uri(
             _attributes[tokenId],
-            address(piggyBanks[tokenId]),
+            address(funds[tokenId]),
             _getPercent(tokenId),
-            IPiggyBank(address(piggyBanks[tokenId])).getTotalBalance(),
+            IFund(address(funds[tokenId])).getTotalBalance(),
             _tokenUrlPrefix,
             tokenId
         );
@@ -256,7 +256,7 @@ contract CryptoPiggies is
             string description;
         }
         */
-        IPiggyBank.Attr memory piglet = IPiggyBank.Attr(
+        IFund.Attr memory piglet = IFund.Attr(
             tokenIdToMint,
             _req.unlockTime,
             block.timestamp,
@@ -269,34 +269,34 @@ contract CryptoPiggies is
         _attributes[tokenIdToMint] = piglet;
     
         // deploy a separate proxy contract to hold the token's ETH; add its address to the attributes
-        piggyBanks[tokenIdToMint] = _deployProxyByImplementation(piglet, bytes32(tokenIdToMint));
+        funds[tokenIdToMint] = _deployProxyByImplementation(piglet, bytes32(tokenIdToMint));
 
         // Mint tokens.
         emit TokensMintedWithSignature(signer, _req.to, tokenIdToMint);
         _mint(_req.to, tokenIdToMint, _req.quantity, "");
         
         // Collect price
-        _collectMakePiggyFee(); 
+        _collectMakeFundFee(); 
     }
 
-    /// @dev Every time a new token is minted, a PiggyBank proxy contract is deployed to hold the funds
+    /// @dev Every time a new token is minted, a Fund proxy contract is deployed to hold the funds
     function _deployProxyByImplementation(
-        IPiggyBank.Attr memory _piggyData,
+        IFund.Attr memory _fundData,
         bytes32 _salt
     ) internal returns (address deployedProxy) {
 
         bytes32 salthash = keccak256(abi.encodePacked(msg.sender, _salt));
         deployedProxy = Clones.cloneDeterministic(
-            address(piggyBankImplementation),
+            address(fundImplementation),
             salthash
         );
 
-        IPiggyBank(deployedProxy).initialize(_piggyData, breakPiggyFeeBps);
+        IFund(deployedProxy).initialize(_fundData, breakFundFeeBps);
 
-        emit PiggyBankDeployed(deployedProxy, msg.sender);
+        emit FundDeployed(deployedProxy, msg.sender);
     }
 
-    /// @dev If sender balance > 0 then burn sender balance and call payout function in the piggy contract
+    /// @dev If sender balance > 0 then burn sender balance and call payout function in the fund contract
     function payout(uint256 tokenId) external tokenExists(tokenId) {
 
         uint256 thisOwnerBalance = balanceOf[msg.sender][tokenId];
@@ -309,7 +309,7 @@ contract CryptoPiggies is
         // burn the tokens so the owner can't claim twice
         _burn(msg.sender, tokenId, thisOwnerBalance);
 
-        try PiggyBank(payable(piggyBanks[tokenId])).payout{value: 0} (
+        try Fund(payable(funds[tokenId])).payout{value: 0} (
             msg.sender,
             feeRecipient,
             thisOwnerBalance,
@@ -333,21 +333,21 @@ contract CryptoPiggies is
         _tokenUrlPrefix = tokenUrlPrefix;
     }
 
-    /// @notice Sets the fee for creating a new piggyBank
-    function setMakePiggyFee(uint256 fee) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit MakePiggyFeeUpdated(fee);
-        makePiggyFee = fee;
+    /// @notice Sets the fee for creating a new fund
+    function setMakeFundFee(uint256 fee) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit MakeFundFeeUpdated(fee);
+        makeFundFee = fee;
     }
 
-    /// @notice Sets the fee for withdrawing the funds from a PiggyBank - does not affect existing piggyBanks
-    function setBreakPiggyBps(uint16 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    /// @notice Sets the fee for withdrawing the funds from a Fund - does not affect existing funds
+    function setBreakFundBps(uint16 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(bps <= 900, "Don't be greedy!");
-        emit BreakPiggyBpsUpdated(bps);
-        breakPiggyFeeBps = bps;
+        emit BreakFundBpsUpdated(bps);
+        breakFundFeeBps = bps;
     }
 
     /**
-     *  @notice         Updates recipient of make & break piggy fees
+     *  @notice         Updates recipient of make & break fund fees
      *  @param _feeRecipient   Address to be set as new recipient of primary sales.
      */
     function setFeeRecipient(address payable _feeRecipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -356,19 +356,19 @@ contract CryptoPiggies is
     }
 
     /**
-     *  @notice         Sets an implementation for the piggyBank clones
+     *  @notice         Sets an implementation for the fund clones
      *                  ** Ensure this is called before using this contract! **
      */
-    function setPiggyBankImplementation(IPiggyBank _piggyBankImplementationAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit PiggyBankImplementationUpdated(address(_piggyBankImplementationAddress));
-        piggyBankImplementation = _piggyBankImplementationAddress;
+    function setFundImplementation(IFund _fundImplementationAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit FundImplementationUpdated(address(_fundImplementationAddress));
+        fundImplementation = _fundImplementationAddress;
     }
 
     /**
      *  @notice         Sets an implementation for generator contract
      *                  This allows us to change the metadata and artwork of the NFTs
      */
-    function setGenerator(IPiggyGenerator _generatorAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setGenerator(IFundGenerator _generatorAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit GeneratorUpdated(address(_generatorAddress));
         generator = _generatorAddress;
     }
@@ -507,7 +507,7 @@ contract CryptoPiggies is
             percentageBasedOnTime = uint256((timeElapsed * 100) / totalTime);
         }
 
-        uint256 balance = IPiggyBank(address(piggyBanks[tokenId])).getTotalBalance();
+        uint256 balance = IFund(address(funds[tokenId])).getTotalBalance();
         if (balance >= _attributes[tokenId].targetBalance) {
             percentageBasedOnBalance = 100;
         } else if (_attributes[tokenId].targetBalance > 0 && balance > 0) {
@@ -563,11 +563,11 @@ contract CryptoPiggies is
     }
 
     /// @dev Collects and distributes the primary sale value of NFTs being claimed.
-    function _collectMakePiggyFee() internal virtual {
-        if (makePiggyFee == 0) {
+    function _collectMakeFundFee() internal virtual {
+        if (makeFundFee == 0) {
             return;
         }
-        require(msg.value == makePiggyFee, "Must send the correct fee");
+        require(msg.value == makeFundFee, "Must send the correct fee");
         feeRecipient.transfer(msg.value);
     }
 }
