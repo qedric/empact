@@ -3,7 +3,6 @@ pragma solidity ^0.8.11;
 
 import "@thirdweb-dev/contracts/extension/Initializable.sol";
 import "@IFund.sol";
-import "@ITreasury.sol";
 
 interface IFactory {
     function oETHTokenAddress() external view returns (address payable);
@@ -51,7 +50,7 @@ contract Fund is IFund, Initializable {
     function initialize(Attr calldata _data, uint16 _breakFundBps) external onlyFactory initializer {
         attributes = _data;
         breakFundFeeBps = _breakFundBps;
-        emit FundInitialised(_data);        
+        emit FundInitialised(_data);
     }
 
     /// @notice this needs to be called if some of the target balance comes from non-ETH supported tokens.

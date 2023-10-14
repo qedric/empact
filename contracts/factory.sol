@@ -131,7 +131,7 @@ contract cryptofunds is
     uint256 internal nextTokenIdToMint_;
 
     /// @dev prefix for the token url
-    string private _tokenUrlPrefix = 'https://cryptofunds.io/';
+    string private _tokenUrlPrefix = 'https://cryptopiggies.io/';
 
     /// @notice This role signs mint requsts.
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -256,7 +256,7 @@ contract cryptofunds is
             string description;
         }
         */
-        IFund.Attr memory piglet = IFund.Attr(
+        IFund.Attr memory fundData = IFund.Attr(
             tokenIdToMint,
             _req.unlockTime,
             block.timestamp,
@@ -266,10 +266,10 @@ contract cryptofunds is
         );
 
         // Set token data
-        _attributes[tokenIdToMint] = piglet;
+        _attributes[tokenIdToMint] = fundData;
     
         // deploy a separate proxy contract to hold the token's ETH; add its address to the attributes
-        funds[tokenIdToMint] = _deployProxyByImplementation(piglet, bytes32(tokenIdToMint));
+        funds[tokenIdToMint] = _deployProxyByImplementation(fundData, bytes32(tokenIdToMint));
 
         // Mint tokens.
         emit TokensMintedWithSignature(signer, _req.to, tokenIdToMint);
@@ -292,6 +292,9 @@ contract cryptofunds is
         );
 
         IFund(deployedProxy).initialize(_fundData, breakFundFeeBps);
+
+        // register the fund with the treasury
+        treasury.lockedFunds.addLockedFund(deployedProxy)
 
         emit FundDeployed(deployedProxy, msg.sender);
     }

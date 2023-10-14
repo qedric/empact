@@ -6,8 +6,40 @@ import "@ITreasury.sol";
 
 contract Treasury is ITreasury {
 
-    /// @notice The Fund implementation contract that is cloned for each new fund
-    IFund public fundImplementation;
+    address[] public lockedFunds;
+    address[] public openFunds;
+
+    /**
+     *  @notice adds a new fund to the lockedFund treasurey register
+     */
+    function addLockedFund(address fundAddress) external {
+        require(!isLockedFund(fundAddress), "Fund already locked");
+        lockedFunds.push(fundAddress);
+    }
+
+    /**
+     *  @notice moves a fund from the lockedFunds to the openFunds treasurey register
+     */
+    function moveToOpenFund(address fundAddress) external {
+        require(isLockedFund(fundAddress), "Fund not found");
+        require(!isOpenFund(fundAddress), "Fund already Open");
+        // remove the fund from lockedFunds
+        _removeLockedFund(fundAddress);
+        openFunds.push(fundAddress);
+    }
+
+    /**
+     *  @notice removes a fund from the locked fund register - should only happen when moving from locked --> open
+     */
+    function _removeLockedFund(address fundAddress) internal {
+        for (uint256 i = 0; i < lockedFunds.length; i++) {
+            if (lockedFunds[i] == fundAddress) {
+                lockedFunds[i] = lockedFunds[lockedFunds.length - 1];
+                lockedFunds.pop();
+                break;
+            }
+        }
+    }
 
     /**
      *  @notice Iterates through all the funds and calls the sendToTreasury() method on them
