@@ -119,9 +119,6 @@ contract cryptofunds is
     event BreakFundBpsUpdated(uint16 bps);
     event FundImplementationUpdated(address indexed implementation);
     event GeneratorUpdated(address indexed generator);
-    event OriginProtocolTokenUpdated(address oldAddress, address newAddress);
-    event SupportedTokenAdded(address tokenAddress);
-    event SupportedTokenRemoved(address tokenAddress);
 
     /*//////////////////////////////////////////////////////////////
     State variables
@@ -154,9 +151,6 @@ contract cryptofunds is
     /// @notice The address that receives all fees.
     address payable public feeRecipient;
 
-    /// @notice the address of Origin Protocol OETH token
-    address payable public oETHTokenAddress;
-
     /*//////////////////////////////////////////////////////////////
     Mappings & Arrays
     //////////////////////////////////////////////////////////////*/
@@ -167,16 +161,8 @@ contract cryptofunds is
      */
     mapping(uint256 => uint256) public totalSupply;
 
-    /// @dev Stores the info for each fund
-    mapping(uint256 => IFund.Attr) internal _attributes;
-
     /// @dev Funds are mapped to the tokenId of the NFT they are tethered to
     mapping(uint256 => address) public funds;
-
-    /// @notice the addresses of tokens that will count toward the ETH balance
-    /// @notice this is intended to contain supported ETH PoS Liquid Staking tokens only.
-    mapping(address => uint256) public supportedTokensIndex;
-    address[] private supportedTokens;
 
     /*//////////////////////////////////////////////////////////////
     Modifiers
@@ -207,9 +193,9 @@ contract cryptofunds is
     /*//////////////////////////////////////////////////////////////
     Overriden metadata logic - On-chain
     //////////////////////////////////////////////////////////////*/
-    function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {    
+    function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {
         return generator.uri(
-            _attributes[tokenId],
+            IFund(address(funds[tokenId]).attributes(),
             address(funds[tokenId]),
             _getPercent(tokenId),
             IFund(address(funds[tokenId])).getTotalBalance(),
@@ -312,14 +298,16 @@ contract cryptofunds is
         // burn the tokens so the owner can't claim twice
         _burn(msg.sender, tokenId, thisOwnerBalance);
 
-        try Fund(payable(funds[tokenId])).payout{value: 0} (
+        try IFund(payable(funds[tokenId])).payout{value: 0} (
             msg.sender,
             feeRecipient,
             thisOwnerBalance,
-            totalSupplyBeforePayout,
-            supportedTokens
-        ) {
-            
+            totalSupplyBeforePayout
+        ) returns (uint8 state) {
+            if (state == 2) {
+                // fund is now open; update the treasury
+                treasury.moveToOpenFund(address(funds[tokenId]));
+            }
         } catch Error(string memory reason) {
             revert(reason);
         } catch (bytes memory /*lowLevelData*/) {
@@ -382,53 +370,6 @@ contract cryptofunds is
     function setTreasury(ITreasury _treasuryAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit TreasuryUpdated(address(_treasuryAddress));
         treasury = _treasuryAddress;
-    }
-
-    /**
-     *  @notice         Set the contract address for Origin Protocol staked token
-     */
-    function setOETHContractAddress(address payable _oETHTokenAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit OriginProtocolTokenUpdated(address(oETHTokenAddress), address(_oETHTokenAddress));
-        oETHTokenAddress = _oETHTokenAddress;
-    }
-
-    function getSupportedTokens() external view returns(address[] memory) {
-        return supportedTokens;
-    }
-
-    function getTreasuryAddress() external view returns(address) {
-        return (address) treasury;
-    }
-
-    /**
-     *  @notice         Add a supported token address
-     */
-    function addSupportedToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(supportedTokensIndex[token] == 0, "Address already exists");
-        supportedTokens.push(token);
-        supportedTokensIndex[token] = supportedTokens.length;
-        emit SupportedTokenAdded(address(token));
-    }
-
-    /**
-     *  @notice         Remove a supported token address
-     */
-    function removeSupportedToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(supportedTokensIndex[token] != 0, "Address doesn't exist");
-
-        uint256 indexToRemove = supportedTokensIndex[token] - 1;
-        uint256 lastIndex = supportedTokens.length - 1;
-
-        if (indexToRemove != lastIndex) {
-            address lastToken = supportedTokens[lastIndex];
-            supportedTokens[indexToRemove] = lastToken;
-            supportedTokensIndex[lastToken] = indexToRemove + 1;
-        }
-
-        supportedTokens.pop();
-        delete supportedTokensIndex[token];
-
-        emit SupportedTokenRemoved(address(token));
     }
 
     /*//////////////////////////////////////////////////////////////

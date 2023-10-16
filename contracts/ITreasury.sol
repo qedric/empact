@@ -3,6 +3,20 @@ pragma solidity ^0.8.11;
 
 interface ITreasury {
 
+    event SupportedTokenAdded(address tokenAddress);
+    event SupportedTokenRemoved(address tokenAddress);
+    event LockedFundAdded(address fundAddress);
+    event MovedToOpenFund(address fundAddress);
+    event CollectedOpenFunds();
+    event DistributedOpenFundsToLockedFunds();
+    event OriginProtocolTokenUpdated(address oldAddress, address newAddress);
+
+    /**
+     * @notice Add a locked fund bank address to the treasury
+     * @param fundAddress The address of the locked fund bank
+     */
+    function supportedTokens() external view returns (address[] memory);
+
     /**
      * @notice Add a locked fund bank address to the treasury
      * @param fundAddress The address of the locked fund bank
@@ -22,12 +36,12 @@ interface ITreasury {
     function _removeLockedFund(address fundAddress) internal;
     
 	/**
-     *  @notice Iterates through all the funds and calls the sendToTreasury() method on them
+     *  @notice Iterates through all the open funds and calls the sendToTreasury() method on them
      */
 	function collect() external payable;
 
 	/**
-     *  @notice Distributes treasury balance to all locked funds
+     *  @notice Distributes treasury balance of given token to all locked funds
      *
      *  @param tokenId the supported token to distribute. Use 0 for native token
      */

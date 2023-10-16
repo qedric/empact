@@ -3,10 +3,10 @@ pragma solidity ^0.8.11;
 
 import "@thirdweb-dev/contracts/extension/Initializable.sol";
 import "@IFund.sol";
+import "@ITreasury";
 
 interface IFactory {
     function oETHTokenAddress() external view returns (address payable);
-    function getSupportedTokens() external view returns (address[] memory);
     function getTreasuryAddress() external view returns (address payable);
 }
 
@@ -68,8 +68,9 @@ contract Fund is IFund, Initializable {
     }
 
     function getStakedTokenBalance() internal view returns(uint256 totalStakedTokenBalance) {
-        for (uint256 i = 0; i < factory.getSupportedTokens().length; i++) {
-            ISupportedToken token = ISupportedToken(factory.getSupportedTokens()[i]);
+        Itreasury treasury = factory.treasury();
+        for (uint256 i = 0; i < treasury.supportedTokens().length; i++) {
+            ISupportedToken token = ISupportedToken(treasury.supportedTokens()[i]);
             totalStakedTokenBalance += token.balanceOf(address(this));
         }
     }
@@ -91,9 +92,8 @@ contract Fund is IFund, Initializable {
         address recipient,
         address payable feeRecipient,
         uint256 thisOwnerBalance,
-        uint256 totalSupply,
-        address[] memory supportedTokens
-    ) external payable onlyFactory {
+        uint256 totalSupply
+    ) external payable onlyFactory returns(int8) {
 
         require(
             block.timestamp > attributes.unlockTime,
@@ -109,8 +109,8 @@ contract Fund is IFund, Initializable {
         uint256 payoutAmount = address(this).balance * thisOwnerBalance / totalSupply;
         uint256 payoutFee = payoutAmount * breakFundFeeBps / 10000;
 
-        // set the state to unlocked
-        currentState = totalSupply - thisOwnerBalance == 0 ? State.Open : State.Unlocked;
+        // set the state to unlocked unless it's the last payout, then set to open
+        currentState = ( totalSupply - thisOwnerBalance == 0 ) ? State.Open : State.Unlocked;
 
         // send the withdrawal event and pay the owner
         emit Withdrawal(recipient, payoutAmount, thisOwnerBalance);
@@ -120,9 +120,11 @@ contract Fund is IFund, Initializable {
         // send the fee to the factory contract owner
         feeRecipient.transfer(payoutFee);
 
+        Itreasury treasury = factory.treasury();
+
         // Withdraw supported tokens and calculate the amounts
-        for (uint256 i = 0; i < supportedTokens.length; i++) {
-            address tokenAddress = supportedTokens[i];
+        for (uint256 i = 0; i < treasury.supportedTokens().length; i++) {
+            address tokenAddress = treasury.supportedTokens()[i];
             ISupportedToken token = ISupportedToken(tokenAddress);
             uint256 tokenBalance = token.balanceOf(address(this));
 
@@ -137,6 +139,9 @@ contract Fund is IFund, Initializable {
             // send the fee to the factory contract owner
             token.transfer(feeRecipient, tokenPayoutFee);
         }
+
+        return currentState;
+
     }
 
     /// @notice transfers all supported tokens to the treasury. Can only be called when the state is Open
@@ -149,12 +154,14 @@ contract Fund is IFund, Initializable {
 
         emit SendETHToTreasury(msg.sender, address(this).balance);
 
+        Itreasury treasury = factory.treasury();
+
         // Transfer native ETH balance to the treasury
         payable(msg.sender).transfer(address(this).balance);
 
         // Transfer all tokens to the treasury
-        for (uint256 i = 0; i < supportedTokens.length; i++) {
-            address tokenAddress = supportedTokens[i];
+        for (uint256 i = 0; i < treasury.supportedTokens().length; i++) {
+            address tokenAddress = treasury.supportedTokens()[i];
             ISupportedToken token = ISupportedToken(tokenAddress);
             uint256 tokenBalance = token.balanceOf(address(this));
             if (tokenBalance > 0) {

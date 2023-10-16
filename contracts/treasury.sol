@@ -4,21 +4,73 @@ pragma solidity ^0.8.11;
 import "@IFund.sol";
 import "@ITreasury.sol";
 
+/**
+ *  @notice The treasury distributes from open funds to locked funds, and keeps track of all supported tokens
+ */
 contract Treasury is ITreasury {
+
+    /// @notice         The addresses of tokens that will count toward the ETH balance
+    /// @notice         This is intended to contain supported ETH Staking tokens only.
+    mapping(address => uint256) public supportedTokensIndex;
+    address[] public supportedTokens;
+
+    /// @notice         The address of Origin Protocol OETH token
+    address payable public oETHTokenAddress;
 
     address[] public lockedFunds;
     address[] public openFunds;
 
     /**
-     *  @notice adds a new fund to the lockedFund treasurey register
+     *  @notice         Set the contract address for Origin Protocol staked token
+     */
+    function setOETHContractAddress(address payable _oETHTokenAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit OriginProtocolTokenUpdated(address(oETHTokenAddress), address(_oETHTokenAddress));
+        oETHTokenAddress = _oETHTokenAddress;
+    }
+
+    /**
+     *  @notice         Add a supported token address
+     */
+    function addSupportedToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(supportedTokensIndex[token] == 0, "Address already exists");
+        supportedTokens.push(token);
+        supportedTokensIndex[token] = supportedTokens.length;
+        emit SupportedTokenAdded(address(token));
+    }
+
+    /**
+     *  @notice         Remove a supported token address
+     */
+    function removeSupportedToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(supportedTokensIndex[token] != 0, "Address doesn't exist");
+
+        uint256 indexToRemove = supportedTokensIndex[token] - 1;
+        uint256 lastIndex = supportedTokens.length - 1;
+
+        if (indexToRemove != lastIndex) {
+            address lastToken = supportedTokens[lastIndex];
+            supportedTokens[indexToRemove] = lastToken;
+            supportedTokensIndex[lastToken] = indexToRemove + 1;
+        }
+
+        supportedTokens.pop();
+        delete supportedTokensIndex[token];
+
+        emit SupportedTokenRemoved(address(token));
+    }
+
+
+    /**
+     *  @notice         Adds a new fund to the lockedFund treasurey register
      */
     function addLockedFund(address fundAddress) external {
         require(!isLockedFund(fundAddress), "Fund already locked");
         lockedFunds.push(fundAddress);
+        emit LockedFundAdded(fundAddress);
     }
 
     /**
-     *  @notice moves a fund from the lockedFunds to the openFunds treasurey register
+     *  @notice         Moves a fund from the lockedFunds to the openFunds treasurey register
      */
     function moveToOpenFund(address fundAddress) external {
         require(isLockedFund(fundAddress), "Fund not found");
@@ -26,10 +78,12 @@ contract Treasury is ITreasury {
         // remove the fund from lockedFunds
         _removeLockedFund(fundAddress);
         openFunds.push(fundAddress);
+        emit MovedToOpenFund(fundAddress);
     }
 
     /**
-     *  @notice removes a fund from the locked fund register - should only happen when moving from locked --> open
+     *  @notice         Removes a fund from the locked fund register
+     *                  should only happen when moving from locked --> open
      */
     function _removeLockedFund(address fundAddress) internal {
         for (uint256 i = 0; i < lockedFunds.length; i++) {
@@ -42,42 +96,60 @@ contract Treasury is ITreasury {
     }
 
     /**
-     *  @notice Iterates through all the funds and calls the sendToTreasury() method on them
+     *  @notice         Iterates through all the funds and calls the sendToTreasury() method on them
      */
     function collect() external {
+
+        require(openFunds.length > 0, "No open funds to collect from");
+
+        for (uint256 i = 0; i < openFunds.length; i++) {
+            address fundAddress = openFunds[i];
+
+            // Ensure the fund is open before collecting
+            IFund fund = IFund(fundAddress);
+            require(fund.getState() == IFund.State.Open, "Fund is not open");
+
+            // Call the sendToTreasury() method on the fund
+            fund.sendToTreasury();
+        }
+
+        emit CollectedOpenFunds();
     }
 
     /**
-     *  @notice Distributes treasury balance to all locked funds
-     *
-     *  @param tokenId the supported token to distribute. Use 0 for native token
-    */
+     * @notice          Distributes treasury balance to all locked funds
+     * @param           tokenId the supported token to distribute. Use 0 for native token
+     */
     function distribute(uint256 tokenId) external onlyRole(TREASURER_ROLE) {
-        for (uint256 tokenId = 0; tokenId <= nextTokenIdToMint_; tokenId++) {
-            if (_isFundLocked(tokenId)) {
-                address fundAddress = funds[tokenId];
-                IFund fund = IFund(fundAddress);
+        require(_isTokenValid(tokenId), "Invalid tokenId");
 
-                if (fund.getFundState() == IFund.State.Unlocked) {
-                    // Transfer native ETH balance to the fund contract
-                    payable(fundAddress).transfer(address(this).balance);
+        uint256 totalLockedFunds = lockedFunds.length;
 
-                    // Transfer supported tokens to the fund contract
-                    for (uint256 i = 0; i < supportedTokens.length; i++) {
-                        address tokenAddress = supportedTokens[i];
-                        ISupportedToken token = ISupportedToken(tokenAddress);
-                        uint256 tokenBalance = token.balanceOf(address(this));
-                        if (tokenBalance > 0) {
-                            token.transfer(fundAddress, tokenBalance);
-                        }
-                    }
+        // Ensure there are locked funds to distribute to
+        require(totalLockedFunds > 0, "No locked funds to distribute to");
+
+        // Calculate the amount to distribute to each locked fund
+        uint256 ethToDistribute = address(this).balance / totalLockedFunds;
+
+        // Loop through the locked funds and distribute ETH and supported tokens
+        for (uint256 i = 0; i < totalLockedFunds; i++) {
+            address fundAddress = lockedFunds[i];
+
+            // Transfer native ETH balance to the fund contract
+            payable(fundAddress).transfer(ethToDistribute);
+
+            // Transfer supported tokens to the fund contract
+            for (uint256 j = 0; j < supportedTokens.length; j++) {
+                address tokenAddress = supportedTokens[j];
+                ISupportedToken token = ISupportedToken(tokenAddress);
+                uint256 tokenBalance = token.balanceOf(address(this));
+
+                if (tokenBalance > 0) {
+                    token.transfer(fundAddress, tokenBalance / totalLockedFunds);
                 }
             }
         }
-    }
 
-    function isFundLocked(uint256 tokenId) external view tokenExists(tokenId) returns (bool) {
-        // Check if the fund is in the "Locked" state
-        return currentState == (IFund(funds[tokenId]).currentState() == IFund.State.Locked);
+        emit DistributedOpenFundsToLockedFunds();
     }
 }

@@ -24,8 +24,9 @@ interface IFund {
     event SendSupportedTokenToTreasury(address treasury, address tokenAddress, uint tokenBalance);
 
     function initialize(Attr calldata _data, uint16 _breakFundBps) external;
-    function getState() external view returns(State);
+    function currentState() external view returns(State);
     function getTotalBalance() external view returns(uint256 totalBalance);
-    function payout(address recipient, address payable feeRecipient, uint256 thisOwnerBalance, uint256 totalSupply, address[] memory supportedTokens) external payable;
+    function payout(address recipient, address payable feeRecipient, uint256 thisOwnerBalance, uint256 totalSupply, address[] memory supportedTokens) external payable returns(uint8);
     function sendToTreasury() external payable;
+    function attributes() external view returns(Attr attributes);
 }
