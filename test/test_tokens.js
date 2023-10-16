@@ -193,10 +193,9 @@ describe("Testing cryptofunds", function () {
       const finalTokenBalance = await token.balanceOf(fundAddress);
 
       expect(finalTokenBalance).to.equal(initialTokenBalance.add(tokenAmount));
-
     });
 
-    it("should not allow transfers out of non-ETH supported tokens before unlock", async function () {
+    it("should not allow payout of non-ETH supported tokens before unlock", async function () {
       // Use the helper function to create a new fund contract
       const fundAddress = await makeFund(
         nftOwner.address,
@@ -284,7 +283,6 @@ describe("Testing cryptofunds", function () {
 
       // Check if the setTargetReached transaction did not revert
       await expect(fund.setTargetReached()).not.to.be.reverted;
-
     });
 
     it("should stop including token in balance after 'removeSupportedToken'", async function () {
@@ -324,7 +322,6 @@ describe("Testing cryptofunds", function () {
 
       // balance should now equal token balance:
       expect(await fund.getTotalBalance()).to.equal(ethers.utils.parseEther("50"));
-
     });
 
     it("should unlock when target balance is reached with 100% non-ETH supported tokens", async function () {
@@ -366,7 +363,6 @@ describe("Testing cryptofunds", function () {
 
       // Check if the setTargetReached transaction did not revert
       await expect(fund.setTargetReached()).not.to.be.reverted;
-
     });
 
     it("should, when unlocked, withdraw correct proportion of ETH & supported tokens to sole owner", async function () {
@@ -452,7 +448,6 @@ describe("Testing cryptofunds", function () {
       //console.log('ownerToken2BalanceAfterPayout', ownerToken2BalanceAfterPayout)
       expect(ownerToken1BalanceAfterPayout).to.equal(initialOwnerToken1Balance.add(tokenAmount).sub(tokenPayoutFee));
       expect(ownerToken2BalanceAfterPayout).to.equal(initialOwnerToken2Balance.add(tokenAmount).sub(tokenPayoutFee));
-
     });
 
     it("should, when unlocked, send correct fee amounts when withdrawing mix of ETH & supported tokens for sole owner", async function () {
@@ -546,7 +541,6 @@ describe("Testing cryptofunds", function () {
       expect(ownerToken2BalanceAfterPayout).to.equal(initialOwnerToken2Balance.add(expectedToken2Change));
       expect(feeRecipientToken1BalanceAfterPayout).to.equal(initialFeeRecipientToken1Balance.add(tokenPayoutFee));
       expect(feeRecipientToken2BalanceAfterPayout).to.equal(initialFeeRecipientToken2Balance.add(tokenPayoutFee));
-
     });
 
     it("should, when unlocked, withdraw correct proportion of ETH & supported tokens to 20% owner", async function () {
@@ -652,7 +646,6 @@ describe("Testing cryptofunds", function () {
       //console.log('ownerToken2BalanceAfterPayout', ownerToken2BalanceAfterPayout)
       expect(nftHolderToken1Balance_afterPayout).to.equal(nftHolderToken1Balance_beforePayout.add(oneFifthOfFundToken1Balance).sub(tokenPayoutFee));
       expect(nftHolderToken2Balance_afterPayout).to.equal(nftHolderToken2Balance_beforePayout.add(oneFifthOfFundToken2Balance).sub(tokenPayoutFee));
-
     });
 
     it("should, when unlocked, send correct fee amounts when withdrawing mix of ETH & supported tokens for 20% owner", async function () {
@@ -766,8 +759,6 @@ describe("Testing cryptofunds", function () {
       expect(feeRecipientETHBalanceAfterPayout).to.equal(initialFeeRecipientETHBalance.add(payoutFee))
       expect(feeRecipientToken1BalanceAfterPayout).to.equal(initialFeeRecipientToken1Balance.add(tokenPayoutFee))
       expect(feeRecipientToken2BalanceAfterPayout).to.equal(initialFeeRecipientToken2Balance.add(tokenPayoutFee))
-
-
     });
 
   });
