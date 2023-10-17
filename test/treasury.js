@@ -1,28 +1,30 @@
-const { expect } = require("chai");
-const { ethers, upgrades, network } = require("hardhat");
-const helpers = require("@nomicfoundation/hardhat-network-helpers");
+const { expect } = require("chai")
+const { ethers, upgrades, network } = require("hardhat")
+const helpers = require("@nomicfoundation/hardhat-network-helpers")
+const { getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, deployMockFund } = require("test_helpers")
 
-const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000';
+const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
 describe("Treasury Contract Tests", function () {
-  let Treasury;
-  let treasury;
-  let owner, newOwner;
-  let minter, newMinter, nonMinter;
-  let nftOwner, nonNftOwner;
-  let feeRecipient, newFeeRecipient;
+  let Treasury
+  let treasury
+  let owner, newOwner
+  let minter, newMinter, nonMinter
+  let nftOwner, nonNftOwner
+  let feeRecipient, newFeeRecipient
 
   before(async function () {
-    [owner, newOwner, minter, newMinter, nonMinter, nftOwner, nonNftOwner, feeRecipient, newFeeRecipient] = await ethers.getSigners();
-    Treasury = await ethers.getContractFactory("Treasury");
-  });
+    [owner, newOwner, minter, newMinter, nonMinter, nftOwner, nonNftOwner, feeRecipient, newFeeRecipient] = await ethers.getSigners()
+    Treasury = await ethers.getContractFactory("Treasury")
+  })
 
   beforeEach(async function () {
-    treasury = await upgrades.deployProxy(Treasury, [owner.address, owner.address]);
-    await treasury.deployed();
-  });
+    treasury = await upgrades.deployProxy(Treasury, [owner.address, owner.address])
+    await treasury.deployed()
+  })
 
   describe("Supported Token Transactions", function () {
+    
     it("should add and remove supported tokens", async function () {
       const token1 = await deployMockToken("Token1", "T1");
       const token2 = await deployMockToken("Token2", "T2");
@@ -81,19 +83,5 @@ describe("Treasury Contract Tests", function () {
     it("should prevent distribution with invalid token ID", async function () {
       await expect(treasury.distribute(1)).to.be.revertedWith("Invalid tokenId");
     });
-  });
-
-  async function deployMockToken(name, symbol) {
-    const MockToken = await ethers.getContractFactory("MockToken");
-    const token = await MockToken.deploy(name, symbol);
-    await token.deployed();
-    return token;
-  }
-
-  async function deployMockFund(owner) {
-    const MockFund = await ethers.getContractFactory("MockFund");
-    const fund = await MockFund.deploy(owner);
-    await fund.deployed();
-    return fund;
-  }
-});
+  })
+})

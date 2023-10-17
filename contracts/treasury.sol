@@ -7,7 +7,12 @@ import "@ITreasury.sol";
 /**
  *  @notice The treasury distributes from open funds to locked funds, and keeps track of all supported tokens
  */
-contract Treasury is ITreasury {
+contract Treasury is ITreasury, AccessControl {
+
+    /// @notice This role can add/remove supported tokens and carry out treasury operations such as collect and distribute
+    bytes32 public constant TREASURER_ROLE = keccak256("TREASURER_ROLE");
+
+    IFactory public immutable factory;
 
     /// @notice         The addresses of tokens that will count toward the ETH balance
     /// @notice         This is intended to contain supported ETH Staking tokens only.
@@ -20,10 +25,22 @@ contract Treasury is ITreasury {
     address[] public lockedFunds;
     address[] public openFunds;
 
+    /// @notice Checks that the `msg.sender` is the factory.
+    modifier onlyFactory() {
+        require(msg.sender == address(factory), "onlyFactory");
+        _;
+    }
+
+    constructor(address _factory) {
+        factory = _factory;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(TREASURER_ROLE, msg.sender);
+    }
+
     /**
      *  @notice         Set the contract address for Origin Protocol staked token
      */
-    function setOETHContractAddress(address payable _oETHTokenAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setOETHContractAddress(address payable _oETHTokenAddress) external onlyRole(TREASURER_ROLE) {
         emit OriginProtocolTokenUpdated(address(oETHTokenAddress), address(_oETHTokenAddress));
         oETHTokenAddress = _oETHTokenAddress;
     }
@@ -31,7 +48,7 @@ contract Treasury is ITreasury {
     /**
      *  @notice         Add a supported token address
      */
-    function addSupportedToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function addSupportedToken(address token) external onlyRole(TREASURER_ROLE) {
         require(supportedTokensIndex[token] == 0, "Address already exists");
         supportedTokens.push(token);
         supportedTokensIndex[token] = supportedTokens.length;
@@ -41,7 +58,7 @@ contract Treasury is ITreasury {
     /**
      *  @notice         Remove a supported token address
      */
-    function removeSupportedToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function removeSupportedToken(address token) external onlyRole(TREASURER_ROLE) {
         require(supportedTokensIndex[token] != 0, "Address doesn't exist");
 
         uint256 indexToRemove = supportedTokensIndex[token] - 1;
@@ -59,11 +76,10 @@ contract Treasury is ITreasury {
         emit SupportedTokenRemoved(address(token));
     }
 
-
     /**
      *  @notice         Adds a new fund to the lockedFund treasurey register
      */
-    function addLockedFund(address fundAddress) external {
+    function addLockedFund(address fundAddress) external onlyFactory {
         require(!isLockedFund(fundAddress), "Fund already locked");
         lockedFunds.push(fundAddress);
         emit LockedFundAdded(fundAddress);
@@ -72,7 +88,7 @@ contract Treasury is ITreasury {
     /**
      *  @notice         Moves a fund from the lockedFunds to the openFunds treasurey register
      */
-    function moveToOpenFund(address fundAddress) external {
+    function moveToOpenFund(address fundAddress) external onlyFactory {
         require(isLockedFund(fundAddress), "Fund not found");
         require(!isOpenFund(fundAddress), "Fund already Open");
         // remove the fund from lockedFunds
@@ -98,7 +114,7 @@ contract Treasury is ITreasury {
     /**
      *  @notice         Iterates through all the funds and calls the sendToTreasury() method on them
      */
-    function collect() external {
+    function collect() external onlyRole(TREASURER_ROLE) {
 
         require(openFunds.length > 0, "No open funds to collect from");
 
@@ -151,5 +167,13 @@ contract Treasury is ITreasury {
         }
 
         emit DistributedOpenFundsToLockedFunds();
+    }
+
+    function grantTreasurerRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        grantRole(TREASURER_ROLE, account);
+    }
+
+    function revokeTreasurerRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        revokeRole(TREASURER_ROLE, account);
     }
 }

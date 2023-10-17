@@ -5,11 +5,6 @@ import "@thirdweb-dev/contracts/extension/Initializable.sol";
 import "@IFund.sol";
 import "@ITreasury";
 
-interface IFactory {
-    function oETHTokenAddress() external view returns (address payable);
-    function getTreasuryAddress() external view returns (address payable);
-}
-
 interface ISupportedToken {
     function balanceOf(address account) external view returns (uint256);
     function transfer(address to, uint256 amount) external returns (bool);
@@ -25,7 +20,8 @@ contract Fund is IFund, Initializable {
     bool private _targetReached;
     bool public oETHRebasingEnabled = false;
     Attr public attributes;
-    IFactory public immutable factory;
+    address public immutable factory;
+    address public immutable treasury;
 
     /// @notice Cannot be modified after initialisation
     uint16 public breakFundFeeBps;
@@ -38,12 +34,13 @@ contract Fund is IFund, Initializable {
 
     /// @notice Checks that the `msg.sender` is the treasury.
     modifier onlyTreasury() {
-        require(msg.sender == factory.getTreasuryAddress(), "onlyTreasury");
+        require(msg.sender == address(treasury), "onlyTreasury");
         _;
     }
 
-    constructor(IFactory _factory) {
+    constructor(address _factory, address, _treasury) {
         factory = _factory;
+        treasury = _treasury;
         _disableInitializers();
     }
 
@@ -68,9 +65,8 @@ contract Fund is IFund, Initializable {
     }
 
     function getStakedTokenBalance() internal view returns(uint256 totalStakedTokenBalance) {
-        Itreasury treasury = factory.treasury();
-        for (uint256 i = 0; i < treasury.supportedTokens().length; i++) {
-            ISupportedToken token = ISupportedToken(treasury.supportedTokens()[i]);
+        for (uint256 i = 0; i <  ITreasury(treasury).supportedTokens().length; i++) {
+            ISupportedToken token = ISupportedToken(ITreasury(treasury).supportedTokens()[i]);
             totalStakedTokenBalance += token.balanceOf(address(this));
         }
     }
@@ -78,9 +74,9 @@ contract Fund is IFund, Initializable {
     /// opt-in is required to earn yield from oETH (Origin Protocol) tokens held by this fund
     function optInForOETHRebasing() external {
         require(!oETHRebasingEnabled, 'oETH rebasing already enabled');
-        require(factory.oETHTokenAddress() != address(0), "oETH contract address is not set");
+        require(ITreasury(treasury).oETHTokenAddress() != address(0), "oETH contract address is not set");
         // Make the call to the oETH contract
-        IOETHToken oETHToken = IOETHToken(factory.oETHTokenAddress());
+        IOETHToken oETHToken = IOETHToken(ITreasury(treasury).oETHTokenAddress());
         oETHToken.rebaseOptIn();
         emit OptedInForOriginProtocolRebasing();
         oETHRebasingEnabled = true;
@@ -120,11 +116,9 @@ contract Fund is IFund, Initializable {
         // send the fee to the factory contract owner
         feeRecipient.transfer(payoutFee);
 
-        Itreasury treasury = factory.treasury();
-
         // Withdraw supported tokens and calculate the amounts
-        for (uint256 i = 0; i < treasury.supportedTokens().length; i++) {
-            address tokenAddress = treasury.supportedTokens()[i];
+        for (uint256 i = 0; i < ITreasury(treasury).supportedTokens().length; i++) {
+            address tokenAddress = ITreasury(treasury).supportedTokens()[i];
             ISupportedToken token = ISupportedToken(tokenAddress);
             uint256 tokenBalance = token.balanceOf(address(this));
 
@@ -141,7 +135,6 @@ contract Fund is IFund, Initializable {
         }
 
         return currentState;
-
     }
 
     /// @notice transfers all supported tokens to the treasury. Can only be called when the state is Open
@@ -154,14 +147,12 @@ contract Fund is IFund, Initializable {
 
         emit SendETHToTreasury(msg.sender, address(this).balance);
 
-        Itreasury treasury = factory.treasury();
-
         // Transfer native ETH balance to the treasury
         payable(msg.sender).transfer(address(this).balance);
 
         // Transfer all tokens to the treasury
-        for (uint256 i = 0; i < treasury.supportedTokens().length; i++) {
-            address tokenAddress = treasury.supportedTokens()[i];
+        for (uint256 i = 0; i < ITreasury(treasury).supportedTokens().length; i++) {
+            address tokenAddress = ITreasury(treasury).supportedTokens()[i];
             ISupportedToken token = ISupportedToken(tokenAddress);
             uint256 tokenBalance = token.balanceOf(address(this));
             if (tokenBalance > 0) {
@@ -178,5 +169,4 @@ contract Fund is IFund, Initializable {
             emit TargetReached();
         }
     }
-
 }

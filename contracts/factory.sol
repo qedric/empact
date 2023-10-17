@@ -5,11 +5,10 @@ import { ERC1155 } from "@thirdweb-dev/contracts/eip/ERC1155.sol";
 import "@thirdweb-dev/contracts/extension/ContractMetadata.sol";
 import "@thirdweb-dev/contracts/extension/Royalty.sol";
 import "@thirdweb-dev/contracts/extension/DefaultOperatorFilterer.sol";
-import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
 import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@fund.sol";
 import "@IGenerator.sol";
 import "@ITreasury.sol";
@@ -44,7 +43,6 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
         MintRequest calldata _req,
         bytes calldata _signature
     ) internal view returns (address signer) {
-        
         bool success;
         (success, signer) = verify(_req, _signature);
         require(success, "Invalid request");
@@ -99,15 +97,16 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
     }
 } 
 
-contract cryptofunds is
+contract Factory is
     ERC1155,
     ContractMetadata,
     Royalty,
     DefaultOperatorFilterer,
     SignatureMint,
-    PermissionsEnumerable,
-    Ownable
+    AccessControl
 {
+
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     /*//////////////////////////////////////////////////////////////
     Events
@@ -129,9 +128,6 @@ contract cryptofunds is
 
     /// @dev prefix for the token url
     string private _tokenUrlPrefix = 'https://cryptopiggies.io/';
-
-    /// @notice This role signs mint requsts.
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     /// @notice The fee to create a new Fund.
     uint256 public makeFundFee = 0.004 ether;
@@ -181,13 +177,14 @@ contract cryptofunds is
         string memory _name,
         string memory _symbol,
         address payable _feeRecipient,
-        uint128 _royaltyBps
+        uint128 _royaltyBps,
+        address _roles
     ) ERC1155(_name, _symbol) {
         _setupDefaultRoyaltyInfo(_feeRecipient, _royaltyBps);
         _setOperatorRestriction(true);
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(MINTER_ROLE, msg.sender);
         feeRecipient = _feeRecipient;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, msg.sender);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -370,6 +367,14 @@ contract cryptofunds is
     function setTreasury(ITreasury _treasuryAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit TreasuryUpdated(address(_treasuryAddress));
         treasury = _treasuryAddress;
+    }
+
+    function grantMinterRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        grantRole(MINTER_ROLE, account);
+    }
+
+    function revokeMinterRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        revokeRole(MINTER_ROLE, account);
     }
 
     /*//////////////////////////////////////////////////////////////
