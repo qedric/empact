@@ -1,4 +1,8 @@
-export function deploy(_name, _symbol, _feeRecipient, _royaltyBps) {
+const { ethers, upgrades, network } = require("hardhat")
+const helpers = require("@nomicfoundation/hardhat-network-helpers")
+
+
+async function deploy(feeRecipient) {
 
   const Factory = await ethers.getContractFactory("Factory")
   const FundImplementation = await ethers.getContractFactory("Fund")
@@ -10,35 +14,35 @@ export function deploy(_name, _symbol, _feeRecipient, _royaltyBps) {
   await generator.deployed()
 
   // deploy the factory
-  const cryptofunds = await Factory.deploy(_name, _symbol, _feeRecipient, _royaltyBps)
+  const factory = await Factory.deploy(feeRecipient)
   // wait for it to finish deploying
-  await cryptofunds.deployed()
+  await factory.deployed()
 
   // deploy the treasury
-  const treasury = await Treasury.deploy(cryptofunds.address)
+  const treasury = await Treasury.deploy(factory.address)
   await treasury.deployed()
 
   // deploy the fund implementation that will be cloned for each new fund
-  const fundImplementation = await FundImplementation.deploy(cryptofunds.address)
+  const fundImplementation = await FundImplementation.deploy(factory.address, treasury.address)
   await fundImplementation.deployed()
 
   //set the implementation in the contract
-  await cryptofunds.setFundImplementation(fundImplementation.address)
+  await factory.setFundImplementation(fundImplementation.address)
 
   //set the generator in the contract
-  await cryptofunds.setGenerator(generator.address)
+  await factory.setGenerator(generator.address)
 
   //set the generator in the contract
-  await cryptofunds.setTreasury(treasury.address)
+  await factory.setTreasury(treasury.address)
 
-  //console.log('factory address:', cryptofunds.address)
-  //console.log('fund address:', fundImplementation.address)
+/*  console.log('factory address:', factory.address)
+  console.log('fund address:', fundImplementation.address)*/
 
-  return cryptofunds
+  return { factory, treasury, generator }
 }
 
-export async function getTypedData(
-  cryptofunds,
+async function getTypedData(
+  factory,
   to,
   quantity,
   validityStartTimestamp,
@@ -65,7 +69,7 @@ export async function getTypedData(
       name: 'SignatureMintERC1155',
       version: "1",
       chainId: (await ethers.provider.getNetwork()).chainId,
-      verifyingContract: cryptofunds.address,
+      verifyingContract: factory.address,
     },
     primaryType: 'MintRequest',
     message: {
@@ -81,7 +85,7 @@ export async function getTypedData(
   };
 }
 
-export function getRevertReason(error) {
+function getRevertReason(error) {
   const startIndex = error.message.indexOf("reverted with reason string '") + "reverted with reason string '".length;
   const endIndex = error.message.length - 1;
   let errorMessage = error.message.slice(startIndex, endIndex);
@@ -89,7 +93,7 @@ export function getRevertReason(error) {
   return errorMessage;
 }
 
-export async function getCurrentBlockTime() {
+async function getCurrentBlockTime() {
   const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
         // getBlock returns a block object and it has a timestamp property.
         ethers.provider.getBlock(blockNumber).then(block => block.timestamp));
@@ -97,13 +101,15 @@ export async function getCurrentBlockTime() {
 }
 
 async function makeFund(
-    to = nftOwner.address,
-    quantity = 4,
-    name = "4 Little Pigs",
-    description = "description",
-    unlockTimeDays = 99,
-    targetBalanceETH = "1",
-    feeToSend = "0.004"
+  factory,
+  signer,
+  to,
+  quantity = 4,
+  name = "4 Little Pigs",
+  description = "description",
+  unlockTimeDays = 99,
+  targetBalanceETH = "1",
+  feeToSend = "0.004"
 )
 {
 
@@ -115,7 +121,7 @@ async function makeFund(
   const makeFundFee = ethers.utils.parseUnits(feeToSend, "ether")
 
   const typedData = await getTypedData(
-    cryptofunds,
+    factory,
     to,
     quantity,
     timestamp,
@@ -127,18 +133,18 @@ async function makeFund(
   )
 
   // Sign the typed data
-  const signature = await minter._signTypedData(
+  const signature = await signer._signTypedData(
     typedData.domain,
     typedData.types,
     typedData.message
   )
 
-  const minterRole = cryptofunds.SIGNER_ROLE()
+  const signerRole = factory.SIGNER_ROLE()
   // grant MINTER role to signer (if not already granted)
-  if (!(await cryptofunds.hasRole(minterRole, minter.address))) {
-      await cryptofunds.grantRole(minterRole, minter.address)
+  if (!(await factory.hasRole(signerRole, signer.address))) {
+      await factory.grantRole(signerRole, signer.address)
   }
-  const tx = await cryptofunds.connect(nftOwner).mintWithSignature(typedData.message, signature, { value: makeFundFee })
+  const tx = await factory.connect(to).mintWithSignature(typedData.message, signature, { value: makeFundFee })
   const txReceipt = await tx.wait()
 
   // const mintedEvent = txReceipt.events.find(event => event.event === 'TokensMintedWithSignature')
@@ -153,9 +159,19 @@ async function makeFund(
   return fundCreatedEvent.args.fund
 }
 
-export async function deployMockToken(name, symbol) {
+async function deployMockToken(name, symbol) {
   const MockToken = await ethers.getContractFactory("MockToken");
   const token = await MockToken.deploy(name, symbol);
   await token.deployed();
   return token;
+}
+
+// Export the functions
+module.exports = {
+  deploy,
+  getTypedData,
+  getRevertReason,
+  getCurrentBlockTime,
+  makeFund,
+  deployMockToken
 }
