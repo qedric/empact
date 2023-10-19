@@ -170,9 +170,7 @@ contract Factory is
     /*//////////////////////////////////////////////////////////////
     Constructor
     //////////////////////////////////////////////////////////////*/
-    constructor(
-        address payable _feeRecipient
-    ) ERC1155('') {
+    constructor(address payable _feeRecipient) ERC1155('') {
         feeRecipient = _feeRecipient;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SIGNER_ROLE, msg.sender);
@@ -357,11 +355,11 @@ contract Factory is
         treasury = _treasuryAddress;
     }
 
-    function grantMinterRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function grantSignerRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
         grantRole(SIGNER_ROLE, account);
     }
 
-    function revokeMinterRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function revokeSignerRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
         revokeRole(SIGNER_ROLE, account);
     }
 
