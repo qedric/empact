@@ -2,24 +2,25 @@
 pragma solidity ^0.8.11;
 
 import "@thirdweb-dev/contracts/extension/Initializable.sol";
-import "@IFund.sol";
-import "@ITreasury";
+import "./IFund.sol";
+import "./ITreasury.sol";
+
+interface IOETHToken {
+    function rebaseOptIn() external;
+}
 
 interface ISupportedToken {
     function balanceOf(address account) external view returns (uint256);
     function transfer(address to, uint256 amount) external returns (bool);
 }
 
-interface IOETHToken {
-    function rebaseOptIn() external;
-}
-
 contract Fund is IFund, Initializable {
 
     State public currentState = State.Locked; // Initialize as locked
+    Attr private _attributes;
     bool private _targetReached;
     bool public oETHRebasingEnabled = false;
-    Attr public attributes;
+    
     address public immutable factory;
     address public immutable treasury;
 
@@ -38,14 +39,14 @@ contract Fund is IFund, Initializable {
         _;
     }
 
-    constructor(address _factory, address, _treasury) {
+    constructor(address _factory, address _treasury) {
         factory = _factory;
         treasury = _treasury;
         _disableInitializers();
     }
 
     function initialize(Attr calldata _data, uint16 _breakFundBps) external onlyFactory initializer {
-        attributes = _data;
+        _attributes = _data;
         breakFundFeeBps = _breakFundBps;
         emit FundInitialised(_data);
     }
@@ -53,7 +54,7 @@ contract Fund is IFund, Initializable {
     /// @notice this needs to be called if some of the target balance comes from non-ETH supported tokens.
     /// @notice this call is not necessary if the target is reached with native ETH only.
     function setTargetReached() external {
-        require(getStakedTokenBalance() + address(this).balance >= attributes.targetBalance,
+        require(getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance,
             'Fund is still hungry!');
         _targetReached = true;
         emit TargetReached();
@@ -69,6 +70,10 @@ contract Fund is IFund, Initializable {
             ISupportedToken token = ISupportedToken(ITreasury(treasury).supportedTokens()[i]);
             totalStakedTokenBalance += token.balanceOf(address(this));
         }
+    }
+
+    function attributes() external view returns (IFund.Attr memory) {
+        return _attributes;
     }
 
     /// opt-in is required to earn yield from oETH (Origin Protocol) tokens held by this fund
@@ -89,10 +94,10 @@ contract Fund is IFund, Initializable {
         address payable feeRecipient,
         uint256 thisOwnerBalance,
         uint256 totalSupply
-    ) external payable onlyFactory returns(int8) {
+    ) external payable onlyFactory returns(State) {
 
         require(
-            block.timestamp > attributes.unlockTime,
+            block.timestamp > _attributes.unlockTime,
             "You can't withdraw yet"
         );
         
@@ -164,7 +169,7 @@ contract Fund is IFund, Initializable {
 
     receive() external payable {
         emit Received(msg.sender, msg.value);
-        if (!_targetReached && address(this).balance >= attributes.targetBalance) {
+        if (!_targetReached && address(this).balance >= _attributes.targetBalance) {
             _targetReached = true;
             emit TargetReached();
         }

@@ -31,7 +31,7 @@ interface ISignatureMint {
 
     /**
      *  @notice Verifies that a mint request is signed by an account holding
-     *          MINTER_ROLE (at the time of the function call).
+     *          SIGNER_ROLE (at the time of the function call).
      *
      *  @param req The payload / mint request.
      *  @param signature The signature produced by an account signing the mint request.

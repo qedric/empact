@@ -1,4 +1,4 @@
-export function deployContracts(_name, _symbol, _feeRecipient, _royaltyBps) {
+export function deploy(_name, _symbol, _feeRecipient, _royaltyBps) {
 
   const Factory = await ethers.getContractFactory("Factory")
   const FundImplementation = await ethers.getContractFactory("Fund")
@@ -133,7 +133,7 @@ async function makeFund(
     typedData.message
   )
 
-  const minterRole = cryptofunds.MINTER_ROLE()
+  const minterRole = cryptofunds.SIGNER_ROLE()
   // grant MINTER role to signer (if not already granted)
   if (!(await cryptofunds.hasRole(minterRole, minter.address))) {
       await cryptofunds.grantRole(minterRole, minter.address)
@@ -158,11 +158,4 @@ export async function deployMockToken(name, symbol) {
   const token = await MockToken.deploy(name, symbol);
   await token.deployed();
   return token;
-}
-
-export async function deployMockFund(owner) {
-  const MockFund = await ethers.getContractFactory("MockFund");
-  const fund = await MockFund.deploy(owner);
-  await fund.deployed();
-  return fund;
 }

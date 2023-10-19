@@ -46,7 +46,7 @@ The `factory.sol` smart contract is the heart of the cryptofunds ecosystem. It e
 
 - **ERC-1155 Compliance:** cryptofunds are compliant with the ERC-1155 standard, making them tradable and transferable.
 
-- **Operator Roles:** Roles such as MINTER_ROLE and DEFAULT_ADMIN_ROLE are defined to control contract operations.
+- **Operator Roles:** Roles such as SIGNER_ROLE and DEFAULT_ADMIN_ROLE are defined to control contract operations.
 
 ### Fund Contract - `fund.sol`
 

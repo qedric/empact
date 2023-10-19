@@ -12,8 +12,7 @@ interface ITreasury {
     event OriginProtocolTokenUpdated(address oldAddress, address newAddress);
 
     /**
-     * @notice Add a locked fund bank address to the treasury
-     * @param fundAddress The address of the locked fund bank
+     * @notice returns array of supported tokens
      */
     function supportedTokens() external view returns (address[] memory);
 
@@ -28,22 +27,16 @@ interface ITreasury {
      * @param fundAddress The address of the open fund bank
      */
     function moveToOpenFund(address fundAddress) external;
-
-    /**
-     * @notice Remove a locked fund address from the treasury
-     * @param fundAddress The address of the locked fund to be removed
-     */
-    function _removeLockedFund(address fundAddress) internal;
     
 	/**
      *  @notice Iterates through all the open funds and calls the sendToTreasury() method on them
      */
-	function collect() external payable;
+	function collect() external;
 
 	/**
-     *  @notice Distributes treasury balance of given token to all locked funds
-     *
-     *  @param tokenId the supported token to distribute. Use 0 for native token
+     *  @notice Distributes treasury balance to locked funds
      */
-	function distribute(uint256 tokenId) external payable;
+	function distribute() external;
+
+    function oETHTokenAddress() external returns(address payable);
 }

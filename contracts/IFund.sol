@@ -26,7 +26,8 @@ interface IFund {
     function initialize(Attr calldata _data, uint16 _breakFundBps) external;
     function currentState() external view returns(State);
     function getTotalBalance() external view returns(uint256 totalBalance);
-    function payout(address recipient, address payable feeRecipient, uint256 thisOwnerBalance, uint256 totalSupply, address[] memory supportedTokens) external payable returns(uint8);
+    function payout(address recipient, address payable feeRecipient, uint256 thisOwnerBalance, uint256 totalSupply) external payable returns(State);
     function sendToTreasury() external payable;
-    function attributes() external view returns(Attr attributes);
+    function attributes() external view returns (Attr calldata attributes);
+
 }

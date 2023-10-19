@@ -77,27 +77,27 @@ describe("Testing cryptofunds", function () {
     })
 
     it("should allow factory DEFAULT ADMIN to grant an address the MINTER Role", async function () {
-      await cryptofunds.connect(owner).grantRole(await cryptofunds.MINTER_ROLE(), minter.address)
-      const isMinter = await cryptofunds.hasRole(await cryptofunds.MINTER_ROLE(), minter.address)
+      await cryptofunds.connect(owner).grantRole(await cryptofunds.SIGNER_ROLE(), minter.address)
+      const isMinter = await cryptofunds.hasRole(await cryptofunds.SIGNER_ROLE(), minter.address)
       assert(isMinter)
     })
 
     it("should fail if non factory DEFAULT ADMIN tries to grant an address the MINTER Role", async function () {
-      await expect(cryptofunds.connect(nonOwner).grantRole(await cryptofunds.MINTER_ROLE(), minter.address)).to.be.revertedWith(
+      await expect(cryptofunds.connect(nonOwner).grantRole(await cryptofunds.SIGNER_ROLE(), minter.address)).to.be.revertedWith(
       /Permissions: account .* is missing role .*/)
     })
 
     it("should allow factory DEFAULT ADMIN to revoke MINTER Role for a given address", async function () {
-      await cryptofunds.grantRole(await cryptofunds.MINTER_ROLE(), minter.address)
-      await cryptofunds.revokeRole(await cryptofunds.MINTER_ROLE(), minter.address)
-      const isMinter = await cryptofunds.hasRole(await cryptofunds.MINTER_ROLE(), minter.address)
+      await cryptofunds.grantRole(await cryptofunds.SIGNER_ROLE(), minter.address)
+      await cryptofunds.revokeRole(await cryptofunds.SIGNER_ROLE(), minter.address)
+      const isMinter = await cryptofunds.hasRole(await cryptofunds.SIGNER_ROLE(), minter.address)
       assert(!isMinter)
     })
 
     it("should fail if non factory DEFAULT ADMIN tries to revoke the MINTER Role for a given address", async function () {
-      await cryptofunds.grantRole(await cryptofunds.MINTER_ROLE(), minter.address)
+      await cryptofunds.grantRole(await cryptofunds.SIGNER_ROLE(), minter.address)
       await expect(
-        cryptofunds.connect(newOwner).revokeRole(await cryptofunds.MINTER_ROLE(), minter.address)
+        cryptofunds.connect(newOwner).revokeRole(await cryptofunds.SIGNER_ROLE(), minter.address)
       ).to.be.revertedWith(/Permissions: account .* is missing role .*/)
     })
 
@@ -220,7 +220,7 @@ describe("Testing cryptofunds", function () {
       )
 
       // grant MINTER role to signer
-      await cryptofunds.grantRole(await cryptofunds.MINTER_ROLE(), minter.address)
+      await cryptofunds.grantRole(await cryptofunds.SIGNER_ROLE(), minter.address)
 
       const tx = await cryptofunds.connect(nftOwner).mintWithSignature(typedData.message, signature, { value: makeFundFee })
 
@@ -260,10 +260,9 @@ describe("Testing cryptofunds", function () {
       )
 
       // grant MINTER role to signer
-      await cryptofunds.grantRole(await cryptofunds.MINTER_ROLE(), minter.address)
+      await cryptofunds.grantRole(await cryptofunds.SIGNER_ROLE(), minter.address)
 
       await expect(cryptofunds.connect(nftOwner).mintWithSignature(typedData.message, signature, { value: makeFundFee })).to.be.revertedWith("Request expired")
-
     })
 
     it("should not allow a signature to be used after the expiry time", async function() {
@@ -296,18 +295,17 @@ describe("Testing cryptofunds", function () {
       )
 
       // grant MINTER role to signer
-      await cryptofunds.grantRole(await cryptofunds.MINTER_ROLE(), minter.address)
+      await cryptofunds.grantRole(await cryptofunds.SIGNER_ROLE(), minter.address)
 
       // Increase block time to past the endTime
       await helpers.time.increase(60 * 60 * 24 * 3) // 3 days
 
       await expect(cryptofunds.connect(nftOwner).mintWithSignature(typedData.message, signature, { value: makeFundFee })).to.be.revertedWith("Request expired")
-
     }) 
 
     it("should fail if a user sets unlock date in the past AND targetbalance <= 0", async function () {
       // grant MINTER role to signer
-      await cryptofunds.grantRole(await cryptofunds.MINTER_ROLE(), minter.address)
+      await cryptofunds.grantRole(await cryptofunds.SIGNER_ROLE(), minter.address)
 
       const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
         // getBlock returns a block object and it has a timestamp property.
@@ -376,7 +374,6 @@ describe("Testing cryptofunds", function () {
       )
 
       await expect(cryptofunds.connect(nftOwner).mintWithSignature(typedData.message, signature, { value: makeFundFee })).to.be.revertedWith("Invalid request")
-      
     })
 
     it("should fail if a the quantity is <= 0", async function () {
@@ -411,10 +408,9 @@ describe("Testing cryptofunds", function () {
       )
 
       // grant MINTER role to signer
-      await cryptofunds.grantRole(await cryptofunds.MINTER_ROLE(), minter.address)
+      await cryptofunds.grantRole(await cryptofunds.SIGNER_ROLE(), minter.address)
       await expect(cryptofunds.connect(nftOwner).mintWithSignature(
         typedData.message, signature, { value: makeFundFee })).to.be.revertedWith("Minting zero tokens.")
-
     })
   })
 
@@ -800,7 +796,7 @@ describe("Testing cryptofunds", function () {
       )
 
       // grant MINTER role to signer
-      await cryptofunds.grantRole(await cryptofunds.MINTER_ROLE(), minter.address)
+      await cryptofunds.grantRole(await cryptofunds.SIGNER_ROLE(), minter.address)
 
       // Sign the typed data
       const signature = await minter._signTypedData(

@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.11;
-import { ERC1155 } from "@thirdweb-dev/contracts/eip/ERC1155.sol";
 
-import "@thirdweb-dev/contracts/extension/ContractMetadata.sol";
-import "@thirdweb-dev/contracts/extension/Royalty.sol";
-import "@thirdweb-dev/contracts/extension/DefaultOperatorFilterer.sol";
-import "@thirdweb-dev/contracts/openzeppelin-presets/utils/cryptography/EIP712.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@fund.sol";
-import "@IGenerator.sol";
-import "@ITreasury.sol";
-import "@ISignatureMint.sol";
+import "@thirdweb-dev/contracts/extension/ContractMetadata.sol";
+import "./fund.sol";
+import "./IGenerator.sol";
+import "./ITreasury.sol";
+import "./ISignatureMint.sol";
 
 abstract contract SignatureMint is EIP712, ISignatureMint {
     using ECDSA for bytes32;
@@ -24,7 +22,7 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
 
     constructor() EIP712("SignatureMintERC1155", "1") {}
 
-    /// @dev Verifies that a mint request is signed by an account holding MINTER_ROLE (at the time of the function call).
+    /// @dev Verifies that a mint request is signed by an account holding SIGNER_ROLE (at the time of the function call).
     function verify(
         MintRequest calldata _req,
         bytes calldata _signature
@@ -100,13 +98,11 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
 contract Factory is
     ERC1155,
     ContractMetadata,
-    Royalty,
-    DefaultOperatorFilterer,
     SignatureMint,
     AccessControl
 {
 
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
 
     /*//////////////////////////////////////////////////////////////
     Events
@@ -118,6 +114,7 @@ contract Factory is
     event BreakFundBpsUpdated(uint16 bps);
     event FundImplementationUpdated(address indexed implementation);
     event GeneratorUpdated(address indexed generator);
+    event TreasuryUpdated(address indexed treasury);
 
     /*//////////////////////////////////////////////////////////////
     State variables
@@ -139,7 +136,7 @@ contract Factory is
     IFund public fundImplementation;
 
     /// @notice The contract that generates the on-chain metadata
-    IFundGenerator public generator;
+    IGenerator public generator;
 
     /// @notice The contract that handles open funds
     ITreasury public treasury;
@@ -174,17 +171,11 @@ contract Factory is
     Constructor
     //////////////////////////////////////////////////////////////*/
     constructor(
-        string memory _name,
-        string memory _symbol,
-        address payable _feeRecipient,
-        uint128 _royaltyBps,
-        address _roles
-    ) ERC1155(_name, _symbol) {
-        _setupDefaultRoyaltyInfo(_feeRecipient, _royaltyBps);
-        _setOperatorRestriction(true);
+        address payable _feeRecipient
+    ) ERC1155('') {
         feeRecipient = _feeRecipient;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(SIGNER_ROLE, msg.sender);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -192,7 +183,7 @@ contract Factory is
     //////////////////////////////////////////////////////////////*/
     function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {
         return generator.uri(
-            IFund(address(funds[tokenId]).attributes(),
+            IFund(address(funds[tokenId])).attributes(),
             address(funds[tokenId]),
             _getPercent(tokenId),
             IFund(address(funds[tokenId])).getTotalBalance(),
@@ -247,9 +238,6 @@ contract Factory is
             _req.name,
             _req.description
         );
-
-        // Set token data
-        _attributes[tokenIdToMint] = fundData;
     
         // deploy a separate proxy contract to hold the token's ETH; add its address to the attributes
         funds[tokenIdToMint] = _deployProxyByImplementation(fundData, bytes32(tokenIdToMint));
@@ -277,7 +265,7 @@ contract Factory is
         IFund(deployedProxy).initialize(_fundData, breakFundFeeBps);
 
         // register the fund with the treasury
-        treasury.lockedFunds.addLockedFund(deployedProxy)
+        treasury.addLockedFund(deployedProxy);
 
         emit FundDeployed(deployedProxy, msg.sender);
     }
@@ -285,7 +273,7 @@ contract Factory is
     /// @dev If sender balance > 0 then burn sender balance and call payout function in the fund contract
     function payout(uint256 tokenId) external tokenExists(tokenId) {
 
-        uint256 thisOwnerBalance = balanceOf[msg.sender][tokenId];
+        uint256 thisOwnerBalance = balanceOf(msg.sender, tokenId);
 
         require(thisOwnerBalance != 0, "Not authorised!");
 
@@ -300,8 +288,8 @@ contract Factory is
             feeRecipient,
             thisOwnerBalance,
             totalSupplyBeforePayout
-        ) returns (uint8 state) {
-            if (state == 2) {
+        ) returns (IFund.State state) {
+            if (state == IFund.State.Open) {
                 // fund is now open; update the treasury
                 treasury.moveToOpenFund(address(funds[tokenId]));
             }
@@ -356,7 +344,7 @@ contract Factory is
      *  @notice         Sets an implementation for generator contract
      *                  This allows us to change the metadata and artwork of the NFTs
      */
-    function setGenerator(IFundGenerator _generatorAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setGenerator(IGenerator _generatorAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit GeneratorUpdated(address(_generatorAddress));
         generator = _generatorAddress;
     }
@@ -370,24 +358,20 @@ contract Factory is
     }
 
     function grantMinterRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        grantRole(MINTER_ROLE, account);
+        grantRole(SIGNER_ROLE, account);
     }
 
     function revokeMinterRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        revokeRole(MINTER_ROLE, account);
+        revokeRole(SIGNER_ROLE, account);
     }
 
     /*//////////////////////////////////////////////////////////////
     ERC165 Logic
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice Returns whether this contract supports the given interface.
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, IERC165) returns (bool) {
-        return
-            interfaceId == 0x01ffc9a7 || // ERC165 Interface ID for ERC165
-            interfaceId == 0xd9b67a26 || // ERC165 Interface ID for ERC1155
-            interfaceId == 0x0e89341c || // ERC165 Interface ID for ERC1155MetadataURI
-            interfaceId == type(IERC2981).interfaceId; // ERC165 ID for ERC2981
+    
+    // Override the supportsInterface function from the ERC1155 contract.
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -400,45 +384,6 @@ contract Factory is
     }
 
     /*//////////////////////////////////////////////////////////////
-    ERC-1155 overrides
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev See {ERC1155-setApprovalForAll}
-    function setApprovalForAll(address operator, bool approved)
-        public
-        override(ERC1155)
-        onlyAllowedOperatorApproval(operator)
-    {
-        super.setApprovalForAll(operator, approved);
-    }
-
-    /**
-     * @dev See {IERC1155-safeTransferFrom}.
-     */
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 id,
-        uint256 amount,
-        bytes memory data
-    ) public override(ERC1155) onlyAllowedOperator(from) {
-        super.safeTransferFrom(from, to, id, amount, data);
-    }
-
-    /**
-     * @dev See {IERC1155-safeBatchTransferFrom}.
-     */
-    function safeBatchTransferFrom(
-        address from,
-        address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
-        bytes memory data
-    ) public override(ERC1155) onlyAllowedOperator(from) {
-        super.safeBatchTransferFrom(from, to, ids, amounts, data);
-    }
-
-    /*//////////////////////////////////////////////////////////////
     Internal / overrideable functions
     //////////////////////////////////////////////////////////////*/
 
@@ -448,19 +393,19 @@ contract Factory is
         uint256 percentageBasedOnTime;
         uint256 percentageBasedOnBalance;
 
-        if (block.timestamp >= _attributes[tokenId].unlockTime) {
+        if (block.timestamp >= IFund(address(funds[tokenId])).attributes().unlockTime) {
             percentageBasedOnTime = 100;
         } else {
-            uint256 totalTime = _attributes[tokenId].unlockTime - _attributes[tokenId].startTime;
-            uint256 timeElapsed = block.timestamp - _attributes[tokenId].startTime;
+            uint256 totalTime = IFund(address(funds[tokenId])).attributes().unlockTime - IFund(address(funds[tokenId])).attributes().startTime;
+            uint256 timeElapsed = block.timestamp - IFund(address(funds[tokenId])).attributes().startTime;
             percentageBasedOnTime = uint256((timeElapsed * 100) / totalTime);
         }
 
         uint256 balance = IFund(address(funds[tokenId])).getTotalBalance();
-        if (balance >= _attributes[tokenId].targetBalance) {
+        if (balance >= IFund(address(funds[tokenId])).attributes().targetBalance) {
             percentageBasedOnBalance = 100;
-        } else if (_attributes[tokenId].targetBalance > 0 && balance > 0) {
-            percentageBasedOnBalance = uint256((balance * 100) / _attributes[tokenId].targetBalance);
+        } else if (IFund(address(funds[tokenId])).attributes().targetBalance > 0 && balance > 0) {
+            percentageBasedOnBalance = uint256((balance * 100) / IFund(address(funds[tokenId])).attributes().targetBalance);
         }
 
         // Return the lower value between percentageBasedOnBalance and percentageBasedOnTime
@@ -476,17 +421,7 @@ contract Factory is
     function _canSignMintRequest(
         address _signer
     ) internal view virtual override returns (bool) {
-        return hasRole(MINTER_ROLE, _signer);
-    }
-
-    /// @dev Returns whether royalty info can be set in the given execution context.
-    function _canSetRoyaltyInfo() internal view virtual override returns (bool) {
-        return hasRole(DEFAULT_ADMIN_ROLE, msg.sender);
-    }
-
-    /// @dev Returns whether operator restriction can be set in the given execution context.
-    function _canSetOperatorRestriction() internal virtual override returns (bool) {
-        return hasRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        return hasRole(SIGNER_ROLE, _signer);
     }
 
     /// @dev Runs before every token transfer / mint / burn.

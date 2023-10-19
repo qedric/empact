@@ -110,7 +110,7 @@ describe("Testing cryptofunds", function () {
       typedData.message
     );
 
-    const minterRole = cryptofunds.MINTER_ROLE()
+    const minterRole = cryptofunds.SIGNER_ROLE()
     // grant MINTER role to signer (if not already granted)
     if (!(await cryptofunds.hasRole(minterRole, minter.address))) {
         await cryptofunds.grantRole(minterRole, minter.address);

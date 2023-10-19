@@ -2,11 +2,11 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/utils/Base64.sol";
-import "@IGenerator.sol";
-import "@IFund.sol";
-import "@roles.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./IGenerator.sol";
+import "./IFund.sol";
 
-contract Generator_v1 is IFundGenerator, Roles {
+contract Generator_v1 is IGenerator, AccessControl {
 
     struct Colours {
         bytes3 fbg;
@@ -110,7 +110,7 @@ contract Generator_v1 is IFundGenerator, Roles {
      * @param pbg Fund background colour.
      * @param pfg Fund foreground colour.
      */
-    function setSvgColours(bytes3 fbg, bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public onlyAdmin {
+    function setSvgColours(bytes3 fbg, bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public onlyRole(DEFAULT_ADMIN_ROLE) {
         svgColours = Colours(fbg, bg, fg, pbg, pfg);
     }
 
