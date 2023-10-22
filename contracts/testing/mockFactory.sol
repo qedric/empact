@@ -268,8 +268,12 @@ contract MockFactory is
         emit FundDeployed(deployedProxy, msg.sender);
     }
 
+    function moveToOpenFund(address real_fund) external {
+        treasury.moveToOpenFund(address(real_fund));
+    }
+
     /// @dev If sender balance > 0 then burn sender balance and call payout function in the fund contract
-    function payout(uint256 tokenId) external tokenExists(tokenId) {
+    function fake_payout(uint256 tokenId, address real_fund) external tokenExists(tokenId) {
 
         uint256 thisOwnerBalance = balanceOf(msg.sender, tokenId);
 
@@ -281,7 +285,7 @@ contract MockFactory is
         // burn the tokens so the owner can't claim twice
         _burn(msg.sender, tokenId, thisOwnerBalance);
 
-        try IFund(payable(funds[tokenId])).payout{value: 0} (
+        try IFund(payable(real_fund)).payout{value: 0} (
             msg.sender,
             feeRecipient,
             thisOwnerBalance,
@@ -289,7 +293,7 @@ contract MockFactory is
         ) returns (IFund.State state) {
             if (state == IFund.State.Open) {
                 // fund is now open; update the treasury
-                treasury.moveToOpenFund(address(funds[tokenId]));
+                treasury.moveToOpenFund(address(real_fund));
             }
         } catch Error(string memory reason) {
             revert(reason);

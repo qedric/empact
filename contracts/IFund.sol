@@ -29,5 +29,4 @@ interface IFund {
     function payout(address recipient, address payable feeRecipient, uint256 thisOwnerBalance, uint256 totalSupply) external payable returns(State);
     function sendToTreasury() external payable;
     function attributes() external view returns (Attr calldata attributes);
-
 }

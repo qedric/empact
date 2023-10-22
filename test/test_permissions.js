@@ -349,7 +349,117 @@ describe("Testing Treasury Roles & permissions", function () {
   })
 
   /*moveToOpenFund*/
-  
+  it("should allow Factory to move a fund to the openFunds array", async function () {
+
+    // get the deployed factory
+    const factory = deployedContracts.factory
+    const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+    const mr = await generateMintRequest(factory.address, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
+    const tx = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
+      mr.typedData.message, mr.signature, { value: makeFundFee })
+    const txReceipt = await tx.wait()
+
+    // get the fund
+    const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
+    const Fund = await ethers.getContractFactory("Fund")
+    const fund = Fund.attach(fundCreatedEvent.args.fund)
+
+    // send 1 ETH to the fund to unlock it
+    const amountToSend = ethers.utils.parseEther("1")
+    await user2.sendTransaction({
+      to: fund.address,
+      value: amountToSend,
+    })
+
+    // move time forward 100 days
+    await helpers.time.increase(60 * 60 * 24 * 100) // 3 days
+
+    const txPayout = await factory.connect(user1).payout(0)
+    const txPayoutReceipt = await txPayout.wait()
+
+    const filter = treasury.filters.MovedToOpenFund();
+    const events = await treasury.queryFilter(filter, txPayoutReceipt.blockNumber)
+
+    expect(events[0].args[0]).to.equal(fund.address)
+  })
+
+  it("should not allow non-Factory to move a fund to the openFunds array", async function () {
+
+    const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+    const FundImplementation = await ethers.getContractFactory("Fund")
+    const Treasury = await ethers.getContractFactory("Treasury")
+
+    // get the deployed factory
+    const factory = deployedContracts.factory
+    // now deploy the mock factory
+    const MockFactory = await ethers.getContractFactory("MockFactory")
+    const fake_factory = await MockFactory.deploy(feeRecipient.address)
+    // wait for it to finish deploying
+    await fake_factory.deployed()
+
+    // set fake fund implementation & treasury
+    const fake_treasury = await Treasury.deploy(fake_factory.address)
+    await fake_treasury.deployed()
+
+    // deploy the fund implementation that will be cloned for each new fund
+    const fake_fundImplementation = await FundImplementation.deploy(fake_factory.address, fake_treasury.address)
+    await fake_fundImplementation.deployed()
+
+    //set the implementation in the contract
+    await fake_factory.setFundImplementation(fake_fundImplementation.address)
+
+    //set the generator in the contract
+    await fake_factory.setTreasury(fake_treasury.address)
+
+    // generate a real mint request
+    const mr = await generateMintRequest(factory.address, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
+    // generate a fake mint request
+    const mr_fake = await generateMintRequest(fake_factory.address, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
+
+    // use the real mint request to mint from the real factory
+    const txMint = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
+      mr.typedData.message, mr.signature, { value: makeFundFee })
+    const txReceipt = await txMint.wait()
+    // use the fake mint request to mint from the fake factory
+    const txFakeMint = await fake_factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
+      mr_fake.typedData.message, mr_fake.signature, { value: makeFundFee })
+    const txFakeReceipt = await txFakeMint.wait()
+
+    // get the real fund that we want to set to open in the real treasury, with our fake factory
+    const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
+    const Fund = await ethers.getContractFactory("Fund")
+    const fund = Fund.attach(fundCreatedEvent.args.fund)
+
+    // now we have two identical mints, we swap the fake treasury and fund for the real ones...
+
+    // get the real fund implementation from the real factory
+    const fundImpl = await factory.fundImplementation()
+
+    //set the real fund implementation in the fake contract
+    await fake_factory.setFundImplementation(fundImpl)
+
+    // set the real treasurey in our fake factory:
+    await fake_factory.setTreasury(treasury.address)
+
+    // send 1 ETH to the fund to unlock it
+    const amountToSend = ethers.utils.parseEther("1")
+    await user2.sendTransaction({
+      to: fund.address,
+      value: amountToSend,
+    })
+
+    // move time forward 100 days
+    await helpers.time.increase(60 * 60 * 24 * 100) // 3 days
+
+    // call our mock move to open function:
+    const txFakePayout = await expect(fake_factory.connect(user1).moveToOpenFund(fund.address)).to.be.revertedWith('onlyFactory')
+  })
+
+  /*collect*/
+
+  /*distribute*/
+
+
 })
 
 describe("Testing Fund Roles & permissions", function () {
