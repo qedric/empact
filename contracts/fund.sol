@@ -54,7 +54,7 @@ contract Fund is IFund, Initializable {
     /// @notice this needs to be called if some of the target balance comes from non-ETH supported tokens.
     /// @notice this call is not necessary if the target is reached with native ETH only.
     function setTargetReached() external {
-        require(getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance,
+        require(_getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance,
             'Fund is still hungry!');
         _targetReached = true;
         emit TargetReached();
@@ -62,10 +62,10 @@ contract Fund is IFund, Initializable {
 
     /// @notice Supported staked tokens can contribute to the target balance.
     function getTotalBalance() external view returns(uint256 totalBalance) {
-        totalBalance = getStakedTokenBalance() + address(this).balance;
+        totalBalance = _getStakedTokenBalance() + address(this).balance;
     }
 
-    function getStakedTokenBalance() internal view returns(uint256 totalStakedTokenBalance) {
+    function _getStakedTokenBalance() internal view returns(uint256 totalStakedTokenBalance) {
         for (uint256 i = 0; i <  ITreasury(treasury).supportedTokens().length; i++) {
             ISupportedToken token = ISupportedToken(ITreasury(treasury).supportedTokens()[i]);
             totalStakedTokenBalance += token.balanceOf(address(this));

@@ -1,6 +1,6 @@
+const { expect, assert } = require("chai")
 const { ethers, upgrades, network } = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-network-helpers")
-
 
 async function deploy(feeRecipient) {
 
@@ -42,7 +42,7 @@ async function deploy(feeRecipient) {
 }
 
 async function getTypedData(
-  factory,
+  factory_address,
   to,
   quantity,
   validityStartTimestamp,
@@ -69,7 +69,7 @@ async function getTypedData(
       name: 'SignatureMintERC1155',
       version: "1",
       chainId: (await ethers.provider.getNetwork()).chainId,
-      verifyingContract: factory.address,
+      verifyingContract: factory_address,
     },
     primaryType: 'MintRequest',
     message: {
@@ -100,34 +100,31 @@ async function getCurrentBlockTime() {
   return timestamp;
 }
 
-async function makeFund(
-  factory,
-  signer,
-  to,
-  quantity = 4,
-  name = "4 Little Pigs",
-  description = "description",
-  unlockTimeDays = 99,
-  targetBalanceETH = "1",
-  feeToSend = "0.004"
-)
-{
+async function deployMockToken(name, symbol) {
+  const MockToken = await ethers.getContractFactory("MockToken");
+  const token = await MockToken.deploy(name, symbol);
+  await token.deployed();
+  return token;
+}
 
+async function generateMintRequest(factory_address, signer, to_address) {
   // Generate a signature for the mint request
-  const timestamp = await getCurrentBlockTime()
-  const endTime = Math.floor(timestamp + 60) // 1 minute later
-  const unlockTime = Math.floor(timestamp + 60 * 60 * 24 * unlockTimeDays)
-  const targetBalance = ethers.utils.parseUnits(targetBalanceETH, "ether").toString()
-  const makeFundFee = ethers.utils.parseUnits(feeToSend, "ether")
+  const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
+    // getBlock returns a block object and it has a timestamp property.
+    ethers.provider.getBlock(blockNumber).then(block => block.timestamp))
+
+  const endTime = Math.floor(timestamp + 60 * 60 * 24)
+  const unlockTime = Math.floor(timestamp + 60 * 60 * 24 * 99)
+  const targetBalance = ethers.utils.parseUnits("1", "ether").toString()
 
   const typedData = await getTypedData(
-    factory,
-    to,
-    quantity,
+    factory_address,
+    to_address,
+    4,
     timestamp,
     endTime,
-    name,
-    description,
+    'A test fund',
+    'description',
     unlockTime,
     targetBalance
   )
@@ -139,31 +136,29 @@ async function makeFund(
     typedData.message
   )
 
-  const signerRole = factory.SIGNER_ROLE()
-  // grant MINTER role to signer (if not already granted)
-  if (!(await factory.hasRole(signerRole, signer.address))) {
-      await factory.grantRole(signerRole, signer.address)
-  }
-  const tx = await factory.connect(to).mintWithSignature(typedData.message, signature, { value: makeFundFee })
+  return { signature, typedData }
+}
+
+async function makeFund(factory, signer, to) {
+  const mintRequest = generateMintRequest(factory.address, signer, to)
+  
+  const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeFundFee })
   const txReceipt = await tx.wait()
 
-  // const mintedEvent = txReceipt.events.find(event => event.event === 'TokensMintedWithSignature')
   const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
 
   const Fund = await ethers.getContractFactory("Fund")
   const fund = Fund.attach(fundCreatedEvent.args.fund)
 
-  /*const attributes = await fund.attributes()
-  console.log(attributes)*/
+  // Find the FundInitialised event within the Fund contract
+  const fundInitialisedEvent = await fund.queryFilter(fund.filters.FundInitialised(), txReceipt.blockHash);
 
-  return fundCreatedEvent.args.fund
-}
+  expect(fundInitialisedEvent.length).to.equal(1); // Ensure only one FundInitialised event was emitted
+  expect(fundInitialisedEvent[0].args.attributes[0]).to.equal(0)
+  expect(fundInitialisedEvent[0].args.attributes[4]).to.equal('A test fund')
+  expect(fundInitialisedEvent[0].args.attributes[5]).to.equal('description')
 
-async function deployMockToken(name, symbol) {
-  const MockToken = await ethers.getContractFactory("MockToken");
-  const token = await MockToken.deploy(name, symbol);
-  await token.deployed();
-  return token;
+  return fundCreatedEvent
 }
 
 // Export the functions
@@ -172,6 +167,7 @@ module.exports = {
   getTypedData,
   getRevertReason,
   getCurrentBlockTime,
-  makeFund,
-  deployMockToken
+  deployMockToken,
+  generateMintRequest,
+  makeFund
 }
