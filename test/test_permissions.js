@@ -456,9 +456,170 @@ describe("Testing Treasury Roles & permissions", function () {
   })
 
   /*collect*/
+  it("should allow TREASURER to collect open funds", async function () {
+    // Grant TREASURER_ROLE to the user
+    await treasury.grantRole(await treasury.TREASURER_ROLE(), TREASURER.address);
 
-  /*distribute*/
+    // Mint a new fund and move it to the openFunds array
+    // get the deployed factory
+    const factory = deployedContracts.factory
+    const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+    const mr = await generateMintRequest(factory.address, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
+    const tx = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
+      mr.typedData.message, mr.signature, { value: makeFundFee })
+    const txReceipt = await tx.wait()
 
+    // get the fund
+    const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
+    const Fund = await ethers.getContractFactory("Fund")
+    const fund = Fund.attach(fundCreatedEvent.args.fund)
+
+    // send 1 ETH to the fund to unlock it
+    const amountToSend = ethers.utils.parseEther("1")
+    await user2.sendTransaction({
+      to: fund.address,
+      value: amountToSend,
+    })
+
+    // move time forward 100 days
+    await helpers.time.increase(60 * 60 * 24 * 100) // 3 days
+
+    const txPayout = await factory.connect(user1).payout(0)
+    const txPayoutReceipt = await txPayout.wait()
+
+    const filter = treasury.filters.MovedToOpenFund();
+    const events = await treasury.queryFilter(filter, txPayoutReceipt.blockNumber)
+
+    expect(events[0].args[0]).to.equal(fund.address)
+
+    // send another 1 ETH to the fund so there's something to collect
+    await user2.sendTransaction({
+      to: fund.address,
+      value: amountToSend,
+    })
+
+    // Get the initial treasury balance
+    const initialTreasuryBalance = await ethers.provider.getBalance(treasury.address);
+
+    // Call the collect function as TREASURER
+    const tx2 = await treasury.connect(TREASURER).collect();
+    const tx2Receipt = await tx2.wait();
+
+    // Verify that the CollectedOpenFunds event was emitted
+    const collectedOpenFundsEvent = tx2Receipt.events.find(event => event.event === 'CollectedOpenFunds');
+    expect(collectedOpenFundsEvent).to.exist;
+
+    // Get the final treasury balance after collecting
+    const finalTreasuryBalance = await ethers.provider.getBalance(treasury.address);
+
+    // Verify that the treasury balance has changed
+    expect(finalTreasuryBalance).to.be.gt(initialTreasuryBalance);
+  });
+
+  it("should not allow non-TREASURER to collect open funds", async function () {
+    // Attempt to collect open funds as a non-TREASURER user
+    await expect(treasury.connect(user1).collect()).to.be.revertedWith(/AccessControl: account .* is missing role .*/);
+  });
+
+  /*distributeNativeToken*/
+  it("should allow TREASURER to distribute native token balance to locked funds", async function () {
+    // Grant TREASURER_ROLE to the user
+    await treasury.grantRole(await treasury.TREASURER_ROLE(), TREASURER.address);
+
+    // Mint a new locked fund
+    // get the deployed factory
+    const factory = deployedContracts.factory
+    const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+    const mr = await generateMintRequest(factory.address, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
+    const tx = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
+      mr.typedData.message, mr.signature, { value: makeFundFee })
+    const txReceipt = await tx.wait()
+
+    // get the fund
+    const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
+    const Fund = await ethers.getContractFactory("Fund")
+    const fund = Fund.attach(fundCreatedEvent.args.fund)
+
+    // send 0.9 ETH to the fund to keep it locked
+    const amountToSendToLockedFund = ethers.utils.parseEther("0.9")
+    await user2.sendTransaction({
+      to: fund.address,
+      value: amountToSendToLockedFund,
+    })
+
+    // Send ETH and supported tokens to the treasury contract
+    const amountToSendToTreasury = ethers.utils.parseEther("2")
+    await user2.sendTransaction({
+      to: treasury.address,
+      value: amountToSendToTreasury,
+    })
+
+    // add supported tokens - to do in functionality tests
+    const treasuryBalance = await ethers.provider.getBalance(treasury.address)
+    const lockedFunds = await treasury.lockedFunds(0)
+
+    // Call the distribute function as TREASURER
+    const tx2 = await treasury.connect(TREASURER).distributeNativeToken();
+    const tx2Receipt = await tx2.wait();
+
+    // Verify that the DistributedOpenFundsToLockedFunds event was emitted
+    const distributedNativeTokensToLockedFundsEvent = tx2Receipt.events.find(event => event.event === 'DistributedNativeTokensToLockedFunds');
+    expect(distributedNativeTokensToLockedFundsEvent).to.exist;
+  });
+
+  it("should not allow non-TREASURER to distribute native token balance to locked funds", async function () {
+    // Attempt to distribute funds as a non-TREASURER user
+    await expect(treasury.connect(user1).distributeNativeToken()).to.be.revertedWith(/AccessControl: account .* is missing role .*/);
+  });
+
+  /*distributeSupportedTokens*/
+  it("should allow TREASURER to distribute supported token balances to locked funds", async function () {
+    // Grant TREASURER_ROLE to the user
+    await treasury.grantRole(await treasury.TREASURER_ROLE(), TREASURER.address);
+
+    // Mint a new locked fund
+    // get the deployed factory
+    const factory = deployedContracts.factory
+    const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+    const mr = await generateMintRequest(factory.address, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
+    const tx = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
+      mr.typedData.message, mr.signature, { value: makeFundFee })
+    const txReceipt = await tx.wait()
+
+    // get the fund
+    const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
+    const Fund = await ethers.getContractFactory("Fund")
+    const fund = Fund.attach(fundCreatedEvent.args.fund)
+
+    // send 0.9 ETH to the fund to keep it locked
+    const amountToSendToLockedFund = ethers.utils.parseEther("0.9")
+    await user2.sendTransaction({
+      to: fund.address,
+      value: amountToSendToLockedFund,
+    })
+
+    // Send ETH and supported tokens to the treasury contract
+    const amountToSendToTreasury = ethers.utils.parseEther("2")
+    await user2.sendTransaction({
+      to: treasury.address,
+      value: amountToSendToTreasury,
+    })
+
+    // deploy a fake erc20 token 
+    //const token = await deployMockToken('FAKE', 'FKK')
+
+    // get the array of target funds
+    const lockedFund = []
+    lockedFund[0] = await treasury.lockedFunds(0)
+
+    // Call the distribute function as TREASURER
+    const tx2 = await treasury.connect(TREASURER).distributeSupportedTokens(lockedFund);
+    const tx2Receipt = await tx2.wait();
+
+    // Verify that the DistributedOpenFundsToLockedFunds event was emitted
+    const distributedSupportedTokensToLockedFundsEvent = tx2Receipt.events.find(event => event.event === 'DistributedSupportedTokensToLockedFunds');
+    expect(distributedSupportedTokensToLockedFundsEvent).to.exist;
+  });
 
 })
 
@@ -526,8 +687,23 @@ describe("Testing Fund Roles & permissions", function () {
 })
 
 describe("Testing Generator Roles & permissions", function () {
-  it("should test something (TODO)", function () {
-    // Add your TODO message here
-    console.log("TODO: Implement this test");
-  });
+  let factory, generator
+  let INITIAL_DEFAULT_ADMIN_AND_SIGNER
+  let user1
+  let feeRecipient
+
+  beforeEach(async function () {
+    [INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1, feeRecipient] = await ethers.getSigners()
+    const deployedContracts = await deploy(feeRecipient.address)
+    generator = deployedContracts.generator
+  })
+
+  it("should allow DEFAULT ADMIN run setSvgColours()", async function () {
+    expect(await generator.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).setSvgColours(0x00300088, 0x300000, 0xf00000, 0x200000, 0xc00000))
+  })
+
+  it("should not allow non DEFAULT ADMIN run setSvgColours()", async function () {
+    await expect(generator.connect(user1).setSvgColours(0x00300088, 0x300000, 0xf00000, 0x200000, 0xc00000)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+  })
+
 })

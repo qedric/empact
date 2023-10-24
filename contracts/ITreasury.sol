@@ -8,8 +8,10 @@ interface ITreasury {
     event LockedFundAdded(address fundAddress);
     event MovedToOpenFund(address fundAddress);
     event CollectedOpenFunds();
-    event DistributedOpenFundsToLockedFunds();
+    event DistributedNativeTokensToLockedFunds();
+    event DistributedSupportedTokensToLockedFunds(address[] lockedFunds);
     event OriginProtocolTokenUpdated(address oldAddress, address newAddress);
+    event Received(address _from, uint _amount);
 
     /**
      * @notice returns array of supported tokens
@@ -34,9 +36,15 @@ interface ITreasury {
 	function collect() external;
 
 	/**
-     *  @notice Distributes treasury balance to locked funds
+     *  @notice Distributes treasury ETH balance to all locked funds
      */
-	function distribute() external;
+	function distributeNativeToken() external;
+
+
+    /**
+     *  @notice Distributes supported token balances to locked funds with balance
+     */
+    function distributeSupportedTokens(address[] memory targetFunds) external;
 
     function oETHTokenAddress() external returns(address payable);
 }

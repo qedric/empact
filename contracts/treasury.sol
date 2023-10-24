@@ -2,6 +2,7 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "./IFund.sol";
 import "./ITreasury.sol";
 
@@ -139,10 +140,9 @@ contract Treasury is ITreasury, AccessControl {
     }
 
     /**
-     * @notice          Distributes treasury balance to all locked funds
+     * @notice          Distributes treasury ETH balance to all locked funds
      */
-    function distribute() external onlyRole(TREASURER_ROLE) {
-
+    function distributeNativeToken() external onlyRole(TREASURER_ROLE) {
         uint256 totalLockedFunds = lockedFunds.length;
 
         // Ensure there are locked funds to distribute to
@@ -151,26 +151,50 @@ contract Treasury is ITreasury, AccessControl {
         // Calculate the amount to distribute to each locked fund
         uint256 ethToDistribute = address(this).balance / totalLockedFunds;
 
-        // Loop through the locked funds and distribute ETH and supported tokens
+        // Loop through the locked funds and distribute ETH
         for (uint256 i = 0; i < totalLockedFunds; i++) {
             address fundAddress = lockedFunds[i];
 
-            // Transfer native ETH balance to the fund contract
-            payable(fundAddress).transfer(ethToDistribute);
+            // Use Address.sendValue for batch transfers
+            Address.sendValue(payable(fundAddress), ethToDistribute);
+        }
 
-            // Transfer supported tokens to the fund contract
-            for (uint256 j = 0; j < _supportedTokens.length; j++) {
-                address tokenAddress = _supportedTokens[j];
-                ISupportedToken token = ISupportedToken(tokenAddress);
-                uint256 tokenBalance = token.balanceOf(address(this));
+        emit DistributedNativeTokensToLockedFunds();
+    }
 
-                if (tokenBalance > 0) {
-                    token.transfer(fundAddress, tokenBalance / totalLockedFunds);
+    /**
+     * @notice  Distributes supported token balances to specified locked funds
+     * @param targetFunds Array of target fund addresses
+     */
+    function distributeSupportedTokens(address[] memory targetFunds) external onlyRole(TREASURER_ROLE) {
+        uint256 totalLockedFunds = lockedFunds.length;
+
+        // Ensure there are locked funds to distribute to
+        require(totalLockedFunds > 0, "No locked funds to distribute to");
+
+        for (uint256 j = 0; j < _supportedTokens.length; j++) {
+            address tokenAddress = _supportedTokens[j];
+            ISupportedToken token = ISupportedToken(tokenAddress);
+            uint256 tokenBalance = token.balanceOf(address(this));
+
+            if (tokenBalance > 0) {
+                for (uint256 i = 0; i < targetFunds.length; i++) {
+                    address fundAddress = targetFunds[i];
+
+                    // Check if the fund is not open or not a member of openFunds
+                    IFund fund = IFund(fundAddress);
+                    require(
+                        fund.currentState() == IFund.State.Locked,
+                        "Fund is not locked"
+                    );
+
+                    // Transfer tokens to the fund
+                    token.transfer(fundAddress, tokenBalance / targetFunds.length);
                 }
             }
         }
 
-        emit DistributedOpenFundsToLockedFunds();
+        emit DistributedSupportedTokensToLockedFunds(targetFunds);
     }
 
     function grantTreasurerRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -202,5 +226,9 @@ contract Treasury is ITreasury, AccessControl {
             }
         }
         return false; // The fund is not in the array
+    }
+
+    receive() external payable {
+        emit Received(msg.sender, msg.value);
     }
 }

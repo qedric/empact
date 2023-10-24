@@ -20,6 +20,7 @@ contract Generator_v1 is IGenerator, AccessControl {
     Colours public svgColours;
 
 	constructor() {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         svgColours = Colours(
             0xffcc00, // fbg
             0xb8abd4, // bg
