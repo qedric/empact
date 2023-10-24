@@ -1,6 +1,7 @@
 /** @type import('hardhat/config').HardhatUserConfig */
 require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-etherscan");
+require("hardhat-gas-reporter");
 require('dotenv').config();
 
 const { ALCHECMY_API_KEY_TEST, ETHERSCAN_API_KEY, PK } = process.env;
@@ -25,5 +26,9 @@ module.exports = {
   },
   etherscan: {
     apiKey: `${ETHERSCAN_API_KEY}`
-  }
+  },
+  gasReporter: {
+    enabled: process.env.REPORT_GAS !== undefined,
+    gasPrice: 20,
+  },
 };
