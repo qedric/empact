@@ -44,25 +44,25 @@ async function deploy(feeRecipient) {
 async function getTypedData(
   factory_address,
   to,
-  quantity,
   validityStartTimestamp,
   validityEndTimestamp,
-  name,
-  description,
+  quantity,
   unlockTime,
-  targetBalance
+  targetBalance,
+  name,
+  description
 ) {
   return {
     types: {
       MintRequest: [
         { name: "to", type: "address" },
-        { name: "quantity", type: "uint256" },
         { name: "validityStartTimestamp", type: "uint128" },
         { name: "validityEndTimestamp", type: "uint128" },
-        { name: "name", type: "string" },
-        { name: "description", type: "string" },
+        { name: "quantity", type: "uint256" },
         { name: "unlockTime", type: "uint256" },
-        { name: "targetBalance", type: "uint256" }
+        { name: "targetBalance", type: "uint256" },
+        { name: "name", type: "string" },
+        { name: "description", type: "string" }
       ],
     },
     domain: {
@@ -74,13 +74,13 @@ async function getTypedData(
     primaryType: 'MintRequest',
     message: {
       to: to,
-      quantity: quantity,
       validityStartTimestamp: validityStartTimestamp,
       validityEndTimestamp: validityEndTimestamp,
-      name: name,
-      description: description,
+      quantity: quantity,
       unlockTime: unlockTime,
-      targetBalance: targetBalance
+      targetBalance: targetBalance,
+      name: name,
+      description: description      
     },
   };
 }
@@ -120,13 +120,13 @@ async function generateMintRequest(factory_address, signer, to_address) {
   const typedData = await getTypedData(
     factory_address,
     to_address,
-    4,
     timestamp,
     endTime,
-    'A test fund',
-    'description',
+    4,
     unlockTime,
-    targetBalance
+    targetBalance,
+    'A test fund',
+    'description'    
   )
 
   // Sign the typed data

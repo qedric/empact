@@ -104,22 +104,6 @@ async function main() {
 
   //initialise
 
-  /*
-  struct MintRequest {
-    uint256 quantity;
-    uint128 validityStartTimestamp;
-    uint128 validityEndTimestamp;
-    string name;
-    string externalUrl;
-    uint256 unlockTime;
-    uint256 targetBalance;
-    uint256 tokenId;
-}
-
-
-
-*/
-
 
 }
 

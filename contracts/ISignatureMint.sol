@@ -13,13 +13,13 @@ interface ISignatureMint {
      */
     struct MintRequest {
         address to;
-        uint256 quantity;
         uint128 validityStartTimestamp;
         uint128 validityEndTimestamp;
-        string name;
-        string description;
+        uint256 quantity;
         uint256 unlockTime;
         uint256 targetBalance;
+        string name;
+        string description;
     }
 
     /// @dev Emitted when tokens are minted.

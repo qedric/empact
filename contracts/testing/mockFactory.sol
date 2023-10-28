@@ -17,7 +17,7 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
 
     bytes32 internal constant TYPEHASH =
         keccak256(
-            "MintRequest(address to,uint256 quantity,uint128 validityStartTimestamp,uint128 validityEndTimestamp,string name,string description,uint256 unlockTime,uint256 targetBalance)"
+            "MintRequest(address to,uint128 validityStartTimestamp,uint128 validityEndTimestamp,uint256 quantity,uint256 unlockTime,uint256 targetBalance,string name,string description)"
         );
 
     constructor() EIP712("SignatureMintERC1155", "1") {}
@@ -66,13 +66,13 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
     /*
     struct MintRequest {
         address to;
-        uint256 quantity;
         uint128 validityStartTimestamp;
         uint128 validityEndTimestamp;
-        string name;
-        string description;
+        uint256 quantity;
         uint256 unlockTime;
         uint256 targetBalance;
+        string name;
+        string description;
     }
     */
 
@@ -84,13 +84,13 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
             abi.encode(
                 TYPEHASH,
                 _req.to,
-                _req.quantity,
                 _req.validityStartTimestamp,
                 _req.validityEndTimestamp,
-                keccak256(bytes(_req.name)),
-                keccak256(bytes(_req.description)),
+                _req.quantity,
                 _req.unlockTime,
                 _req.targetBalance
+                keccak256(bytes(_req.name)),
+                keccak256(bytes(_req.description)),
             );
     }
 } 

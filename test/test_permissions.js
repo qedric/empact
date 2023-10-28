@@ -620,7 +620,6 @@ describe("Testing Treasury Roles & permissions", function () {
     const distributedSupportedTokensToLockedFundsEvent = tx2Receipt.events.find(event => event.event === 'DistributedSupportedTokensToLockedFunds');
     expect(distributedSupportedTokensToLockedFundsEvent).to.exist;
   });
-
 })
 
 describe("Testing Fund Roles & permissions", function () {
@@ -705,5 +704,4 @@ describe("Testing Generator Roles & permissions", function () {
   it("should not allow non DEFAULT ADMIN run setSvgColours()", async function () {
     await expect(generator.connect(user1).setSvgColours(0x00300088, 0x300000, 0xf00000, 0x200000, 0xc00000)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
   })
-
 })
