@@ -88,9 +88,9 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
                 _req.validityEndTimestamp,
                 _req.quantity,
                 _req.unlockTime,
-                _req.targetBalance
+                _req.targetBalance,
                 keccak256(bytes(_req.name)),
-                keccak256(bytes(_req.description)),
+                keccak256(bytes(_req.description))
             );
     }
 } 

@@ -130,7 +130,7 @@ contract Treasury is ITreasury, AccessControl {
 
             // Ensure the fund is open before collecting
             IFund fund = IFund(fundAddress);
-            require(fund.currentState() == IFund.State.Open, "Fund is not open");
+            require(fund.state() == IFund.State.Open, "Fund is not open");
 
             // Call the sendToTreasury() method on the fund
             fund.sendToTreasury();
@@ -184,7 +184,7 @@ contract Treasury is ITreasury, AccessControl {
                     // Check if the fund is not open or not a member of openFunds
                     IFund fund = IFund(fundAddress);
                     require(
-                        fund.currentState() == IFund.State.Locked,
+                        fund.state() == IFund.State.Locked,
                         "Fund is not locked"
                     );
 

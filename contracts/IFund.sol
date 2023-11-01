@@ -15,6 +15,7 @@ interface IFund {
     }
 
     event FundInitialised(Attr attributes);
+    event StateChanged(State newState);
     event Received(address _from, uint _amount);
     event Withdrawal(address who, uint amount, uint balance);
     event SupportedTokenWithdrawal(address indexed token, address who, uint amount, uint balance);
@@ -24,7 +25,7 @@ interface IFund {
     event SendSupportedTokenToTreasury(address treasury, address tokenAddress, uint tokenBalance);
 
     function initialize(Attr calldata _data, uint16 _breakFundBps) external;
-    function currentState() external view returns(State);
+    function state() external view returns(State);
     function getTotalBalance() external view returns(uint256 totalBalance);
     function payout(address recipient, address payable feeRecipient, uint256 thisOwnerBalance, uint256 totalSupply) external payable returns(State);
     function sendToTreasury() external payable;

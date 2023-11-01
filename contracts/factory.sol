@@ -88,9 +88,9 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
                 _req.validityEndTimestamp,
                 _req.quantity,
                 _req.unlockTime,
-                _req.targetBalance
+                _req.targetBalance,
                 keccak256(bytes(_req.name)),
-                keccak256(bytes(_req.description)),
+                keccak256(bytes(_req.description))
             );
     }
 } 
@@ -115,6 +115,8 @@ contract Factory is
     event FundImplementationUpdated(address indexed implementation);
     event GeneratorUpdated(address indexed generator);
     event TreasuryUpdated(address indexed treasury);
+    event Payout(address indexed fundAddress, uint256 tokenId);
+    event TokenUrlPrefixUpdated(string oldPrefix, string newPrefix);
 
     /*//////////////////////////////////////////////////////////////
     State variables
@@ -124,7 +126,7 @@ contract Factory is
     uint256 internal nextTokenIdToMint_;
 
     /// @dev prefix for the token url
-    string private _tokenUrlPrefix = 'https://cryptopiggies.io/';
+    string private _tokenUrlPrefix;
 
     /// @notice The fee to create a new Fund.
     uint256 public makeFundFee = 0.004 ether;
@@ -163,15 +165,16 @@ contract Factory is
 
     /// @notice checks to ensure that the token exists before referencing it
     modifier tokenExists(uint256 tokenId) {
-        require(totalSupply[tokenId] > 0, "Token data not found");
+        require(totalSupply[tokenId] > 0, "Token not found");
         _;
     }
 
     /*//////////////////////////////////////////////////////////////
     Constructor
     //////////////////////////////////////////////////////////////*/
-    constructor(address payable _feeRecipient) ERC1155('') {
+    constructor(address payable _feeRecipient, string memory tokenUrlPrefix) ERC1155('') {
         feeRecipient = _feeRecipient;
+        _tokenUrlPrefix = tokenUrlPrefix;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SIGNER_ROLE, msg.sender);
     }
@@ -196,10 +199,10 @@ contract Factory is
 
     /**
      *  @notice          Lets an authorized address mint NFTs to a recipient, via signed mint request
-     *  @dev             - The logic in the `_canSignMintRequest` function determines whether the caller is authorized to mint NFTs.
+     *  @dev             The logic in the `_canSignMintRequest` function determines whether the caller is authorized to mint NFTs.
      *
      *  @param _req      The signed mint request.
-     *  @param _signature  The signature of an address with the MINTER role.
+     *  @param _signature  The signature of an address with the SIGNER role.
      */
     function mintWithSignature(
         MintRequest calldata _req,
@@ -291,6 +294,7 @@ contract Factory is
                 // fund is now open; update the treasury
                 treasury.moveToOpenFund(address(funds[tokenId]));
             }
+            emit Payout(address(funds[tokenId]), tokenId);
         } catch Error(string memory reason) {
             revert(reason);
         } catch (bytes memory /*lowLevelData*/) {
@@ -304,6 +308,7 @@ contract Factory is
 
     /// @notice this will display in NFT metadata
     function setTokenUrlPrefix(string memory tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit TokenUrlPrefixUpdated(_tokenUrlPrefix, tokenUrlPrefix);
         _tokenUrlPrefix = tokenUrlPrefix;
     }
 

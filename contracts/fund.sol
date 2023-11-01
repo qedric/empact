@@ -16,7 +16,7 @@ interface ISupportedToken {
 
 contract Fund is IFund, Initializable {
 
-    State public currentState = State.Locked; // Initialize as locked
+    State public state = State.Locked; // Initialize as locked
     Attr private _attributes;
     bool private _targetReached;
     bool public oETHRebasingEnabled = false;
@@ -52,12 +52,30 @@ contract Fund is IFund, Initializable {
     }
 
     /// @notice this needs to be called if some of the target balance comes from non-ETH supported tokens.
+    /// @notice this needs to be called if no funds are received after unlock time has been reached.
     /// @notice this call is not necessary if the target is reached with native ETH only.
     function setTargetReached() external {
-        require(_getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance,
-            'Fund is still hungry!');
-        _targetReached = true;
-        emit TargetReached();
+
+        require(
+            _getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance,
+            'Fund has not met target'
+        );
+
+        require(
+            state == State.Locked,
+            'Fund is not locked'
+        );
+
+        if (!_targetReached) {
+            _targetReached = true;
+            emit TargetReached();
+        }
+        
+        if (block.timestamp > _attributes.unlockTime) {
+            // set to Unlocked
+            state = State.Unlocked;
+            emit StateChanged(State.Unlocked);
+        }
     }
 
     /// @notice Supported staked tokens can contribute to the target balance.
@@ -88,7 +106,7 @@ contract Fund is IFund, Initializable {
     }
 
     /// @notice transfers the share of available funds to the recipient and fee recipient
-    /// @notice If this is the last payout, set state to Open, otherwise set to unlocked
+    /// @notice If this is the last payout, set state to Open
     function payout(
         address recipient,
         address payable feeRecipient,
@@ -97,21 +115,20 @@ contract Fund is IFund, Initializable {
     ) external payable onlyFactory returns(State) {
 
         require(
-            block.timestamp > _attributes.unlockTime,
-            "You can't withdraw yet"
+            state == State.Unlocked,
+            "Fund must be Unlocked"
         );
-        
-        require(
-            _targetReached,
-            "Fund is still hungry!"
-        );
+
+        // set the state to Open if it's the last payout
+        if (totalSupply - thisOwnerBalance == 0 ) {
+            // set to Open
+            emit StateChanged(State.Open);
+            state = State.Open;
+        }
 
         // calculate the ETH amount owed
         uint256 payoutAmount = address(this).balance * thisOwnerBalance / totalSupply;
         uint256 payoutFee = payoutAmount * breakFundFeeBps / 10000;
-
-        // set the state to unlocked unless it's the last payout, then set to open
-        currentState = ( totalSupply - thisOwnerBalance == 0 ) ? State.Open : State.Unlocked;
 
         // send the withdrawal event and pay the owner
         emit Withdrawal(recipient, payoutAmount, thisOwnerBalance);
@@ -139,14 +156,14 @@ contract Fund is IFund, Initializable {
             token.transfer(feeRecipient, tokenPayoutFee);
         }
 
-        return currentState;
+        return state;
     }
 
     /// @notice transfers all supported tokens to the treasury. Can only be called when the state is Open
     function sendToTreasury() external payable onlyTreasury {
 
         require(
-            currentState == State.Open,
+            state == State.Open,
             'Fund must be Open'
         );
 
@@ -172,6 +189,15 @@ contract Fund is IFund, Initializable {
         if (!_targetReached && address(this).balance >= _attributes.targetBalance) {
             _targetReached = true;
             emit TargetReached();
+        }
+        if (
+            _targetReached &&
+            block.timestamp > _attributes.unlockTime &&
+            state == State.Locked
+            ) {
+            // set to Unlocked
+            emit StateChanged(State.Unlocked);
+            state = State.Unlocked;
         }
     }
 }
