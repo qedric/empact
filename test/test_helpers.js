@@ -2,29 +2,55 @@ const { expect, assert } = require("chai")
 const { ethers, upgrades, network } = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-network-helpers")
 
-async function deploy(feeRecipient) {
+async function deployFundImplementation(factory_address, treasury_address) {
 
-  const Factory = await ethers.getContractFactory("Factory")
   const FundImplementation = await ethers.getContractFactory("Fund")
+
+  // deploy the fund implementation that will be cloned for each new fund
+  const fundImplementation = await FundImplementation.deploy(factory_address, treasury_address)
+  await fundImplementation.deployed()
+
+  return fundImplementation
+}
+
+async function deployGenerator() {
+
   const Generator = await ethers.getContractFactory("Generator_v1")
-  const Treasury = await ethers.getContractFactory("Treasury")
-  
+
   // deploy the generator contract
   const generator = await Generator.deploy()
   await generator.deployed()
 
+  return generator
+}
+
+async function deployTreasury(factory_address) {
+
+  const Treasury = await ethers.getContractFactory("Treasury")
+
+  // deploy the treasury
+  const treasury = await Treasury.deploy(factory_address)
+  await treasury.deployed()
+
+  return treasury
+}
+
+async function deploy(feeRecipient, tokenUrlPrefix) {
+
+  const Factory = await ethers.getContractFactory("Factory")
+  
+  // deploy the generator contract
+  const generator = await deployGenerator()
+
   // deploy the factory
-  const factory = await Factory.deploy(feeRecipient)
-  // wait for it to finish deploying
+  const factory = await Factory.deploy(feeRecipient, tokenUrlPrefix)
   await factory.deployed()
 
   // deploy the treasury
-  const treasury = await Treasury.deploy(factory.address)
-  await treasury.deployed()
+  const treasury = await deployTreasury(factory.address)
 
   // deploy the fund implementation that will be cloned for each new fund
-  const fundImplementation = await FundImplementation.deploy(factory.address, treasury.address)
-  await fundImplementation.deployed()
+  const fundImplementation = await deployFundImplementation(factory.address, treasury.address)
 
   //set the implementation in the contract
   await factory.setFundImplementation(fundImplementation.address)
@@ -107,7 +133,7 @@ async function deployMockToken(name, symbol) {
   return token;
 }
 
-async function generateMintRequest(factory_address, signer, to_address) {
+async function generateMintRequest(factory_address, signer, to_address, typedData) {
   // Generate a signature for the mint request
   const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
     // getBlock returns a block object and it has a timestamp property.
@@ -117,17 +143,19 @@ async function generateMintRequest(factory_address, signer, to_address) {
   const unlockTime = Math.floor(timestamp + 60 * 60 * 24 * 99)
   const targetBalance = ethers.utils.parseUnits("1", "ether").toString()
 
-  const typedData = await getTypedData(
-    factory_address,
-    to_address,
-    timestamp,
-    endTime,
-    4,
-    unlockTime,
-    targetBalance,
-    'A test fund',
-    'description'    
-  )
+  if (!typedData) {
+    typedData = await getTypedData(
+      factory_address,
+      to_address,
+      timestamp,
+      endTime,
+      4,
+      unlockTime,
+      targetBalance,
+      'A test fund',
+      'description'    
+    )
+  }
 
   // Sign the typed data
   const signature = await signer._signTypedData(
@@ -140,8 +168,10 @@ async function generateMintRequest(factory_address, signer, to_address) {
 }
 
 async function makeFund(factory, signer, to) {
-  const mintRequest = generateMintRequest(factory.address, signer, to)
+  const mintRequest = await generateMintRequest(factory.address, signer, to.address)
   
+  const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+
   const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeFundFee })
   const txReceipt = await tx.wait()
 
@@ -158,12 +188,15 @@ async function makeFund(factory, signer, to) {
   expect(fundInitialisedEvent[0].args.attributes[4]).to.equal('A test fund')
   expect(fundInitialisedEvent[0].args.attributes[5]).to.equal('description')
 
-  return fundCreatedEvent
+  return fund
 }
 
 // Export the functions
 module.exports = {
   deploy,
+  deployFundImplementation,
+  deployGenerator,
+  deployTreasury,
   getTypedData,
   getRevertReason,
   getCurrentBlockTime,
