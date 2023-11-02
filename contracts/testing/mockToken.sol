@@ -8,3 +8,17 @@ contract MockToken is ERC20 {
         _mint(msg.sender, 1000000000000000000000000); // Mint 1,000,000 tokens to the contract deployer
     }
 }
+
+contract MockOETHToken is ERC20 {
+
+    bool private _isNonRebasingAccount = true;
+
+    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {
+        _mint(msg.sender, 1000000000000000000000000); // Mint 1,000,000 tokens to the contract deployer
+    }
+
+    function rebaseOptIn() public {
+        require(_isNonRebasingAccount, "Account has not opted out");
+        _isNonRebasingAccount = false;
+    }
+}

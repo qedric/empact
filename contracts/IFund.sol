@@ -18,6 +18,7 @@ interface IFund {
     event StateChanged(State newState);
     event Received(address _from, uint _amount);
     event Withdrawal(address who, uint amount, uint balance);
+    event WithdrawalFeePaid(address recipient, uint amount);
     event SupportedTokenWithdrawal(address indexed token, address who, uint amount, uint balance);
     event TargetReached();
     event OptedInForOriginProtocolRebasing();

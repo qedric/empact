@@ -132,7 +132,7 @@ contract Factory is
     uint256 public makeFundFee = 0.004 ether;
 
     /// @notice The fee deducted with each withdrawal from a fund, in basis points
-    uint16 public breakFundFeeBps = 400;
+    uint16 public withdrawalFeeBps = 400;
 
     /// @notice The Fund implementation contract that is cloned for each new fund
     IFund public fundImplementation;
@@ -263,7 +263,7 @@ contract Factory is
             salthash
         );
 
-        IFund(deployedProxy).initialize(_fundData, breakFundFeeBps);
+        IFund(deployedProxy).initialize(_fundData, withdrawalFeeBps);
 
         // register the fund with the treasury
         treasury.addLockedFund(deployedProxy);
@@ -322,7 +322,7 @@ contract Factory is
     function setBreakFundBps(uint16 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(bps <= 900, "Don't be greedy!");
         emit BreakFundBpsUpdated(bps);
-        breakFundFeeBps = bps;
+        withdrawalFeeBps = bps;
     }
 
     /**

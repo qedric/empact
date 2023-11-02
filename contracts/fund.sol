@@ -5,6 +5,13 @@ import "@thirdweb-dev/contracts/extension/Initializable.sol";
 import "./IFund.sol";
 import "./ITreasury.sol";
 
+/*
+    Origin Protocol staked tokens are treated differently to other supported tokens
+    because its contract requires a call to be made from the fund contract address
+    to opt-in to staking rewards. 
+
+    Origin Protocol still needs to be added as a supported token via the factory contract
+*/
 interface IOETHToken {
     function rebaseOptIn() external;
 }
@@ -18,14 +25,13 @@ contract Fund is IFund, Initializable {
 
     State public state = State.Locked; // Initialize as locked
     Attr private _attributes;
-    bool private _targetReached;
     bool public oETHRebasingEnabled = false;
     
     address public immutable factory;
     address public immutable treasury;
 
     /// @notice Cannot be modified after initialisation
-    uint16 public breakFundFeeBps;
+    uint16 public withdrawalFeeBps;
 
     /// @notice Checks that the `msg.sender` is the factory.
     modifier onlyFactory() {
@@ -47,14 +53,20 @@ contract Fund is IFund, Initializable {
 
     function initialize(Attr calldata _data, uint16 _breakFundBps) external onlyFactory initializer {
         _attributes = _data;
-        breakFundFeeBps = _breakFundBps;
+        withdrawalFeeBps = _breakFundBps;
         emit FundInitialised(_data);
     }
 
-    /// @notice this needs to be called if some of the target balance comes from non-ETH supported tokens.
-    /// @notice this needs to be called if no funds are received after unlock time has been reached.
-    /// @notice this call is not necessary if the target is reached with native ETH only.
-    function setTargetReached() external {
+    /*  @notice this needs to be called if some of the target balance comes from non-native tokens.
+                this needs to be called if no funds are received after unlock time has been reached.
+                this call is not necessary if the target is reached with native tokens only.
+    */
+    function setStateUnlocked() external {
+
+        require(
+            state == State.Locked,
+            'Fund is not locked'
+        );
 
         require(
             _getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance,
@@ -62,20 +74,13 @@ contract Fund is IFund, Initializable {
         );
 
         require(
-            state == State.Locked,
-            'Fund is not locked'
+            block.timestamp > _attributes.unlockTime,
+            'Fund has not reached maturity'
         );
 
-        if (!_targetReached) {
-            _targetReached = true;
-            emit TargetReached();
-        }
-        
-        if (block.timestamp > _attributes.unlockTime) {
-            // set to Unlocked
-            state = State.Unlocked;
-            emit StateChanged(State.Unlocked);
-        }
+        // set to Unlocked
+        state = State.Unlocked;
+        emit StateChanged(State.Unlocked);
     }
 
     /// @notice Supported staked tokens can contribute to the target balance.
@@ -128,15 +133,17 @@ contract Fund is IFund, Initializable {
 
         // calculate the ETH amount owed
         uint256 payoutAmount = address(this).balance * thisOwnerBalance / totalSupply;
-        uint256 payoutFee = payoutAmount * breakFundFeeBps / 10000;
+        uint256 payoutFee = payoutAmount * withdrawalFeeBps / 10000;
 
         // send the withdrawal event and pay the owner
-        emit Withdrawal(recipient, payoutAmount, thisOwnerBalance);
+        emit Withdrawal(recipient, payoutAmount - payoutFee, thisOwnerBalance);
 
         payable(recipient).transfer(payoutAmount - payoutFee);
 
         // send the fee to the factory contract owner
         feeRecipient.transfer(payoutFee);
+
+        emit WithdrawalFeePaid(feeRecipient, payoutFee);
 
         // Withdraw supported tokens and calculate the amounts
         for (uint256 i = 0; i < ITreasury(treasury).supportedTokens().length; i++) {
@@ -146,7 +153,7 @@ contract Fund is IFund, Initializable {
 
             // Calculate the amount of supported tokens to be withdrawn
             uint256 tokenPayoutAmount = tokenBalance * thisOwnerBalance / totalSupply;
-            uint256 tokenPayoutFee = tokenPayoutAmount * breakFundFeeBps / 10000;
+            uint256 tokenPayoutFee = tokenPayoutAmount * withdrawalFeeBps / 10000;
 
             // Send the withdrawal event and pay the owner with supported tokens
             emit SupportedTokenWithdrawal(tokenAddress, recipient, tokenPayoutAmount, thisOwnerBalance);
@@ -186,12 +193,8 @@ contract Fund is IFund, Initializable {
 
     receive() external payable {
         emit Received(msg.sender, msg.value);
-        if (!_targetReached && address(this).balance >= _attributes.targetBalance) {
-            _targetReached = true;
-            emit TargetReached();
-        }
         if (
-            _targetReached &&
+            _getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance &&
             block.timestamp > _attributes.unlockTime &&
             state == State.Locked
             ) {

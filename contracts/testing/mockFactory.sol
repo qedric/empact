@@ -115,6 +115,8 @@ contract MockFactory is
     event FundImplementationUpdated(address indexed implementation);
     event GeneratorUpdated(address indexed generator);
     event TreasuryUpdated(address indexed treasury);
+    event Payout(address indexed fundAddress, uint256 tokenId);
+    event TokenUrlPrefixUpdated(string oldPrefix, string newPrefix);
 
     /*//////////////////////////////////////////////////////////////
     State variables
@@ -124,13 +126,13 @@ contract MockFactory is
     uint256 internal nextTokenIdToMint_;
 
     /// @dev prefix for the token url
-    string private _tokenUrlPrefix = 'https://cryptopiggies.io/';
+    string private _tokenUrlPrefix;
 
     /// @notice The fee to create a new Fund.
     uint256 public makeFundFee = 0.004 ether;
 
     /// @notice The fee deducted with each withdrawal from a fund, in basis points
-    uint16 public breakFundFeeBps = 400;
+    uint16 public withdrawalFeeBps = 400;
 
     /// @notice The Fund implementation contract that is cloned for each new fund
     IFund public fundImplementation;
@@ -163,15 +165,16 @@ contract MockFactory is
 
     /// @notice checks to ensure that the token exists before referencing it
     modifier tokenExists(uint256 tokenId) {
-        require(totalSupply[tokenId] > 0, "Token data not found");
+        require(totalSupply[tokenId] > 0, "Token not found");
         _;
     }
 
     /*//////////////////////////////////////////////////////////////
     Constructor
     //////////////////////////////////////////////////////////////*/
-    constructor(address payable _feeRecipient) ERC1155('') {
+    constructor(address payable _feeRecipient, string memory tokenUrlPrefix) ERC1155('') {
         feeRecipient = _feeRecipient;
+        _tokenUrlPrefix = tokenUrlPrefix;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SIGNER_ROLE, msg.sender);
     }
@@ -196,10 +199,10 @@ contract MockFactory is
 
     /**
      *  @notice          Lets an authorized address mint NFTs to a recipient, via signed mint request
-     *  @dev             - The logic in the `_canSignMintRequest` function determines whether the caller is authorized to mint NFTs.
+     *  @dev             The logic in the `_canSignMintRequest` function determines whether the caller is authorized to mint NFTs.
      *
      *  @param _req      The signed mint request.
-     *  @param _signature  The signature of an address with the MINTER role.
+     *  @param _signature  The signature of an address with the SIGNER role.
      */
     function mintWithSignature(
         MintRequest calldata _req,
@@ -260,7 +263,7 @@ contract MockFactory is
             salthash
         );
 
-        IFund(deployedProxy).initialize(_fundData, breakFundFeeBps);
+        IFund(deployedProxy).initialize(_fundData, withdrawalFeeBps);
 
         // register the fund with the treasury
         treasury.addLockedFund(deployedProxy);
@@ -268,8 +271,35 @@ contract MockFactory is
         emit FundDeployed(deployedProxy, msg.sender);
     }
 
-    function moveToOpenFund(address real_fund) external {
-        treasury.moveToOpenFund(address(real_fund));
+    /// @dev If sender balance > 0 then burn sender balance and call payout function in the fund contract
+    function payout(uint256 tokenId) external tokenExists(tokenId) {
+
+        uint256 thisOwnerBalance = balanceOf(msg.sender, tokenId);
+
+        require(thisOwnerBalance != 0, "Not authorised!");
+
+        // get the total supply before burning
+        uint256 totalSupplyBeforePayout = totalSupply[tokenId];
+
+        // burn the tokens so the owner can't claim twice
+        _burn(msg.sender, tokenId, thisOwnerBalance);
+
+        try IFund(payable(funds[tokenId])).payout{value: 0} (
+            msg.sender,
+            feeRecipient,
+            thisOwnerBalance,
+            totalSupplyBeforePayout
+        ) returns (IFund.State state) {
+            if (state == IFund.State.Open) {
+                // fund is now open; update the treasury
+                treasury.moveToOpenFund(address(funds[tokenId]));
+            }
+            emit Payout(address(funds[tokenId]), tokenId);
+        } catch Error(string memory reason) {
+            revert(reason);
+        } catch (bytes memory /*lowLevelData*/) {
+            revert("payout failed");
+        }
     }
 
     /// @dev If sender balance > 0 then burn sender balance and call payout function in the fund contract
@@ -308,6 +338,7 @@ contract MockFactory is
 
     /// @notice this will display in NFT metadata
     function setTokenUrlPrefix(string memory tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit TokenUrlPrefixUpdated(_tokenUrlPrefix, tokenUrlPrefix);
         _tokenUrlPrefix = tokenUrlPrefix;
     }
 
@@ -321,7 +352,7 @@ contract MockFactory is
     function setBreakFundBps(uint16 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(bps <= 900, "Don't be greedy!");
         emit BreakFundBpsUpdated(bps);
-        breakFundFeeBps = bps;
+        withdrawalFeeBps = bps;
     }
 
     /**
