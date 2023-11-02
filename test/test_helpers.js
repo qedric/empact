@@ -133,6 +133,13 @@ async function deployMockToken(name, symbol) {
   return token;
 }
 
+async function deployMockOETHToken() {
+  const MockOETHoken = await ethers.getContractFactory("MockOETHToken")
+  const token = await MockOETHoken.deploy('Origin Protocol Mock Token', 'mOETH')
+  await token.deployed()
+  return token
+}
+
 async function generateMintRequest(factory_address, signer, to_address, typedData) {
   // Generate a signature for the mint request
   const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
@@ -201,6 +208,7 @@ module.exports = {
   getRevertReason,
   getCurrentBlockTime,
   deployMockToken,
+  deployMockOETHToken,
   generateMintRequest,
   makeFund
 }

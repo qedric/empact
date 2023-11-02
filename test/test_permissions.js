@@ -14,9 +14,12 @@ describe("Testing Factory Roles & permissions", function () {
   let user1, user2
   let feeRecipient, newFeeRecipient
 
-  beforeEach(async function () {
+  before(async function () {
     [INITIAL_DEFAULT_ADMIN_AND_SIGNER, NEW_SIGNER, FAKE_FUND_IMPL, FAKE_GENERATOR, FAKE_TREASURY, user1, user2, feeRecipient, newFeeRecipient] = await ethers.getSigners()
-    const deployedContracts = await deploy(feeRecipient.address)
+  })
+
+  beforeEach(async function () {
+    const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
     factory = deployedContracts.factory
   })
 
@@ -43,7 +46,7 @@ describe("Testing Factory Roles & permissions", function () {
   it("should allow DEFAULT ADMIN run setBreakFundBps()", async function () {
     const newBps = 500 // 5%
     await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).setBreakFundBps(newBps)
-    const updatedBps = await factory.breakFundFeeBps()
+    const updatedBps = await factory.withdrawalFeeBps()
     expect(updatedBps).to.equal(newBps)
   })
 
@@ -144,9 +147,12 @@ describe("Testing Treasury Roles & permissions", function () {
   let feeRecipient
   let deployedContracts
 
-  beforeEach(async function () {
+  before(async function () {
     [INITIAL_DEFAULT_ADMIN_AND_SIGNER, TREASURER, NEW_TREASURER, user1, user2, feeRecipient] = await ethers.getSigners()
-    deployedContracts = await deploy(feeRecipient.address)
+  })
+
+  beforeEach(async function () {
+    deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
     treasury = deployedContracts.treasury
   })
 
@@ -335,7 +341,7 @@ describe("Testing Treasury Roles & permissions", function () {
 
     // deploy the factory
     const MockFactory = await ethers.getContractFactory("MockFactory")
-    const fake_factory = await MockFactory.deploy(feeRecipient.address)
+    const fake_factory = await MockFactory.deploy(feeRecipient.address, '')
     // wait for it to finish deploying
     await fake_factory.deployed()
 
@@ -364,15 +370,15 @@ describe("Testing Treasury Roles & permissions", function () {
     const Fund = await ethers.getContractFactory("Fund")
     const fund = Fund.attach(fundCreatedEvent.args.fund)
 
+    // move time forward 100 days
+    await helpers.time.increase(60 * 60 * 24 * 100)
+
     // send 1 ETH to the fund to unlock it
     const amountToSend = ethers.utils.parseEther("1")
     await user2.sendTransaction({
       to: fund.address,
       value: amountToSend,
     })
-
-    // move time forward 100 days
-    await helpers.time.increase(60 * 60 * 24 * 100) // 3 days
 
     const txPayout = await factory.connect(user1).payout(0)
     const txPayoutReceipt = await txPayout.wait()
@@ -393,7 +399,7 @@ describe("Testing Treasury Roles & permissions", function () {
     const factory = deployedContracts.factory
     // now deploy the mock factory
     const MockFactory = await ethers.getContractFactory("MockFactory")
-    const fake_factory = await MockFactory.deploy(feeRecipient.address)
+    const fake_factory = await MockFactory.deploy(feeRecipient.address, '')
     // wait for it to finish deploying
     await fake_factory.deployed()
 
@@ -441,6 +447,9 @@ describe("Testing Treasury Roles & permissions", function () {
     // set the real treasurey in our fake factory:
     await fake_factory.setTreasury(treasury.address)
 
+    // move time forward 100 days
+    await helpers.time.increase(60 * 60 * 24 * 100)
+
     // send 1 ETH to the fund to unlock it
     const amountToSend = ethers.utils.parseEther("1")
     await user2.sendTransaction({
@@ -448,11 +457,8 @@ describe("Testing Treasury Roles & permissions", function () {
       value: amountToSend,
     })
 
-    // move time forward 100 days
-    await helpers.time.increase(60 * 60 * 24 * 100) // 3 days
-
-    // call our mock move to open function:
-    const txFakePayout = await expect(fake_factory.connect(user1).moveToOpenFund(fund.address)).to.be.revertedWith('onlyFactory')
+    // call our fake payout function:
+    const txFakePayout = await expect(fake_factory.connect(user1).fake_payout(0, fund.address)).to.be.revertedWith('onlyFactory')
   })
 
   /*collect*/
@@ -474,15 +480,15 @@ describe("Testing Treasury Roles & permissions", function () {
     const Fund = await ethers.getContractFactory("Fund")
     const fund = Fund.attach(fundCreatedEvent.args.fund)
 
+    // move time forward 100 days
+    await helpers.time.increase(60 * 60 * 24 * 100)
+
     // send 1 ETH to the fund to unlock it
     const amountToSend = ethers.utils.parseEther("1")
     await user2.sendTransaction({
       to: fund.address,
       value: amountToSend,
     })
-
-    // move time forward 100 days
-    await helpers.time.increase(60 * 60 * 24 * 100) // 3 days
 
     const txPayout = await factory.connect(user1).payout(0)
     const txPayoutReceipt = await txPayout.wait()
@@ -627,11 +633,13 @@ describe("Testing Fund Roles & permissions", function () {
   let fund, factory, treasury
   let INITIAL_DEFAULT_ADMIN_AND_SIGNER, FEE_RECIPIENT, TREASURER, user1, user2
 
-  beforeEach(async function () {
+  before(async function () {
     [INITIAL_DEFAULT_ADMIN_AND_SIGNER, FEE_RECIPIENT, TREASURER, user1, user2] = await ethers.getSigners()
+  })
 
+  beforeEach(async function () {
     // Deploy Factory and Treasury contracts
-    const deployedContracts = await deploy(FEE_RECIPIENT.address)
+    const deployedContracts = await deploy(FEE_RECIPIENT.address, 'https://zebra.xyz/')
     factory = deployedContracts.factory
     treasury = deployedContracts.treasury
 
@@ -658,14 +666,13 @@ describe("Testing Fund Roles & permissions", function () {
     fund = Fund.attach(fundCreatedEvent.args.fund)
   })
 
-  it("should not allow non-factory to initialize the fund contract", async function () {
-    // Attempt to call a function using onlyFactory modifier by a non-Factory account
+  it("should revert when calling initialize after initialization", async function () {
     await expect(fund.connect(user1).initialize({}, 500)).to.be.reverted
   })
 
   it("should allow Factory to call payout function", async function () {
     // Call the payout function using onlyFactory modifier
-    await expect(factory.connect(user1).payout(0)).to.be.revertedWith('You can\'t withdraw yet')
+    await expect(factory.connect(user1).payout(0)).to.be.revertedWith('Fund must be Unlocked')
   })
 
   it("should not allow User to call payout function", async function () {
@@ -686,14 +693,17 @@ describe("Testing Fund Roles & permissions", function () {
 })
 
 describe("Testing Generator Roles & permissions", function () {
-  let factory, generator
+  let generator
   let INITIAL_DEFAULT_ADMIN_AND_SIGNER
   let user1
   let feeRecipient
 
-  beforeEach(async function () {
+  before(async function () {
     [INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1, feeRecipient] = await ethers.getSigners()
-    const deployedContracts = await deploy(feeRecipient.address)
+  })
+
+  beforeEach(async function () {
+    const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
     generator = deployedContracts.generator
   })
 

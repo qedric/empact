@@ -13,7 +13,7 @@
         },
         {
           "functionSelector": "0xbcf98ba3",
-          "functionSignature": "breakFundFeeBps()"
+          "functionSignature": "withdrawalFeeBps()"
         },
         {
           "functionSelector": "0xc45a0155",

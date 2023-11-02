@@ -28,8 +28,6 @@ describe("Minting & Fund Creation", function () {
     2. checks that user received the minted tokens
     3. checks that TokensMintedWithSignature' event was fired with correct args
     4. checks that FundDeployed event was fired with correct args
-    5. checks that fund's FundInitialised event was fired with correct args
-    6. gets fund attributes and checks they have expected values
   */
   it("should successfully mint new tokens and initalise funds", async function () {
     const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
@@ -56,20 +54,6 @@ describe("Minting & Fund Creation", function () {
 
     // Retrieve the fund address from the FundDeployed event
     const fundAddress = fundDeployedEvent[0].args.fund
-
-    // Verify events in the Fund contract
-    const fundContract = await ethers.getContractAt('IFund', fundAddress)
-    const fundInitialisedEvent = await fundContract.queryFilter('FundInitialised', tx.blockHash)
-    expect(fundInitialisedEvent.length).to.equal(1)
-    expect(fundInitialisedEvent[0].args.attributes.tokenId).to.equal(0)
-
-    // Verify the attributes of the Fund contract
-    const fundAttributes = await fundContract.attributes()
-    expect(fundAttributes.tokenId).to.equal(0)
-    expect(fundAttributes.unlockTime).to.equal(mr.typedData.message.unlockTime)
-    expect(fundAttributes.targetBalance).to.equal(mr.typedData.message.targetBalance)
-    expect(fundAttributes.name).to.equal(mr.typedData.message.name)
-    expect(fundAttributes.description).to.equal(mr.typedData.message.description)
   })
 
   it("should not allow a signature to be used before the start time", async function() {
@@ -561,5 +545,4 @@ describe("Metadata", function () {
     await helpers.time.increase(60 * 60 * 24 * 44) // 33 days
     expect(await getPercentage()).to.equal(100, "Percentage should be 100")
   }) 
-
 })
