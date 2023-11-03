@@ -129,11 +129,16 @@ contract Fund is IFund, Initializable {
             // set to Open
             emit StateChanged(State.Open);
             state = State.Open;
-        }
+        } 
 
         // calculate the ETH amount owed
         uint256 payoutAmount = address(this).balance * thisOwnerBalance / totalSupply;
         uint256 payoutFee = payoutAmount * withdrawalFeeBps / 10000;
+
+        require(
+            payoutAmount > 0,
+            "Fund is empty"
+        );
 
         // send the withdrawal event and pay the owner
         emit Withdrawal(recipient, payoutAmount - payoutFee, thisOwnerBalance);
