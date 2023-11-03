@@ -142,9 +142,7 @@ async function deployMockOETHToken() {
 
 async function generateMintRequest(factory_address, signer, to_address, typedData) {
   // Generate a signature for the mint request
-  const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
-    // getBlock returns a block object and it has a timestamp property.
-    ethers.provider.getBlock(blockNumber).then(block => block.timestamp))
+  const timestamp = await getCurrentBlockTime()
 
   const endTime = Math.floor(timestamp + 60 * 60 * 24)
   const unlockTime = Math.floor(timestamp + 60 * 60 * 24 * 99)
@@ -198,6 +196,80 @@ async function makeFund(factory, signer, to) {
   return fund
 }
 
+async function makeFund_100edition_target100_noUnlockTime(factory, signer, to) {
+
+  const timestamp = await getCurrentBlockTime()
+  const typedData = await getTypedData(
+    factory.address,
+    to.address,
+    timestamp,
+    Math.floor(timestamp + 60 * 60 * 24),
+    100,
+    timestamp,
+    100,
+    'A 100-edition test fund',
+    'no unlock time'    
+  )
+
+  const mintRequest = await generateMintRequest(factory.address, signer, to.address, typedData)
+
+  const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+
+  const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeFundFee })
+  const txReceipt = await tx.wait()
+
+  const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
+
+  const Fund = await ethers.getContractFactory("Fund")
+  const fund = Fund.attach(fundCreatedEvent.args.fund)
+
+  // Find the FundInitialised event within the Fund contract
+  const fundInitialisedEvent = await fund.queryFilter(fund.filters.FundInitialised(), txReceipt.blockHash);
+  expect(fundInitialisedEvent.length).to.equal(1); // Ensure only one FundInitialised event was emitted
+  expect(fundInitialisedEvent[0].args.attributes[0]).to.equal(1)
+  expect(fundInitialisedEvent[0].args.attributes[4]).to.equal('A 100-edition test fund')
+  expect(fundInitialisedEvent[0].args.attributes[5]).to.equal('no unlock time')
+
+  return fund
+}
+
+async function makeFund_100edition_notarget_99days(factory, signer, to) {
+
+  const timestamp = await getCurrentBlockTime()
+  const typedData = await getTypedData(
+    factory.address,
+    to.address,
+    timestamp,
+    Math.floor(timestamp + 60 * 60 * 24),
+    100,
+    Math.floor(timestamp + 60 * 60 * 24 * 99),
+    0,
+    'A 100-edition test fund',
+    '99 days, no target'    
+  )
+
+  const mintRequest = await generateMintRequest(factory.address, signer, to.address, typedData)
+
+  const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+
+  const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeFundFee })
+  const txReceipt = await tx.wait()
+
+  const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
+
+  const Fund = await ethers.getContractFactory("Fund")
+  const fund = Fund.attach(fundCreatedEvent.args.fund)
+
+  // Find the FundInitialised event within the Fund contract
+  const fundInitialisedEvent = await fund.queryFilter(fund.filters.FundInitialised(), txReceipt.blockHash);
+  expect(fundInitialisedEvent.length).to.equal(1); // Ensure only one FundInitialised event was emitted
+  expect(fundInitialisedEvent[0].args.attributes[0]).to.equal(2)
+  expect(fundInitialisedEvent[0].args.attributes[4]).to.equal('A 100-edition test fund')
+  expect(fundInitialisedEvent[0].args.attributes[5]).to.equal('99 days, no target')
+
+  return fund
+}
+
 // Export the functions
 module.exports = {
   deploy,
@@ -210,5 +282,7 @@ module.exports = {
   deployMockToken,
   deployMockOETHToken,
   generateMintRequest,
-  makeFund
+  makeFund,
+  makeFund_100edition_target100_noUnlockTime,
+  makeFund_100edition_notarget_99days
 }
