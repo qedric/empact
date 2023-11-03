@@ -1,26 +1,23 @@
-const { expect } = require("chai")
+// We import Chai to use its asserting functions here.
+const { expect, assert } = require("chai")
 const { ethers, upgrades, network } = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-network-helpers")
-const { getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, deployMockFund } = require("test_helpers")
+const { deploy, deployFundImplementation, deployGenerator, deployTreasury, getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, deployMockOETHToken, generateMintRequest, makeFund, makeFund_100edition_target100_noUnlockTime, makeFund_100edition_notarget_99days } = require("./test_helpers")
 
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
-describe("Treasury Contract Tests", function () {
-  let Treasury
+describe(" -- Testing Treasury Contract -- ", function () {
   let treasury
-  let owner, newOwner
-  let minter, newMinter, nonMinter
-  let nftOwner, nonNftOwner
-  let feeRecipient, newFeeRecipient
+  let user1
+  let feeRecipient
 
   before(async function () {
-    [owner, newOwner, minter, newMinter, nonMinter, nftOwner, nonNftOwner, feeRecipient, newFeeRecipient] = await ethers.getSigners()
-    Treasury = await ethers.getContractFactory("Treasury")
+    [user1, feeRecipient] = await ethers.getSigners()
   })
 
   beforeEach(async function () {
-    treasury = await upgrades.deployProxy(Treasury, [owner.address, owner.address])
-    await treasury.deployed()
+    const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+    treasury = deployedContracts.treasury
   })
 
   describe("Supported Token Transactions", function () {
@@ -30,21 +27,28 @@ describe("Treasury Contract Tests", function () {
       const token2 = await deployMockToken("Token2", "T2");
 
       // Add token1 as a supported token
-      await treasury.addSupportedToken(token1.address);
-      expect(await treasury.supportedTokens(0)).to.equal(token1.address);
+      let tx = await treasury.addSupportedToken(token1.address)
+      tx.wait()
+      let supportedTokens = await treasury.supportedTokens()
+      expect(supportedTokens[0]).to.equal(token1.address)
 
       // Add token2 as a supported token
-      await treasury.addSupportedToken(token2.address);
-      expect(await treasury.supportedTokens(1)).to.equal(token2.address);
+      tx = await treasury.addSupportedToken(token2.address)
+      tx.wait()
+
+      supportedTokens = await treasury.supportedTokens()
+      expect(supportedTokens[1]).to.equal(token2.address)
 
       // Remove token1 from supported tokens
-      await treasury.removeSupportedToken(token1.address);
-      expect(await treasury.supportedTokens(0)).to.equal(token2.address);
+      await treasury.removeSupportedToken(token1.address)
+      supportedTokens = await treasury.supportedTokens()
+      expect(supportedTokens[0]).to.equal(token2.address)
 
       // Remove token2 from supported tokens
-      await treasury.removeSupportedToken(token2.address);
-      expect(await treasury.supportedTokens(0)).to.equal(ethers.constants.AddressZero);
-    });
+      await treasury.removeSupportedToken(token2.address)
+      supportedTokens = await treasury.supportedTokens()
+      expect(supportedTokens.length).to.equal(0)
+    })
 
     it("should collect funds from open funds", async function () {
       // Deploy a mock open fund contract
