@@ -87,7 +87,7 @@ contract Treasury is ITreasury, AccessControl {
      *  @notice         Adds a new fund to the lockedFund treasurey register
      */
     function addLockedFund(address fundAddress) external onlyFactory {
-        require(!isMember(fundAddress, lockedFunds), "Fund already locked");
+        require(!isLockedFund(fundAddress), "Fund already locked");
         lockedFunds.push(fundAddress);
         emit LockedFundAdded(fundAddress);
     }
@@ -96,8 +96,8 @@ contract Treasury is ITreasury, AccessControl {
      *  @notice         Moves a fund from the lockedFunds to the openFunds treasurey register
      */
     function moveToOpenFund(address fundAddress) external onlyFactory {
-        require(isMember(fundAddress, lockedFunds), "Fund not found");
-        require(!isMember(fundAddress, openFunds), "Fund already Open");
+        require(isLockedFund(fundAddress), "Fund not found");
+        require(!isOpenFund(fundAddress), "Fund already Open");
         // remove the fund from lockedFunds
         _removeLockedFund(fundAddress);
         openFunds.push(fundAddress);
@@ -216,12 +216,25 @@ contract Treasury is ITreasury, AccessControl {
     /**
      * @notice Checks if a fund is already added to the specified fund array.
      * @param fundAddress The address of the fund to check
-     * @param fundArray The array to check (e.g., lockedFunds or openFunds)
      * @return true if the fund is already added, false otherwise
      */
-    function isMember(address fundAddress, address[] memory fundArray) public pure returns (bool) {
-        for (uint256 i = 0; i < fundArray.length; i++) {
-            if (fundArray[i] == fundAddress) {
+    function isLockedFund(address fundAddress) public view returns (bool) {
+        for (uint256 i = 0; i < lockedFunds.length; i++) {
+            if (lockedFunds[i] == fundAddress) {
+                return true; // The fund is already added
+            }
+        }
+        return false; // The fund is not in the array
+    }
+
+    /**
+     * @notice Checks if a fund is already added to the specified fund array.
+     * @param fundAddress The address of the fund to check
+     * @return true if the fund is already added, false otherwise
+     */
+    function isOpenFund(address fundAddress) public view returns (bool) {
+        for (uint256 i = 0; i < openFunds.length; i++) {
+            if (openFunds[i] == fundAddress) {
                 return true; // The fund is already added
             }
         }
