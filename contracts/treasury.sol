@@ -1,16 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.11;
 
+import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "./IFund.sol";
 import "./ITreasury.sol";
-
-interface ISupportedToken {
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address to, uint256 amount) external returns (bool);
-}
-
 
 interface IFactory {
     function nextTokenIdToMint() external view returns (uint256);
@@ -21,6 +16,7 @@ interface IFactory {
  *  @notice The treasury distributes from open funds to locked funds, and keeps track of all supported tokens
  */
 contract Treasury is ITreasury, AccessControl {
+    using SafeERC20 for IERC20;
 
     /// @notice This role can add/remove supported tokens and carry out treasury operations such as collect and distribute
     bytes32 public constant TREASURER_ROLE = keccak256("TREASURER_ROLE");
@@ -103,14 +99,14 @@ contract Treasury is ITreasury, AccessControl {
 
         require(openFunds.length > 0, "No open funds to collect from");
 
+        emit CollectedOpenFunds();
+
         for (uint256 i = 0; i < openFunds.length; i++) {
             address fundAddress = openFunds[i];
             // Call the sendToTreasury() method on the fund
             IFund fund = IFund(fundAddress);
             fund.sendToTreasury();
         }
-
-        emit CollectedOpenFunds();
     }
 
     /**
@@ -134,13 +130,15 @@ contract Treasury is ITreasury, AccessControl {
         for (uint256 i = 0; i < lockedFunds.length; i++) {
             if (lockedFunds[i] != address(0)) {
                 uint256 reward = (balanceBeforeDistribution * lockedBalances[i]) / totalLockedBalance;
-                Address.sendValue(payable(lockedFunds[i]), reward);
                 emit DistributedNativeTokensToLockedFund(lockedFunds[i], reward);
                 nRecipients++;
+                Address.sendValue(payable(lockedFunds[i]), reward);
+                
             }
         }
 
         emit DistributedNativeTokensToLockedFunds(balanceBeforeDistribution, nRecipients);
+        
     }
 
     /**
@@ -150,7 +148,7 @@ contract Treasury is ITreasury, AccessControl {
         
         require(_isSupportedToken(supportedTokenAddress), 'Unsupported token');
 
-        ISupportedToken token = ISupportedToken(supportedTokenAddress);
+        IERC20 token = IERC20(supportedTokenAddress);
 
         require(token.balanceOf(address(this)) > 0, 'No supported tokens');
 
@@ -170,10 +168,10 @@ contract Treasury is ITreasury, AccessControl {
                     if (targetFunds[i] != address(0)) {
                         // Calculate the proportionate share of tokens to distribute
                         uint256 proportionateShare = (treasuryTokenBalance * lockedBalances[i]) / tokenTotalBalance;
-                        // Transfer tokens to the fund
-                        token.transfer(targetFunds[i], proportionateShare);
                         emit DistributedSupportedTokenToLockedFund(address(token), targetFunds[i], proportionateShare);
                         nRecipients++;
+                        // Transfer tokens to the fund
+                        token.safeTransfer(targetFunds[i], proportionateShare);
                     }
                 }
                 emit DistributedSupportedTokensToLockedFunds(address(token), treasuryTokenBalance, nRecipients);
@@ -202,7 +200,7 @@ contract Treasury is ITreasury, AccessControl {
                     fundBalance = fund.getNativeTokenBalance();
                 } else {
                     // If a supported token address is provided, consider the balance of that token
-                    ISupportedToken token = ISupportedToken(supportedToken);
+                    IERC20 token = IERC20(supportedToken);
                     fundBalance = token.balanceOf(fundAddress);
                 }
 

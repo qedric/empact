@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.11;
 
+import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@thirdweb-dev/contracts/extension/Initializable.sol";
 import "./IFund.sol";
 import "./ITreasury.sol";
@@ -16,12 +17,8 @@ interface IOETHToken {
     function rebaseOptIn() external;
 }
 
-interface ISupportedToken {
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address to, uint256 amount) external returns (bool);
-}
-
 contract Fund is IFund, Initializable {
+    using SafeERC20 for IERC20;
 
     State public state = State.Locked; // Initialize as locked
     Attr private _attributes;
@@ -94,7 +91,7 @@ contract Fund is IFund, Initializable {
 
     function _getStakedTokenBalance() internal view returns(uint256 totalStakedTokenBalance) {
         for (uint256 i = 0; i <  ITreasury(treasury).supportedTokens().length; i++) {
-            ISupportedToken token = ISupportedToken(ITreasury(treasury).supportedTokens()[i]);
+            IERC20 token = IERC20(ITreasury(treasury).supportedTokens()[i]);
             totalStakedTokenBalance += token.balanceOf(address(this));
         }
     }
@@ -107,11 +104,13 @@ contract Fund is IFund, Initializable {
     function optInForOETHRebasing() external {
         require(!oETHRebasingEnabled, 'oETH rebasing already enabled');
         require(ITreasury(treasury).oETHTokenAddress() != address(0), "oETH contract address is not set");
+        
+        emit OptedInForOriginProtocolRebasing();
+        oETHRebasingEnabled = true;
+
         // Make the call to the oETH contract
         IOETHToken oETHToken = IOETHToken(ITreasury(treasury).oETHTokenAddress());
         oETHToken.rebaseOptIn();
-        emit OptedInForOriginProtocolRebasing();
-        oETHRebasingEnabled = true;
     }
 
     /// @notice transfers the share of available funds to the recipient and fee recipient
@@ -146,18 +145,16 @@ contract Fund is IFund, Initializable {
 
         // send the withdrawal event and pay the owner
         emit Withdrawal(recipient, payoutAmount - payoutFee, thisOwnerBalance);
-
         payable(recipient).transfer(payoutAmount - payoutFee);
 
         // send the fee to the factory contract owner
-        feeRecipient.transfer(payoutFee);
-
         emit WithdrawalFeePaid(feeRecipient, payoutFee);
+        feeRecipient.transfer(payoutFee);
 
         // Withdraw supported tokens and calculate the amounts
         for (uint256 i = 0; i < ITreasury(treasury).supportedTokens().length; i++) {
             address tokenAddress = ITreasury(treasury).supportedTokens()[i];
-            ISupportedToken token = ISupportedToken(tokenAddress);
+            IERC20 token = IERC20(tokenAddress);
             uint256 tokenBalance = token.balanceOf(address(this));
 
             // Calculate the amount of supported tokens to be withdrawn
@@ -166,10 +163,10 @@ contract Fund is IFund, Initializable {
 
             // Send the withdrawal event and pay the owner with supported tokens
             emit SupportedTokenWithdrawal(tokenAddress, recipient, tokenPayoutAmount, thisOwnerBalance);
-            token.transfer(recipient, tokenPayoutAmount - tokenPayoutFee);
+            token.safeTransfer(recipient, tokenPayoutAmount - tokenPayoutFee);
 
             // send the fee to the factory contract owner
-            token.transfer(feeRecipient, tokenPayoutFee);
+            token.safeTransfer(feeRecipient, tokenPayoutFee);
         }
 
         return state;
@@ -191,11 +188,11 @@ contract Fund is IFund, Initializable {
         // Transfer all tokens to the treasury
         for (uint256 i = 0; i < ITreasury(treasury).supportedTokens().length; i++) {
             address tokenAddress = ITreasury(treasury).supportedTokens()[i];
-            ISupportedToken token = ISupportedToken(tokenAddress);
+            IERC20 token = IERC20(tokenAddress);
             uint256 tokenBalance = token.balanceOf(address(this));
             if (tokenBalance > 0) {
                 emit SendSupportedTokenToTreasury(address(this), msg.sender, tokenAddress, tokenBalance);
-                token.transfer(msg.sender, tokenBalance);
+                token.safeTransfer(msg.sender, tokenBalance);
             }
         }
     }

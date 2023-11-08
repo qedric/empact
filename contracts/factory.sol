@@ -287,11 +287,11 @@ contract Factory is
             thisOwnerBalance,
             totalSupplyBeforePayout
         ) returns (IFund.State state) {
+            emit Payout(address(funds[tokenId]), tokenId);
             if (state == IFund.State.Open) {
                 // fund is now open; update the treasury
                 treasury.addOpenFund(address(funds[tokenId]));
             }
-            emit Payout(address(funds[tokenId]), tokenId);
         } catch Error(string memory reason) {
             revert(reason);
         } catch (bytes memory /*lowLevelData*/) {
@@ -390,8 +390,8 @@ contract Factory is
     /// @dev calculates the percentage towards unlock based on time and target balance
     function _getPercent(uint256 tokenId) internal view returns (uint256 percentage) {
 
-        uint256 percentageBasedOnTime;
-        uint256 percentageBasedOnBalance;
+        uint256 percentageBasedOnTime = 0;
+        uint256 percentageBasedOnBalance = 0;
 
         if (block.timestamp >= IFund(address(funds[tokenId])).attributes().unlockTime) {
             percentageBasedOnTime = 100;

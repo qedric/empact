@@ -12,7 +12,7 @@ import "../IGenerator.sol";
 import "../ITreasury.sol";
 import "../ISignatureMint.sol";
 
-abstract contract SignatureMint is EIP712, ISignatureMint {
+abstract contract MockSignatureMint is EIP712, ISignatureMint {
     using ECDSA for bytes32;
 
     bytes32 internal constant TYPEHASH =
@@ -98,7 +98,7 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
 contract MockFactory is
     ERC1155,
     ContractMetadata,
-    SignatureMint,
+    MockSignatureMint,
     AccessControl
 {
 
