@@ -11,6 +11,12 @@ interface ISupportedToken {
     function transfer(address to, uint256 amount) external returns (bool);
 }
 
+
+interface IFactory {
+    function nextTokenIdToMint() external view returns (uint256);
+    function funds(uint256 tokenId) external view returns (address);
+}
+
 /**
  *  @notice The treasury distributes from open funds to locked funds, and keeps track of all supported tokens
  */
@@ -19,7 +25,7 @@ contract Treasury is ITreasury, AccessControl {
     /// @notice This role can add/remove supported tokens and carry out treasury operations such as collect and distribute
     bytes32 public constant TREASURER_ROLE = keccak256("TREASURER_ROLE");
 
-    address public immutable factory;
+    IFactory public immutable factory;
 
     /// @notice         The addresses of tokens that will count toward the ETH balance
     /// @notice         This is intended to contain supported ETH Staking tokens only.
@@ -28,18 +34,16 @@ contract Treasury is ITreasury, AccessControl {
 
     /// @notice         The address of Origin Protocol OETH token
     address payable private _oETHTokenAddress;
-
-    address[] public lockedFunds;
     address[] public openFunds;
 
     /// @notice Checks that the `msg.sender` is the factory.
     modifier onlyFactory() {
-        require(msg.sender == factory, "onlyFactory");
+        require(msg.sender == address(factory), "onlyFactory");
         _;
     }
 
     constructor(address _factory) {
-        factory = _factory;
+        factory = IFactory(_factory);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(TREASURER_ROLE, msg.sender);
     }
@@ -84,38 +88,12 @@ contract Treasury is ITreasury, AccessControl {
     }
 
     /**
-     *  @notice         Adds a new fund to the lockedFund treasurey register
-     */
-    function addLockedFund(address fundAddress) external onlyFactory {
-        require(!isLockedFund(fundAddress), "Fund already locked");
-        lockedFunds.push(fundAddress);
-        emit LockedFundAdded(fundAddress);
-    }
-
-    /**
      *  @notice         Moves a fund from the lockedFunds to the openFunds treasurey register
      */
-    function moveToOpenFund(address fundAddress) external onlyFactory {
-        require(isLockedFund(fundAddress), "Fund not found");
+    function addOpenFund(address fundAddress) external onlyFactory {
         require(!isOpenFund(fundAddress), "Fund already Open");
-        // remove the fund from lockedFunds
-        _removeLockedFund(fundAddress);
         openFunds.push(fundAddress);
-        emit MovedToOpenFund(fundAddress);
-    }
-
-    /**
-     *  @notice         Removes a fund from the locked fund register
-     *                  should only happen when moving from locked --> open
-     */
-    function _removeLockedFund(address fundAddress) internal {
-        for (uint256 i = 0; i < lockedFunds.length; i++) {
-            if (lockedFunds[i] == fundAddress) {
-                lockedFunds[i] = lockedFunds[lockedFunds.length - 1];
-                lockedFunds.pop();
-                break;
-            }
-        }
+        emit AddedOpenFund(fundAddress);
     }
 
     /**
@@ -127,12 +105,8 @@ contract Treasury is ITreasury, AccessControl {
 
         for (uint256 i = 0; i < openFunds.length; i++) {
             address fundAddress = openFunds[i];
-
-            // Ensure the fund is open before collecting
-            IFund fund = IFund(fundAddress);
-            require(fund.state() == IFund.State.Open, "Fund is not open");
-
             // Call the sendToTreasury() method on the fund
+            IFund fund = IFund(fundAddress);
             fund.sendToTreasury();
         }
 
@@ -140,61 +114,107 @@ contract Treasury is ITreasury, AccessControl {
     }
 
     /**
-     * @notice          Distributes treasury ETH balance to all locked funds
+     * @notice          Distributes treasury native token balance to all locked funds
      */
-    function distributeNativeToken() external onlyRole(TREASURER_ROLE) {
-        uint256 totalLockedFunds = lockedFunds.length;
+    function distributeNativeTokenRewards() external onlyRole(TREASURER_ROLE) {
 
-        // Ensure there are locked funds to distribute to
-        require(totalLockedFunds > 0, "No locked funds to distribute to");
+        require(address(this).balance > 0, 'No native tokens');
 
-        // Calculate the amount to distribute to each locked fund
-        uint256 ethToDistribute = address(this).balance / totalLockedFunds;
+        address[] memory lockedFunds;
+        uint256[] memory lockedBalances;
+        uint256 totalLockedBalance;
 
-        // Loop through the locked funds and distribute ETH
-        for (uint256 i = 0; i < totalLockedFunds; i++) {
-            address fundAddress = lockedFunds[i];
+        uint256 nRecipients = 0;
 
-            // Use Address.sendValue for batch transfers
-            Address.sendValue(payable(fundAddress), ethToDistribute);
+        (lockedFunds, lockedBalances, totalLockedBalance) = _lockedFundsWithBalance(address(0));
+
+        uint256 balanceBeforeDistribution = address(this).balance;
+
+        // calculate & distribute each locked fund's percentage of rewards
+        for (uint256 i = 0; i < lockedFunds.length; i++) {
+            if (lockedFunds[i] != address(0)) {
+                uint256 reward = (balanceBeforeDistribution * lockedBalances[i]) / totalLockedBalance;
+                Address.sendValue(payable(lockedFunds[i]), reward);
+                emit DistributedNativeTokensToLockedFund(lockedFunds[i], reward);
+                nRecipients++;
+            }
         }
 
-        emit DistributedNativeTokensToLockedFunds();
+        emit DistributedNativeTokensToLockedFunds(balanceBeforeDistribution, nRecipients);
     }
 
     /**
-     * @notice  Distributes supported token balances to specified locked funds
-     * @param targetFunds Array of target fund addresses
+     * @notice  Distributes supported token balances to locked funds having balance of that token
      */
-    function distributeSupportedTokens(address[] memory targetFunds) external onlyRole(TREASURER_ROLE) {
-        uint256 totalLockedFunds = lockedFunds.length;
+    function distributeSupportedTokenRewards(address supportedTokenAddress) external onlyRole(TREASURER_ROLE) {
+        
+        require(_isSupportedToken(supportedTokenAddress), 'Unsupported token');
 
-        // Ensure there are locked funds to distribute to
-        require(totalLockedFunds > 0, "No locked funds to distribute to");
+        ISupportedToken token = ISupportedToken(supportedTokenAddress);
 
-        for (uint256 j = 0; j < _supportedTokens.length; j++) {
-            address tokenAddress = _supportedTokens[j];
-            ISupportedToken token = ISupportedToken(tokenAddress);
-            uint256 tokenBalance = token.balanceOf(address(this));
+        require(token.balanceOf(address(this)) > 0, 'No supported tokens');
 
-            if (tokenBalance > 0) {
+        address[] memory targetFunds;
+        uint256[] memory lockedBalances;
+        uint256 tokenTotalBalance;
+        uint256 nRecipients = 0;
+
+        uint256 treasuryTokenBalance = token.balanceOf(address(this));
+
+        if (treasuryTokenBalance > 0) {
+
+            (targetFunds, lockedBalances, tokenTotalBalance) = _lockedFundsWithBalance(supportedTokenAddress);
+
+            if (tokenTotalBalance > 0) {
                 for (uint256 i = 0; i < targetFunds.length; i++) {
-                    address fundAddress = targetFunds[i];
+                    if (targetFunds[i] != address(0)) {
+                        // Calculate the proportionate share of tokens to distribute
+                        uint256 proportionateShare = (treasuryTokenBalance * lockedBalances[i]) / tokenTotalBalance;
+                        // Transfer tokens to the fund
+                        token.transfer(targetFunds[i], proportionateShare);
+                        emit DistributedSupportedTokenToLockedFund(address(token), targetFunds[i], proportionateShare);
+                        nRecipients++;
+                    }
+                }
+                emit DistributedSupportedTokensToLockedFunds(address(token), treasuryTokenBalance, nRecipients);
+            }
+        }
+    }
 
-                    // Check if the fund is not open or not a member of openFunds
-                    IFund fund = IFund(fundAddress);
-                    require(
-                        fund.state() == IFund.State.Locked,
-                        "Fund is not locked"
-                    );
+    function _lockedFundsWithBalance(address supportedToken) internal view returns (
+        address[] memory, uint256[] memory, uint256) {
 
-                    // Transfer tokens to the fund
-                    token.transfer(fundAddress, tokenBalance / targetFunds.length);
+        uint256 totalLockedBalance = 0;
+        uint256 nFunds = factory.nextTokenIdToMint(); // total number of all funds
+
+        address[] memory lockedFunds = new address[](nFunds);
+        uint256[] memory lockedBalances = new uint256[](nFunds);
+
+        // find the total balance of all locked funds and keep track of their individual balances
+        for (uint256 tokenId = 0; tokenId < nFunds; tokenId++) {
+            address fundAddress = factory.funds(tokenId);
+            IFund fund = IFund(fundAddress);
+
+            if (fund.state() == IFund.State.Locked) {
+                uint256 fundBalance;
+                if (address(supportedToken) == address(0)) {
+                    // If it's a zero address, consider native token balance
+                    fundBalance = fund.getNativeTokenBalance();
+                } else {
+                    // If a supported token address is provided, consider the balance of that token
+                    ISupportedToken token = ISupportedToken(supportedToken);
+                    fundBalance = token.balanceOf(fundAddress);
+                }
+
+                if (fundBalance > 0) {
+                    lockedFunds[tokenId] = fundAddress;
+                    lockedBalances[tokenId] = fundBalance;
+                    totalLockedBalance += fundBalance;
                 }
             }
         }
 
-        emit DistributedSupportedTokensToLockedFunds(targetFunds);
+        return (lockedFunds, lockedBalances, totalLockedBalance);
     }
 
     function grantTreasurerRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -218,20 +238,6 @@ contract Treasury is ITreasury, AccessControl {
      * @param fundAddress The address of the fund to check
      * @return true if the fund is already added, false otherwise
      */
-    function isLockedFund(address fundAddress) public view returns (bool) {
-        for (uint256 i = 0; i < lockedFunds.length; i++) {
-            if (lockedFunds[i] == fundAddress) {
-                return true; // The fund is already added
-            }
-        }
-        return false; // The fund is not in the array
-    }
-
-    /**
-     * @notice Checks if a fund is already added to the specified fund array.
-     * @param fundAddress The address of the fund to check
-     * @return true if the fund is already added, false otherwise
-     */
     function isOpenFund(address fundAddress) public view returns (bool) {
         for (uint256 i = 0; i < openFunds.length; i++) {
             if (openFunds[i] == fundAddress) {
@@ -239,6 +245,15 @@ contract Treasury is ITreasury, AccessControl {
             }
         }
         return false; // The fund is not in the array
+    }
+
+    function _isSupportedToken(address tokenAddress) internal view returns (bool) {
+        for (uint256 i = 0; i < _supportedTokens.length; i++) {
+            if (_supportedTokens[i] == tokenAddress) {
+                return true;
+            }
+        }
+        return false;
     }
 
     receive() external payable {

@@ -22,12 +22,13 @@ interface IFund {
     event SupportedTokenWithdrawal(address indexed token, address who, uint amount, uint balance);
     event TargetReached();
     event OptedInForOriginProtocolRebasing();
-    event SendETHToTreasury(address treasury, uint amount);
-    event SendSupportedTokenToTreasury(address treasury, address tokenAddress, uint tokenBalance);
+    event SendNativeTokenToTreasury(address indexed fundAddress, address treasuryAddress, uint amount);
+    event SendSupportedTokenToTreasury(address indexed fundAddress, address treasuryAddress, address indexed tokenAddress, uint tokenBalance);
 
     function initialize(Attr calldata _data, uint16 _breakFundBps) external;
     function state() external view returns(State);
     function getTotalBalance() external view returns(uint256 totalBalance);
+    function getNativeTokenBalance() external view returns(uint256 balance);
     function payout(address recipient, address payable feeRecipient, uint256 thisOwnerBalance, uint256 totalSupply) external payable returns(State);
     function sendToTreasury() external payable;
     function attributes() external view returns (Attr calldata attributes);

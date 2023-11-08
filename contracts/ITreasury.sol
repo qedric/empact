@@ -5,11 +5,12 @@ interface ITreasury {
 
     event SupportedTokenAdded(address tokenAddress);
     event SupportedTokenRemoved(address tokenAddress);
-    event LockedFundAdded(address fundAddress);
-    event MovedToOpenFund(address fundAddress);
+    event AddedOpenFund(address fundAddress);
     event CollectedOpenFunds();
-    event DistributedNativeTokensToLockedFunds();
-    event DistributedSupportedTokensToLockedFunds(address[] lockedFunds);
+    event DistributedNativeTokensToLockedFund(address indexed fundAddress, uint amount);
+    event DistributedNativeTokensToLockedFunds(uint balanceBeforeDistribution, uint numberOfRecipients);
+    event DistributedSupportedTokenToLockedFund(address indexed supportedToken, address indexed fundAddress, uint amount);
+    event DistributedSupportedTokensToLockedFunds(address indexed supportedToken, uint balanceBeforeDistribution, uint numberOfRecipients);
     event OriginProtocolTokenUpdated(address oldAddress, address newAddress);
     event Received(address _from, uint _amount);
 
@@ -19,16 +20,10 @@ interface ITreasury {
     function supportedTokens() external view returns (address[] memory);
 
     /**
-     * @notice Add a locked fund bank address to the treasury
-     * @param fundAddress The address of the locked fund bank
-     */
-    function addLockedFund(address fundAddress) external;
-
-    /**
      * @notice Add an open fund bank address to the treasury
      * @param fundAddress The address of the open fund bank
      */
-    function moveToOpenFund(address fundAddress) external;
+    function addOpenFund(address fundAddress) external;
     
 	/**
      *  @notice Iterates through all the open funds and calls the sendToTreasury() method on them
@@ -38,13 +33,12 @@ interface ITreasury {
 	/**
      *  @notice Distributes treasury ETH balance to all locked funds
      */
-	function distributeNativeToken() external;
-
+	function distributeNativeTokenRewards() external;
 
     /**
      *  @notice Distributes supported token balances to locked funds with balance
      */
-    function distributeSupportedTokens(address[] memory targetFunds) external;
+    function distributeSupportedTokenRewards(address supportedTokenAddress) external;
 
     function oETHTokenAddress() external returns(address payable);
 }

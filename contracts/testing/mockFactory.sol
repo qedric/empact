@@ -265,9 +265,6 @@ contract MockFactory is
 
         IFund(deployedProxy).initialize(_fundData, withdrawalFeeBps);
 
-        // register the fund with the treasury
-        treasury.addLockedFund(deployedProxy);
-
         emit FundDeployed(deployedProxy, msg.sender);
     }
 
@@ -292,7 +289,7 @@ contract MockFactory is
         ) returns (IFund.State state) {
             if (state == IFund.State.Open) {
                 // fund is now open; update the treasury
-                treasury.moveToOpenFund(address(funds[tokenId]));
+                treasury.addOpenFund(address(funds[tokenId]));
             }
             emit Payout(address(funds[tokenId]), tokenId);
         } catch Error(string memory reason) {
@@ -323,7 +320,7 @@ contract MockFactory is
         ) returns (IFund.State state) {
             if (state == IFund.State.Open) {
                 // fund is now open; update the treasury
-                treasury.moveToOpenFund(address(real_fund));
+                treasury.addOpenFund(address(real_fund));
             }
         } catch Error(string memory reason) {
             revert(reason);

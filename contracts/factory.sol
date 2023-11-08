@@ -218,7 +218,7 @@ contract Factory is
         signer = _processRequest(_req, _signature);
 
         // always mint new token ids
-        uint256 tokenIdToMint = nextTokenIdToMint();
+        uint256 tokenIdToMint = nextTokenIdToMint_;
         nextTokenIdToMint_ += 1;
 
         /*
@@ -265,9 +265,6 @@ contract Factory is
 
         IFund(deployedProxy).initialize(_fundData, withdrawalFeeBps);
 
-        // register the fund with the treasury
-        treasury.addLockedFund(deployedProxy);
-
         emit FundDeployed(deployedProxy, msg.sender);
     }
 
@@ -292,7 +289,7 @@ contract Factory is
         ) returns (IFund.State state) {
             if (state == IFund.State.Open) {
                 // fund is now open; update the treasury
-                treasury.moveToOpenFund(address(funds[tokenId]));
+                treasury.addOpenFund(address(funds[tokenId]));
             }
             emit Payout(address(funds[tokenId]), tokenId);
         } catch Error(string memory reason) {
@@ -382,7 +379,7 @@ contract Factory is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice The tokenId assigned to the next new NFT to be minted.
-    function nextTokenIdToMint() public view virtual returns (uint256) {
+    function nextTokenIdToMint() external view returns (uint256) {
         return nextTokenIdToMint_;
     }
 

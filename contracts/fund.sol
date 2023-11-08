@@ -57,7 +57,7 @@ contract Fund is IFund, Initializable {
         emit FundInitialised(_data);
     }
 
-    /*  @notice this needs to be called if some of the target balance comes from non-native tokens.
+    /*  @notice this needs to be called if target is reached with non native tokens.
                 this needs to be called if no funds are received after unlock time has been reached.
                 this call is not necessary if the target is reached with native tokens only.
     */
@@ -86,6 +86,10 @@ contract Fund is IFund, Initializable {
     /// @notice Supported staked tokens can contribute to the target balance.
     function getTotalBalance() external view returns(uint256 totalBalance) {
         totalBalance = _getStakedTokenBalance() + address(this).balance;
+    }
+
+    function getNativeTokenBalance() external view returns(uint256 balance) {
+        return address(this).balance;
     }
 
     function _getStakedTokenBalance() internal view returns(uint256 totalStakedTokenBalance) {
@@ -179,7 +183,7 @@ contract Fund is IFund, Initializable {
             'Fund must be Open'
         );
 
-        emit SendETHToTreasury(msg.sender, address(this).balance);
+        emit SendNativeTokenToTreasury(address(this), msg.sender, address(this).balance);
 
         // Transfer native ETH balance to the treasury
         payable(msg.sender).transfer(address(this).balance);
@@ -190,7 +194,7 @@ contract Fund is IFund, Initializable {
             ISupportedToken token = ISupportedToken(tokenAddress);
             uint256 tokenBalance = token.balanceOf(address(this));
             if (tokenBalance > 0) {
-                emit SendSupportedTokenToTreasury(msg.sender, tokenAddress, tokenBalance);
+                emit SendSupportedTokenToTreasury(address(this), msg.sender, tokenAddress, tokenBalance);
                 token.transfer(msg.sender, tokenBalance);
             }
         }
