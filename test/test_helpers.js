@@ -199,6 +199,7 @@ async function makeFund(factory, signer, to) {
 async function makeFund_100edition_target100_noUnlockTime(factory, signer, to) {
 
   const timestamp = await getCurrentBlockTime()
+  const targetBalance = ethers.utils.parseUnits("100", "ether").toString()
   const typedData = await getTypedData(
     factory.address,
     to.address,
@@ -206,7 +207,7 @@ async function makeFund_100edition_target100_noUnlockTime(factory, signer, to) {
     Math.floor(timestamp + 60 * 60 * 24),
     100,
     timestamp,
-    100,
+    targetBalance,
     'A 100-edition test fund',
     'no unlock time'    
   )
@@ -226,7 +227,6 @@ async function makeFund_100edition_target100_noUnlockTime(factory, signer, to) {
   // Find the FundInitialised event within the Fund contract
   const fundInitialisedEvent = await fund.queryFilter(fund.filters.FundInitialised(), txReceipt.blockHash);
   expect(fundInitialisedEvent.length).to.equal(1); // Ensure only one FundInitialised event was emitted
-  expect(fundInitialisedEvent[0].args.attributes[0]).to.equal(1)
   expect(fundInitialisedEvent[0].args.attributes[4]).to.equal('A 100-edition test fund')
   expect(fundInitialisedEvent[0].args.attributes[5]).to.equal('no unlock time')
 

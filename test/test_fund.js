@@ -210,7 +210,8 @@ describe(" -- Testing Fund Contract -- ", function () {
     })
 
     it("should fail when sending non-native tokens to a fund", async function () {
-      await expect(factory.connect(owner).safeTransferFrom(owner.address, fund.address2, 0, 2, "0x")).to.be.revertedWith("!ERC1155RECEIVER")
+      await expect(factory.connect(user1).safeTransferFrom(user1.address, fund.address, 0, 2, "0x"))
+      .to.be.revertedWith("ERC1155: transfer to non-ERC1155Receiver implementer")
     })
   })
 
@@ -529,7 +530,11 @@ describe(" -- Testing Fund Contract -- ", function () {
       await treasury.addSupportedToken(token2.address)
 
       // setStateUnlocked should be unlocked
-      expect(await fund100.state()).to.equal(1, 'fund state should == 1 (locked)')
+      expect(await fund100.state()).to.equal(0, 'fund state should == 0 (locked)')
+
+      await fund100.setStateUnlocked()
+
+      expect(await fund100.state()).to.equal(1, 'fund state should == 1 (unlocked)')
 
       //get holders balance before payout
       const initialOwnerETHBalance = await ethers.provider.getBalance(user1.address)
@@ -589,6 +594,9 @@ describe(" -- Testing Fund Contract -- ", function () {
       await treasury.addSupportedToken(token1.address)
       await treasury.addSupportedToken(token2.address)
 
+      // unlock the fund
+      await fund100.setStateUnlocked()
+
       // Get initial owner balances
       const initialOwnerETHBalance = await ethers.provider.getBalance(user1.address)
       const initialOwnerToken1Balance = await token1.balanceOf(user1.address)
@@ -644,6 +652,7 @@ describe(" -- Testing Fund Contract -- ", function () {
       // distribute 20% of tokens to new owner
       await factory.connect(user1).safeTransferFrom(user1.address, user3.address, 1, 20, '0x')
       expect(await factory.balanceOf(user3.address, 1)).to.equal(20)
+      expect(await factory.balanceOf(user1.address, 1)).to.equal(80)
       // Deploy mock ERC20 tokens for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const token1 = await MockToken.connect(user2).deploy("Mock Token 1", "MOCK1")
@@ -674,6 +683,13 @@ describe(" -- Testing Fund Contract -- ", function () {
       // Approve our mock tokens:
       await treasury.addSupportedToken(token1.address)
       await treasury.addSupportedToken(token2.address)
+
+      // setStateUnlocked should be unlocked
+      expect(await fund100.state()).to.equal(0, 'fund state should == 0 (locked)')
+
+      await fund100.setStateUnlocked()
+
+      expect(await fund100.state()).to.equal(1, 'fund state should == 1 (unlocked)')
 
       // get holders balance before payout
       const nftHolderETHBalance_beforePayout = await ethers.provider.getBalance(user3.address)
@@ -760,6 +776,9 @@ describe(" -- Testing Fund Contract -- ", function () {
       // Approve our mock tokens:
       await treasury.addSupportedToken(token1.address)
       await treasury.addSupportedToken(token2.address)
+
+      // unlock the fund
+      await fund100.setStateUnlocked()
 
       // get holders balance before payout
       const nftHolderETHBalance_beforePayout = await ethers.provider.getBalance(user3.address)
@@ -885,6 +904,128 @@ describe(" -- Testing Fund Contract -- ", function () {
 
       // should not allow payout
       await expect(factory.connect(user1).payout(2)).to.be.revertedWith("Fund is empty")
+    })
+  })
+
+  describe("Send to Treasury", function () {
+    let factory, treasury
+    let lockedFund, unlockedFund, openFund
+    let user1, user2
+    let feeRecipient
+    let token1, token2
+
+    before(async function () {
+      [user1, user2, feeRecipient] = await ethers.getSigners()
+    })
+
+    beforeEach(async function () {
+      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      factory = deployedContracts.factory
+      treasury = deployedContracts.treasury
+      lockedFund = await makeFund_100edition_target100_noUnlockTime(factory, user1, user1)
+      unlockedFund = await makeFund_100edition_target100_noUnlockTime(factory, user1, user1)
+      openFund = await makeFund_100edition_target100_noUnlockTime(factory, user1, user1)
+      
+      const treasurerRole = treasury.TREASURER_ROLE()
+      await treasury.grantRole(treasurerRole, user1.address)
+
+      // Deploy mock ERC20 tokens for testing
+      const MockToken = await ethers.getContractFactory("MockToken")
+      token1 = await MockToken.deploy("Mock Token 1", "MOCK1")
+      await token1.deployed()
+      token2 = await MockToken.deploy("Mock Token 2", "MOCK2")
+      await token2.deployed()
+
+      // Approve our mock tokens:
+      await treasury.addSupportedToken(token1.address)
+      await treasury.addSupportedToken(token2.address)
+
+      // Transfer enough tokens to reach 66% target amount of unlocked and open funds
+      let tokenAmount = ethers.utils.parseUnits("33", 18)
+      await token1.transfer(unlockedFund.address, tokenAmount)
+      await token2.transfer(unlockedFund.address, tokenAmount)
+      await token1.transfer(openFund.address, tokenAmount)
+      await token2.transfer(openFund.address, tokenAmount)
+
+      // send the remaining required ETH:
+      let ethToSend = ethers.utils.parseUnits("34", 18)
+      await user2.sendTransaction({
+        to: unlockedFund.address,
+        value: ethToSend,
+      })
+      await user2.sendTransaction({
+        to: openFund.address,
+        value: ethToSend,
+      })
+
+      // call payout on the open fund (index 2) to set it to Open
+      const tx = await factory.connect(user1).payout(2)
+      tx.wait()
+
+      // Transfer some tokens to the open fund
+      tokenAmount = ethers.utils.parseUnits("60", 18)
+      await token1.transfer(openFund.address, tokenAmount)
+      await token2.transfer(openFund.address, tokenAmount)
+
+      // and some ETH:
+      ethToSend = ethers.utils.parseUnits("60", 18)
+      await user2.sendTransaction({
+        to: openFund.address,
+        value: ethToSend,
+      })
+    })
+
+    it("should send open funds to the treasury", async function () {
+
+      // verify that the locked fund is in the Locked state
+      expect(await lockedFund.state()).to.equal(0)
+      // verify that the unlocked fund is in the Unlocked state
+      expect(await unlockedFund.state()).to.equal(1)
+      // verify that the open fund is in the Open state
+      expect(await openFund.state()).to.equal(2)
+      expect(await treasury.isOpenFund(openFund.address)).to.be.true
+
+      // Get the initial balances of native tokens and supported tokens
+      const initialEthBalance = await ethers.provider.getBalance(treasury.address)
+      const initialToken1Balance = await token1.balanceOf(treasury.address)
+      const initialToken2Balance = await token2.balanceOf(treasury.address)
+
+      // call collect on the treasury which should pull balance from the Open Fund only
+      const tx = await treasury.connect(user1).collect()
+      const txReceipt = await tx.wait()
+
+      // Get the updated balances after collecting from the Open Fund
+      const updatedEthBalance = await ethers.provider.getBalance(treasury.address)
+      const updatedToken1Balance = await token1.balanceOf(treasury.address)
+      const updatedToken2Balance = await token2.balanceOf(treasury.address)
+
+      // Verify that balances have changed as expected
+      const amountCollectedOfEachToken = ethers.utils.parseUnits("60", "ether")
+      expect(updatedEthBalance).to.equal(initialEthBalance.add(amountCollectedOfEachToken))
+      expect(updatedToken1Balance).to.equal(initialToken1Balance.add(amountCollectedOfEachToken))
+      expect(updatedToken2Balance).to.equal(initialToken2Balance.add(amountCollectedOfEachToken))
+
+      // Retrieve events emitted by the treasury contract
+      const sendNativeTokenEvent = (await openFund.queryFilter("SendNativeTokenToTreasury"))[0]
+      const sendSupportedTokenEvents = (await openFund.queryFilter("SendSupportedTokenToTreasury"))
+
+      // Verify the SendNativeTokenToTreasury event
+      expect(sendNativeTokenEvent).to.exist
+      expect(sendNativeTokenEvent.args.fundAddress).to.equal(openFund.address, 'fund address should be correct')
+      expect(sendNativeTokenEvent.args.treasuryAddress).to.equal(treasury.address, 'treasury address should be correct')
+      expect(sendNativeTokenEvent.args.amount).to.equal(amountCollectedOfEachToken, 'native token amount should be correct')
+
+      // Verify the SendSupportedTokenToTreasury event
+      expect(sendSupportedTokenEvents[0]).to.exist
+      expect(sendSupportedTokenEvents[1]).to.exist
+      expect(sendSupportedTokenEvents[0].args.fundAddress).to.equal(openFund.address, 'fund address should be correct')
+      expect(sendSupportedTokenEvents[0].args.treasuryAddress).to.equal(treasury.address, 'treasury address should be correct')
+      expect(sendSupportedTokenEvents[0].args.tokenAddress).to.equal(token1.address, 'token1 address should be correct')
+      expect(sendSupportedTokenEvents[0].args.tokenBalance).to.equal(amountCollectedOfEachToken, 'token1 amount should be correct')
+      expect(sendSupportedTokenEvents[1].args.fundAddress).to.equal(openFund.address, 'fund address should be correct')
+      expect(sendSupportedTokenEvents[1].args.treasuryAddress).to.equal(treasury.address, 'treasury address should be correct')
+      expect(sendSupportedTokenEvents[1].args.tokenAddress).to.equal(token2.address, 'token2 address should be correct')
+      expect(sendSupportedTokenEvents[1].args.tokenBalance).to.equal(amountCollectedOfEachToken, 'token2 amount should be correct')
     })
   })
 })

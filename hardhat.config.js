@@ -30,5 +30,6 @@ module.exports = {
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
     gasPrice: 20,
+    coinmarketcap: '9ce1674f-8587-4207-877a-705d1429764b'
   },
 };

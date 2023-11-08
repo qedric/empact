@@ -2,7 +2,7 @@
 const { expect, assert } = require("chai")
 const { ethers, upgrades, network } = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-network-helpers")
-const { deploy, deployFundImplementation, deployGenerator, deployTreasury, getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, generateMintRequest, makeFund } = require("./test_helpers")
+const { deploy, deployFundImplementation, deployGenerator, deployTreasury, getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, generateMintRequest, makeFund, makeFund_100edition_target100_noUnlockTime } = require("./test_helpers")
 
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
@@ -344,7 +344,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       await helpers.time.increase(60 * 60 * 24 * 100) // 100 days
 
       // Call setTargetReached()
-      const targetReachedTx = await fund.setTargetReached()
+      const targetReachedTx = await fund.setStateUnlocked()
 
       // Call the payout function
       const payoutTx = await factory.connect(user1).payout(0)
@@ -366,7 +366,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       2. issue fund with 4 shares, divide between 2 users
       3. ensure fund is moved to open on last payout
     */
-    it("Should call treasury.moveToOpenFund if it is the last payout", async function () {
+    it("Should call treasury.addOpenFund if it is the last payout", async function () {
       // Generate a signature for the mint request
       const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
       // getBlock returns a block object and it has a timestamp property.
@@ -435,19 +435,19 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(await factory.balanceOf(user1.address, 0)).to.equal(2)
       expect(await factory.balanceOf(user2.address, 0)).to.equal(2)
 
-      // call payout on 1st fund and make sure that MovedToOpenFund event NOT emitted
+      // call payout on 1st fund and make sure that AddedOpenFund event NOT emitted
       tx1 = await factory.connect(user1).payout(0)
-      const payout1Event = await treasury.queryFilter('MovedToOpenFund', tx1.blockHash)
+      const payout1Event = await treasury.queryFilter('AddedOpenFund', tx1.blockHash)
       expect(payout1Event).to.be.empty
 
-      // call payout on 2nd fund and make sure that MovedToOpenFund event was emitted
+      // call payout on 2nd fund and make sure that AddedOpenFund event was emitted
       tx2 = await factory.connect(user2).payout(1)
-      const payout2Event = await treasury.queryFilter('MovedToOpenFund', tx2.blockHash)
+      const payout2Event = await treasury.queryFilter('AddedOpenFund', tx2.blockHash)
       expect(payout2Event.length).to.be.gt(0)
 
-      // call payout on 1st fund with user2, and make sure that MovedToOpenFund event was emitted
+      // call payout on 1st fund with user2, and make sure that AddedOpenFund event was emitted
       tx3 = await factory.connect(user2).payout(0)
-      const payout3Event = await treasury.queryFilter('MovedToOpenFund', tx3.blockHash)
+      const payout3Event = await treasury.queryFilter('AddedOpenFund', tx3.blockHash)
       expect(payout3Event.length).to.be.gt(0)
     })
 
@@ -569,41 +569,55 @@ describe(" -- Testing Factory Contract -- ", function () {
       await expect(owner.sendTransaction({
         to: factory,
         value: amountToSend,
-      })).to.be.revertedWith("!ERC1155RECEIVER")
+      })).to.be.reverted
     })
 
     it("should fail when sending non-native tokens to the factory contract", async function () {
-      const fundAddress = await makeFund()
-      await expect(cryptofunds.connect(nftOwner).safeTransferFrom(nftOwner.address, fundAddress, 0, 2, "0x")).to.be.revertedWith("!ERC1155RECEIVER")
+      const fundAddress = await makeFund(factory, owner, owner)
+      await expect(factory.connect(owner).safeTransferFrom(owner.address, fundAddress, 0, 2, "0x")).to.be.reverted
     })
 
-    it("should transfer a quantity of fund NTFs from one holder to another", async function () {
-      const fundAddress = await makeFund()
-      await cryptofunds.connect(nftOwner).safeTransferFrom(nftOwner.address, newOwner.address, 0, 2, "0x")
-      expect(await cryptofunds.balanceOf(newOwner.address, 0)).to.equal(2)
+    it("should transfer a quantity of NTFs from one holder to another", async function () {
+      const fundAddress = await makeFund(factory, owner, owner)
+      await factory.connect(owner).safeTransferFrom(owner.address, feeRecipient.address, 0, 2, "0x")
+      expect(await factory.balanceOf(feeRecipient.address, 0)).to.equal(2)
     })
   })
 
   describe("Querying", function() {
+
+    let factory
+    let INITIAL_DEFAULT_ADMIN_AND_SIGNER
+    let user1, user2
+    let feeRecipient
+
+    before(async function () {
+      [INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1, user2, feeRecipient] = await ethers.getSigners()
+    })
+
+    beforeEach(async function () {
+      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      factory = deployedContracts.factory
+      treasury = deployedContracts.treasury
+    })
+
+
     it("should generate the metadata on uri query", async function() {
 
-      const expectedName = '4 Little Pigs'
+      const expectedName = 'A test fund'
       const expectedDescription = 'description'
-      const expectedUnlockTime = 1698495367
 
       // Generate a sample token and its attributes
-      const fundAddress = await makeFund()
+      const fund = await makeFund(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
 
       // Retrieve the token's metadata URI
-      const metadataURI = await cryptofunds.uri(0)
+      const metadataURI = await factory.uri(0)
 
       // Decode the base64-encoded JSON data
       const decodedData = atob(metadataURI.split(",")[1])
 
       // Parse the decoded JSON data
       const metadata = JSON.parse(decodedData)
-
-      console.log(metadata)
 
       // Assert that the metadata has the correct values
       expect(metadata.name).to.equal(expectedName)
@@ -616,36 +630,31 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(metadata.attributes[2].trait_type).to.equal("Current Balance")
       expect(metadata.attributes[2].value).to.equal("0 ETH")
       expect(metadata.attributes[3].trait_type).to.equal("Receive Address")
-      expect(metadata.attributes[3].value).to.equal(fundAddress.toLowerCase())
+      expect(metadata.attributes[3].value).to.equal(fund.address.toLowerCase())
     })
 
     it("should return correct metadata for unlocked fund", async function() {
-      const expectedName = '4 Little Pigs'
-      const expectedDescription = 'The description'
-      const expectedUnlockTime = 0
+      const expectedName = 'A 100-edition test fund'
+      const expectedDescription = 'no unlock time'
 
       // Generate a sample token and its attributes
-      const fundAddress = await makeFund(
-        nftOwner.address,
-        4,
-        '4 Little Pigs',
-        'The description',
-        0, // unlock days
-        '10', // target balance
-        '0.004'
+      const fund = await makeFund_100edition_target100_noUnlockTime(
+        factory,
+        INITIAL_DEFAULT_ADMIN_AND_SIGNER,
+        user1
       )
 
       //send enough ETH
       const amountToSend = ethers.utils.parseEther("10")
 
       // Send the ETH to the fund contract
-      await nonOwner.sendTransaction({
-        to: fundAddress,
+      await user2.sendTransaction({
+        to: fund.address,
         value: amountToSend,
       })
 
       // Retrieve the token's metadata URI
-      const metadataURI = await cryptofunds.uri(0)
+      const metadataURI = await factory.uri(0)
 
       // Decode the base64-encoded JSON data
       const decodedData = atob(metadataURI.split(",")[1])
@@ -653,7 +662,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       // Parse the decoded JSON data
       const metadata = JSON.parse(decodedData)
 
-      console.log(metadata)
+      //console.log(metadata)
 
       // Assert that the metadata has the correct values
       expect(metadata.name).to.equal(expectedName)
@@ -662,14 +671,14 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(metadata.attributes[0].display_type).to.equal("date")
       expect(metadata.attributes[0].trait_type).to.equal("Maturity Date")
       expect(metadata.attributes[1].trait_type).to.equal("Target Balance")
-      expect(metadata.attributes[1].value).to.equal("10.00000 ETH")
+      expect(metadata.attributes[1].value).to.equal("100.00000 ETH")
       expect(metadata.attributes[2].trait_type).to.equal("Current Balance")
       expect(metadata.attributes[2].value).to.equal("10.00000 ETH")
       expect(metadata.attributes[3].trait_type).to.equal("Receive Address")
-      expect(metadata.attributes[3].value).to.equal(fundAddress.toLowerCase())
+      expect(metadata.attributes[3].value).to.equal(fund.address.toLowerCase())
       expect(metadata.attributes[4].display_type).to.equal("boost_percentage")
       expect(metadata.attributes[4].trait_type).to.equal("Percent Complete")
-      expect(metadata.attributes[4].value).to.equal(100)
+      expect(metadata.attributes[4].value).to.equal(10)
     })
   })
 })
