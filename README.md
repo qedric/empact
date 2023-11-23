@@ -1,4 +1,4 @@
-# cryptopiggies
+# ZebraFramework
 
 Welcome to the official README for cryptoPiggies, the community for creating and managing digital piggy-banks in the world of blockchain and NFTs!
 
