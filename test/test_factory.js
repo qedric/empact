@@ -280,7 +280,7 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
 
     it("should set the Generator address and emit the GeneratorUpdated event", async function () {
-      const newGenerator = await deployGenerator()
+      const newGenerator = await deployGenerator('Generator_v1')
       const receipt = await factory.connect(owner).setGenerator(newGenerator.address)
 
       const events = await factory.queryFilter("GeneratorUpdated", receipt.blockHash)

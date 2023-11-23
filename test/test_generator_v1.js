@@ -6,7 +6,7 @@ const { deploy, deployFundImplementation, deployGenerator, deployTreasury, getTy
 
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
-describe(" -- Testing Generator Contract -- ", function () {
+describe(" -- Testing Generator v1 Contract -- ", function () {
 
   let factory
   let INITIAL_DEFAULT_ADMIN_AND_SIGNER

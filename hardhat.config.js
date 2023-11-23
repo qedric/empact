@@ -4,7 +4,7 @@ require("@nomiclabs/hardhat-etherscan");
 require("hardhat-gas-reporter");
 require('dotenv').config();
 
-const { ALCHECMY_API_KEY_TEST, ETHERSCAN_API_KEY, PK } = process.env;
+const { ALCHECMY_API_KEY_TEST, ALCHEMY_API_KEY_SEPOLIA, ETHERSCAN_API_KEY, PK } = process.env;
 
 module.exports = {
   solidity: {
@@ -19,6 +19,10 @@ module.exports = {
   networks: {
     goerli: {
       url: `https://eth-goerli.alchemyapi.io/v2/${ALCHECMY_API_KEY_TEST}`,
+      accounts: [PK]
+    },
+    sepolia: {
+      url: `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY_SEPOLIA}`,
       accounts: [PK]
     },
     hardhat: {

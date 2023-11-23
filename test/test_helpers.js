@@ -13,9 +13,9 @@ async function deployFundImplementation(factory_address, treasury_address) {
   return fundImplementation
 }
 
-async function deployGenerator() {
+async function deployGenerator(contractName) {
 
-  const Generator = await ethers.getContractFactory("Generator_v1")
+  const Generator = await ethers.getContractFactory(contractName)
 
   // deploy the generator contract
   const generator = await Generator.deploy()
@@ -40,7 +40,7 @@ async function deploy(feeRecipient, tokenUrlPrefix) {
   const Factory = await ethers.getContractFactory("Factory")
   
   // deploy the generator contract
-  const generator = await deployGenerator()
+  const generator = await deployGenerator('Generator_v1')
 
   // deploy the factory
   const factory = await Factory.deploy(feeRecipient, tokenUrlPrefix)
