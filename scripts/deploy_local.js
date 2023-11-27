@@ -15,7 +15,7 @@
   "metadata":"",
   "unlockTime":0,
   "targetBalance":0,
-  "piggyBank":"0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+  "fund":"0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
 }
 
 ["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",99999999,"","","",0,0,"0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"]
@@ -32,7 +32,7 @@ function callback(x) {
 
 async function main() {
 
-  const _name = 'PiggiesTESTLOCAL'
+  const _name = 'FundsTESTLOCAL'
   const _symbol = 'CPG'
   const _royaltyRecipient = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
   const _royaltyBps = '400'
@@ -41,12 +41,12 @@ async function main() {
   /*const _libAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3' // Goerli deployed via thirdweb
   const _implAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512' // Goerli deployed PB implementation*/
 
-  // deploy the PiggyBank first if necessary
-  const PB = await hre.ethers.getContractFactory("PiggyBank");
+  // deploy the Fund first if necessary
+  const PB = await hre.ethers.getContractFactory("Fund");
   const pb = await PB.deploy();
   await pb.deployed();
 
-  console.log('got PiggyBank at ', pb.address);
+  console.log('got Fund at ', pb.address);
 
   // deploy the library first if necessary
   const Lib = await hre.ethers.getContractFactory("Utils");
@@ -59,7 +59,7 @@ async function main() {
   console.log('got library at ', lib.address);
   
   // Get contract that we want to deploy
-  const PiggyFactory = await hre.ethers.getContractFactory("CryptoPiggies", {
+  const FundFactory = await hre.ethers.getContractFactory("cryptofunds", {
     libraries: {
       Utils: lib.address,
     }}
@@ -68,7 +68,7 @@ async function main() {
   console.log('got the conract we want to deploy');
 
   // deploy
-  const deployedFactory = await PiggyFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient, pb.address);
+  const deployedFactory = await FundFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient, pb.address);
 
   // Wait for this transaction to be mined
   await deployedFactory.deployed();
@@ -76,15 +76,15 @@ async function main() {
   // Get contract address
   console.log("Owner is: ", await deployedFactory.owner())
 
-  console.log('PiggyFactory address:', deployedFactory.address)
+  console.log('FundFactory address:', deployedFactory.address)
 
-  /*// then deploy the implementation piggy bank that the factory can then clone:
-  const Piggy = await hre.ethers.getContractFactory("PiggyBank");
+  /*// then deploy the implementation fund bank that the factory can then clone:
+  const Fund = await hre.ethers.getContractFactory("Fund");
 
-  const deployedPiggy = await Piggy.deploy();
+  const deployedFund = await Fund.deploy();
 
-  await deployedPiggy.deployed();
-  console.log(deployedPiggy);*/
+  await deployedFund.deployed();
+  console.log(deployedFund);*/
 
   /*const data = {
     owner: owner,
@@ -93,16 +93,16 @@ async function main() {
     supply: 1,
     externalUrl: '',
     targetBalance: ethers.BigNumber.from(99),
-    piggyBank: owner
+    fund: owner
   }*/
 
 
-/*  // deploy piggybank implementation
-  const PiggyBank = await ethers.getContractFactory("PiggyBank");
-  const deployedPiggyBankImplementation = await PiggyBank.deploy();
-  await deployedPiggyBankImplementation.deployed();
+/*  // deploy fundbank implementation
+  const Fund = await ethers.getContractFactory("Fund");
+  const deployedFundImplementation = await Fund.deploy();
+  await deployedFundImplementation.deployed();
 
-  //console.log('deployed PiggyBank:', deployedPiggyBankImplementation)
+  //console.log('deployed Fund:', deployedFundImplementation)
 
   //https://portal.thirdweb.com/typescript/sdk.erc1155signaturemintable
 

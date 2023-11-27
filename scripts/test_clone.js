@@ -1,7 +1,7 @@
 //https://forum.openzeppelin.com/t/how-to-correctly-test-the-initialisation-of-a-clone-contract-on-hardhat-eip-1167/31774
 // https://ethereum.stackexchange.com/questions/110652/how-to-test-clone-contract-functions
 
-const _name = 'Piggies_Local_TEST'
+const _name = 'Funds_Local_TEST'
 const _symbol = 'CPG'
 const _royaltyRecipient = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
 const _royaltyBps = '400'
@@ -9,7 +9,7 @@ const _primarySaleRecipient = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 
 const { ethers } = require("hardhat");
 
-const MintPiggyRequest1155 = [
+const MintFundRequest1155 = [
 	{
 	  name: "to",
 	  type: "address"
@@ -55,7 +55,7 @@ async function generateSig(payloadToSign, contractWrapper) {
       chainId,
       verifyingContract: contractWrapper.readContract.address
     }, {
-      MintRequest: MintPiggyRequest1155
+      MintRequest: MintFundRequest1155
     },payloadToSign);
   return {
     payload: payloadToSign,
@@ -70,17 +70,17 @@ async function main() {
 	const lib = await Lib.deploy();
 	await lib.deployed();
 
-	// 2. deploy the implementation PiggyBank
-	const PB = await hre.ethers.getContractFactory("PiggyBank");
+	// 2. deploy the implementation Fund
+	const PB = await hre.ethers.getContractFactory("Fund");
 	const pB = await Lib.deploy();
 	await pB.deployed();
 
-	// 3. deploy cryptoPiggies Factory contract
-  const PiggyFactory = await hre.ethers.getContractFactory("CryptoPiggies", {
+	// 3. deploy cryptofunds Factory contract
+  const FundFactory = await hre.ethers.getContractFactory("cryptofunds", {
     libraries: { Utils: lib.address }
   });
-  const piggyFactory = await PiggyFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient, _implAddress);
-  await piggyFactory.deployed();
+  const fundFactory = await FundFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient, _implAddress);
+  await fundFactory.deployed();
 
   
 

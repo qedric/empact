@@ -2,33 +2,17 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/utils/Base64.sol";
-import "./IPiggyGenerator.sol";
-import "./IPiggyBank.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./IGenerator.sol";
+import "./IFund.sol";
 
-contract Generator_v1 is IPiggyGenerator {
-
-    struct Colours {
-        bytes3 fbg;
-        bytes3 bg;
-        bytes3 fg;
-        bytes3 pbg;
-        bytes3 pfg;
-    }
-
-    /// @notice the colours used to generate the SVG
-    Colours public svgColours;
+contract Generator_v3 is IGenerator, AccessControl {
 
 	constructor() {
-        svgColours = Colours(
-            0xffcc00, // fbg
-            0xb8abd4, // bg
-            0xbccdc7, // fg
-            0x332429, // pbg
-            0xecedab  // pfg
-        );
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 	}
 
-    function uri(IPiggyBank.Attr calldata attributes, address piggyAddress, uint256 percent, uint256 balance, string memory tokenUrl, uint256 tokenId) external view returns (string memory) {    
+    function uri(IFund.Attr calldata attributes, address fundAddress, uint256 percent, uint256 balance, string memory tokenUrl, uint256 tokenId) external pure returns (string memory) {    
         return string(
             abi.encodePacked(
                 "data:application/json;base64,",
@@ -40,16 +24,14 @@ contract Generator_v1 is IPiggyGenerator {
                             '","description":"',
                             attributes.description,
                             '","image_data":"',
-                            generateSVG(
-                                percent
-                            ),
+                            generateSVG(percent),
                             '","external_url":"',
                             tokenUrl,
                             uint2str(tokenId),
                             '","',
                             generateAttributes(
                             	attributes,
-                            	piggyAddress,
+                            	fundAddress,
                             	percent,
                             	balance
                             ),
@@ -61,32 +43,7 @@ contract Generator_v1 is IPiggyGenerator {
         );
     }
 
-    function generateSVG(uint256 percent) internal view returns (bytes memory) {
-
-        // Build the SVG string using the percentage and the colors
-        return abi.encodePacked(
-            "data:image/svg+xml;base64,",
-            Base64.encode(bytes(string(
-                abi.encodePacked(
-                    '<svg id="Ebene_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080"><defs><style>.cls-1{fill:#',
-                    bytes3ToHexString(percent == 100 ? svgColours.fbg : svgColours.bg),
-                    ';}.cls-2{fill:#',
-                    bytes3ToHexString(svgColours.fg),
-                    ';}.cls-3{fill:#',
-                    bytes3ToHexString(svgColours.pbg),
-                    ';}.cls-4{fill:#',
-                    bytes3ToHexString(svgColours.pfg),
-                    ';}</style></defs><rect class="cls-2" y="0" width="1080" height="1080"/><rect class="cls-1" y="',
-                    uint2str(10800 - (108 * percent)),
-                    '" width="1080" height="',
-                    uint2str((1080 * percent) / 100),
-                    '"/><path class="cls-4" d="m536.13,889.18c-83.07-5.83-163.6-33.51-234.74-89.69-49.89-39.42-79.54-91.78-106.16-147.49-17.86-37.36-23.35-76.95-26.07-117.28-4.63-68.32,9.94-132.28,48.51-189.16,14.06-20.71,31.04-40.23,49.74-56.78,35.63-31.52,74.72-59.75,120.18-74.31,51.64-16.51,104.18-29.11,160.07-25.54,45.1,2.87,89.71,6.19,133.15,18.59,72.96,20.83,131.82,61.03,171.22,127.6,26.85,45.39,45.26,93.98,54.54,145.78,10.41,58.08,5.03,114.13-17.63,169.63-18.52,45.36-42.42,86.31-74.66,122.71-43.35,48.93-98.71,77.88-160.33,96.1-36.4,10.76-73.43,18.21-117.83,19.85"/><path class="cls-3" d="m783.12,513.76c-.95,50.12-45.99,96.71-96.96,98.59-59.39,2.17-104.4-32.33-116.86-67.57-11.65-32.9-13.83-76.75,18.19-107.52,34.97-33.59,73.23-47.55,120.55-34.71,27.83,7.55,47.1,25.83,60.12,50.09,9.99,18.62,17.94,38.79,14.97,61.11"/><path class="cls-3" d="m424.53,608.1c-50.46,7.02-108.91-56.43-110.22-102.51-1.81-64.03,55.07-117.91,119.14-111.34,46.74,4.81,77.2,32.58,88.33,80.6,12.78,55.07-5.46,98.29-52.85,125.13-15.25,8.65-18.95,9.33-44.4,8.12"/></svg>'
-                )
-            )))
-        );
-    }
-
-    function generateAttributes(IPiggyBank.Attr calldata attributes, address receiveAddress, uint256 percent, uint256 balance) internal pure returns(string memory) {
+    function generateAttributes(IFund.Attr calldata attributes, address receiveAddress, uint256 percent, uint256 balance) internal pure returns(string memory) {
         return string(abi.encodePacked(
             'attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
             uint2str(attributes.unlockTime),
@@ -102,30 +59,37 @@ contract Generator_v1 is IPiggyGenerator {
         ));
     }
 
-    /**
-     * @notice Sets the SVG colours.
-     * @param bg Background colour.
-     * @param fg Foreground colour.
-     * @param pbg Piggy background colour.
-     * @param pfg Piggy foreground colour.
-     */
-    function setSvgColours(bytes3 fbg, bytes3 bg, bytes3 fg, bytes3 pbg, bytes3 pfg) public {
-        svgColours = Colours(fbg, bg, fg, pbg, pfg);
+    function generateSVG(uint256 percent) internal pure returns (bytes memory) {
+        return abi.encodePacked(
+            "data:image/svg+xml;base64,",
+            Base64.encode(bytes(string(
+                abi.encodePacked(
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200" fill="none"><rect width="1200" height="1200" fill="#323D9E"/>',
+                    percent > 0 ? generatePaths(percent) : '',
+                    '<text x="600" y="600" fill="#fff" alignment-baseline="middle" text-anchor="middle" font-size="440">',
+                    uint2str(percent),
+                    '%</text></svg>'
+                )
+            )))
+        );
+    }
+
+    function generatePaths(uint256 percentage) internal pure returns (string memory pathsString) {
+        uint256 pathsToShow = (percentage * 30) / 100; // Calculate paths to display
+
+        for (uint256 i = 0; i < pathsToShow; i++) {
+            uint256 yCoordinate = 1200 - (40 * i); // Invert Y-coordinate
+            pathsString = string(abi.encodePacked(
+                pathsString,
+                '<path d="M1200 ', uint2str(yCoordinate), 'H0V', uint2str(yCoordinate - 20),
+                'H1200V', uint2str(yCoordinate), 'Z" fill="white"/>\n'
+            ));
+        }
     }
 
     /*
-        UTILS
+        UTILS - internal functions only
     */
-
-    function bytes3ToHexString(bytes3 value) internal pure returns (string memory) {
-        bytes memory result = new bytes(6);
-        bytes16 hexAlphabet = "0123456789abcdef";
-        for (uint256 i = 0; i < 3; ++i) {
-            result[i * 2] = hexAlphabet[uint8(value[i] >> 4)];
-            result[1 + i * 2] = hexAlphabet[uint8(value[i] & 0x0f)];
-        }
-        return string(result);
-    }
 
     function uint2str(
         uint _i

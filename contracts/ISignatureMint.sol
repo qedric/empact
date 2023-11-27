@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.11;
 
-interface IPiggySignatureMintERC1155 { 
+interface ISignatureMint { 
     /**
      *  @notice The body of a request to mint tokens.
      *
@@ -13,13 +13,13 @@ interface IPiggySignatureMintERC1155 {
      */
     struct MintRequest {
         address to;
-        uint256 quantity;
         uint128 validityStartTimestamp;
         uint128 validityEndTimestamp;
-        string name;
-        string description;
+        uint256 quantity;
         uint256 unlockTime;
         uint256 targetBalance;
+        string name;
+        string description;
     }
 
     /// @dev Emitted when tokens are minted.
@@ -31,7 +31,7 @@ interface IPiggySignatureMintERC1155 {
 
     /**
      *  @notice Verifies that a mint request is signed by an account holding
-     *          MINTER_ROLE (at the time of the function call).
+     *          SIGNER_ROLE (at the time of the function call).
      *
      *  @param req The payload / mint request.
      *  @param signature The signature produced by an account signing the mint request.
