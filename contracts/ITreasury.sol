@@ -5,11 +5,11 @@ interface ITreasury {
 
     event SupportedTokenAdded(address tokenAddress);
     event SupportedTokenRemoved(address tokenAddress);
-    event AddedOpenFund(address fundAddress);
+    event AddedOpenFund(address vaultAddress);
     event CollectedOpenFunds();
-    event DistributedNativeTokensToLockedFund(address indexed fundAddress, uint amount);
+    event DistributedNativeTokensToLockedFund(address indexed vaultAddress, uint amount);
     event DistributedNativeTokensToLockedFunds(uint balanceBeforeDistribution, uint numberOfRecipients);
-    event DistributedSupportedTokenToLockedFund(address indexed supportedToken, address indexed fundAddress, uint amount);
+    event DistributedSupportedTokenToLockedFund(address indexed supportedToken, address indexed vaultAddress, uint amount);
     event DistributedSupportedTokensToLockedFunds(address indexed supportedToken, uint balanceBeforeDistribution, uint numberOfRecipients);
     event OriginProtocolTokenUpdated(address oldAddress, address newAddress);
     event Received(address _from, uint _amount);
@@ -20,23 +20,23 @@ interface ITreasury {
     function supportedTokens() external view returns (address[] memory);
 
     /**
-     * @notice Add an open fund bank address to the treasury
-     * @param fundAddress The address of the open fund bank
+     * @notice Add an open vault address to the treasury
+     * @param vaultAddress The address of the open vault
      */
-    function addOpenFund(address fundAddress) external;
+    function addOpenFund(address vaultAddress) external;
     
 	/**
-     *  @notice Iterates through all the open funds and calls the sendToTreasury() method on them
+     *  @notice Iterates through all the open vaults and calls the sendToTreasury() method on them
      */
 	function collect() external;
 
 	/**
-     *  @notice Distributes treasury ETH balance to all locked funds
+     *  @notice Distributes treasury ETH balance to all locked vaults
      */
 	function distributeNativeTokenRewards() external;
 
     /**
-     *  @notice Distributes supported token balances to locked funds with balance
+     *  @notice Distributes supported token balances to locked vaults with balance
      */
     function distributeSupportedTokenRewards(address supportedTokenAddress) external;
 

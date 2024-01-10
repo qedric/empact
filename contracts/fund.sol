@@ -8,7 +8,7 @@ import "./ITreasury.sol";
 
 /*
     Origin Protocol staked tokens are treated differently to other supported tokens
-    because its contract requires a call to be made from the fund contract address
+    because its contract requires a call to be made from the vault contract address
     to opt-in to staking rewards. 
 
     Origin Protocol still needs to be added as a supported token via the factory contract
@@ -55,7 +55,7 @@ contract Fund is IFund, Initializable {
     }
 
     /*  @notice this needs to be called if target is reached with non native tokens.
-                this needs to be called if no funds are received after unlock time has been reached.
+                this needs to be called if no vaults are received after unlock time has been reached.
                 this call is not necessary if the target is reached with native tokens only.
     */
     function setStateUnlocked() external {
@@ -100,7 +100,7 @@ contract Fund is IFund, Initializable {
         return _attributes;
     }
 
-    /// opt-in is required to earn yield from oETH (Origin Protocol) tokens held by this fund
+    /// opt-in is required to earn yield from oETH (Origin Protocol) tokens held by this vault
     function optInForOETHRebasing() external {
         require(!oETHRebasingEnabled, 'oETH rebasing already enabled');
         require(ITreasury(treasury).oETHTokenAddress() != address(0), "oETH contract address is not set");
@@ -113,7 +113,7 @@ contract Fund is IFund, Initializable {
         oETHToken.rebaseOptIn();
     }
 
-    /// @notice transfers the share of available funds to the recipient and fee recipient
+    /// @notice transfers the share of available vaults to the recipient and fee recipient
     /// @notice If this is the last payout, set state to Open
     function payout(
         address recipient,

@@ -22,8 +22,8 @@ interface IFund {
     event SupportedTokenWithdrawal(address indexed token, address who, uint amount, uint balance);
     event TargetReached();
     event OptedInForOriginProtocolRebasing();
-    event SendNativeTokenToTreasury(address indexed fundAddress, address treasuryAddress, uint amount);
-    event SendSupportedTokenToTreasury(address indexed fundAddress, address treasuryAddress, address indexed tokenAddress, uint tokenBalance);
+    event SendNativeTokenToTreasury(address indexed vaultAddress, address treasuryAddress, uint amount);
+    event SendSupportedTokenToTreasury(address indexed vaultAddress, address treasuryAddress, address indexed tokenAddress, uint tokenBalance);
 
     function initialize(Attr calldata _data, uint16 _breakFundBps) external;
     function state() external view returns(State);

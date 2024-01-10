@@ -30,7 +30,7 @@ contract Generator_v1 is IGenerator, AccessControl {
         );
 	}
 
-    function uri(IFund.Attr calldata attributes, address fundAddress, uint256 percent, uint256 balance, string memory tokenUrl, uint256 tokenId) external view returns (string memory) {    
+    function uri(IFund.Attr calldata attributes, address vaultAddress, uint256 percent, uint256 balance, string memory tokenUrl, uint256 tokenId) external view returns (string memory) {    
         return string(
             abi.encodePacked(
                 "data:application/json;base64,",
@@ -51,7 +51,7 @@ contract Generator_v1 is IGenerator, AccessControl {
                             '","',
                             generateAttributes(
                             	attributes,
-                            	fundAddress,
+                            	vaultAddress,
                             	percent,
                             	balance
                             ),
