@@ -30,7 +30,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       3. checks that TokensMintedWithSignature' event was fired with correct args
       4. checks that VaultDeployed event was fired with correct args
     */
-    it("should successfully mint new tokens and initalise funds", async function () {
+    it("should successfully mint new tokens and initalise vaults", async function () {
       const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
       const mr = await generateMintRequest(factory.address, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
 
@@ -49,12 +49,12 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(tokensMintedEvent[0].args.mintedTo).to.equal(user1.address)
       expect(tokensMintedEvent[0].args.tokenIdMinted.toNumber()).to.equal(0)
 
-      const fundDeployedEvent = await factory.queryFilter('VaultDeployed', tx.blockHash)
-      expect(fundDeployedEvent.length).to.equal(1)
-      expect(fundDeployedEvent[0].args.msgSender).to.equal(INITIAL_DEFAULT_ADMIN_AND_SIGNER.address)
+      const vaultDeployedEvent = await factory.queryFilter('VaultDeployed', tx.blockHash)
+      expect(vaultDeployedEvent.length).to.equal(1)
+      expect(vaultDeployedEvent[0].args.msgSender).to.equal(INITIAL_DEFAULT_ADMIN_AND_SIGNER.address)
 
-      // Retrieve the fund address from the VaultDeployed event
-      const fundAddress = fundDeployedEvent[0].args.fund
+      // Retrieve the vault address from the VaultDeployed event
+      const vaultAddress = vaultDeployedEvent[0].args.vault
     })
 
     it("should not allow a signature to be used before the start time", async function() {
@@ -75,7 +75,7 @@ describe(" -- Testing Factory Contract -- ", function () {
         4,
         unlockTime,
         targetBalance,
-        'A test fund',
+        'A test vault',
         'invalid start time'    
       )
 
@@ -112,7 +112,7 @@ describe(" -- Testing Factory Contract -- ", function () {
         4,
         unlockTime,
         targetBalance,
-        'A test fund',
+        'A test vault',
         'invalid end time'    
       )
 
@@ -150,7 +150,7 @@ describe(" -- Testing Factory Contract -- ", function () {
         4,
         unlockTime,
         targetBalance,
-        'A test fund',
+        'A test vault',
         'invalid unlock time with targetBalance zero'    
       )
 
@@ -188,7 +188,7 @@ describe(" -- Testing Factory Contract -- ", function () {
         0,
         unlockTime,
         targetBalance,
-        'A test fund',
+        'A test vault',
         'invalid start time'    
       )
 
@@ -235,7 +235,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(event.args.newPrefix).to.equal(newTokenUrlPrefix)
     })
 
-    it("should set the make fund fee and emit the MakeVaultFeeUpdated event", async function () {
+    it("should set the make vault fee and emit the MakeVaultFeeUpdated event", async function () {
       const newMakeVaultFee = ethers.utils.parseUnits("0.005", "ether")
       const receipt = await factory.connect(owner).setMakeVaultFee(newMakeVaultFee)
 
@@ -246,7 +246,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(event.args.fee).to.equal(newMakeVaultFee)
     })
 
-    it("should set the break fund fee basis points and emit the BreakVaultBpsUpdated event", async function () {
+    it("should set the break vault fee basis points and emit the BreakVaultBpsUpdated event", async function () {
       const newBreakVaultBps = 500 // 5% represented in basis points
       const receipt = await factory.connect(owner).setBreakVaultBps(newBreakVaultBps)
 
@@ -304,7 +304,7 @@ describe(" -- Testing Factory Contract -- ", function () {
 
   describe("Payout & Burn", function () {
 
-    let factory, fund
+    let factory, vault
     let INITIAL_DEFAULT_ADMIN_AND_SIGNER
     let user1, user2
     let feeRecipient
@@ -317,12 +317,12 @@ describe(" -- Testing Factory Contract -- ", function () {
       const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
-      fund = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
+      vault = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
     })
 
     /*
       1. check that user has a balance
-      2. send enough funds to unlock
+      2. send enough vaults to unlock
       3. execute payout
       4. check that tokens have been burned
       5. check that payout event was fired
@@ -336,7 +336,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       //send enough ETH
       const amountToSend = ethers.utils.parseEther("1")
       let receiveTx = await user2.sendTransaction({
-        to: fund.address,
+        to: vault.address,
         value: amountToSend,
       })
 
@@ -344,7 +344,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       await helpers.time.increase(60 * 60 * 24 * 100) // 100 days
 
       // Call setTargetReached()
-      const targetReachedTx = await fund.setStateUnlocked()
+      const targetReachedTx = await vault.setStateUnlocked()
 
       // Call the payout function
       const payoutTx = await factory.connect(user1).payout(0)
@@ -353,7 +353,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       // get the StateChanged event from the transaction
       events = await factory.queryFilter("Payout", payoutTx.blockHash)
 
-      expect(events[0].args.fundAddress).to.equal(fund.address)
+      expect(events[0].args.vaultAddress).to.equal(vault.address)
       expect(events[0].args.tokenId).to.equal(0)
 
       // Verify that the tokens were burned
@@ -362,9 +362,9 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
 
     /*
-      1. issue fund with 1 share, check it is marked open on first payout
-      2. issue fund with 4 shares, divide between 2 users
-      3. ensure fund is moved to open on last payout
+      1. issue vault with 1 share, check it is marked open on first payout
+      2. issue vault with 4 shares, divide between 2 users
+      3. ensure vault is moved to open on last payout
     */
     it("Should call treasury.addOpenVault if it is the last payout", async function () {
       // Generate a signature for the mint request
@@ -384,7 +384,7 @@ describe(" -- Testing Factory Contract -- ", function () {
         1,
         unlockTime,
         targetBalance,
-        'A test fund',
+        'A test vault',
         '1 edition'    
       )
 
@@ -403,15 +403,15 @@ describe(" -- Testing Factory Contract -- ", function () {
         { value: makeVaultFee }
       )
       const txReceipt = await tx.wait()
-      const fundCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
+      const vaultCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
       const Vault = await ethers.getContractFactory("Vault")
-      const fund1 = Vault.attach(fundCreatedEvent.args.fund)
+      const vault1 = Vault.attach(vaultCreatedEvent.args.vault)
 
-      // Verify that the initial fund's tokens were minted and assigned to the correct recipient
+      // Verify that the initial vault's tokens were minted and assigned to the correct recipient
       const balanceUser1 = await factory.balanceOf(user1.address, 0)
       expect(balanceUser1).to.equal(4)
 
-      // Verify that the single token fund was minted and assigned to the correct recipient
+      // Verify that the single token vault was minted and assigned to the correct recipient
       const balanceUser2 = await factory.balanceOf(user2.address, 1)
       expect(balanceUser2).to.equal(1)
 
@@ -422,11 +422,11 @@ describe(" -- Testing Factory Contract -- ", function () {
       //send enough ETH
       const amountToSend = ethers.utils.parseEther("1")
       let receiveTx1 = await user2.sendTransaction({
-        to: fund.address,
+        to: vault.address,
         value: amountToSend,
       })
       let receiveTx2 = await user2.sendTransaction({
-        to: fund1.address,
+        to: vault1.address,
         value: amountToSend,
       })
 
@@ -435,17 +435,17 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(await factory.balanceOf(user1.address, 0)).to.equal(2)
       expect(await factory.balanceOf(user2.address, 0)).to.equal(2)
 
-      // call payout on 1st fund and make sure that AddedOpenVault event NOT emitted
+      // call payout on 1st vault and make sure that AddedOpenVault event NOT emitted
       tx1 = await factory.connect(user1).payout(0)
       const payout1Event = await treasury.queryFilter('AddedOpenVault', tx1.blockHash)
       expect(payout1Event).to.be.empty
 
-      // call payout on 2nd fund and make sure that AddedOpenVault event was emitted
+      // call payout on 2nd vault and make sure that AddedOpenVault event was emitted
       tx2 = await factory.connect(user2).payout(1)
       const payout2Event = await treasury.queryFilter('AddedOpenVault', tx2.blockHash)
       expect(payout2Event.length).to.be.gt(0)
 
-      // call payout on 1st fund with user2, and make sure that AddedOpenVault event was emitted
+      // call payout on 1st vault with user2, and make sure that AddedOpenVault event was emitted
       tx3 = await factory.connect(user2).payout(0)
       const payout3Event = await treasury.queryFilter('AddedOpenVault', tx3.blockHash)
       expect(payout3Event.length).to.be.gt(0)
@@ -472,7 +472,7 @@ describe(" -- Testing Factory Contract -- ", function () {
 
   describe("Metadata", function () {
 
-    let factory, fund
+    let factory, vault
     let INITIAL_DEFAULT_ADMIN_AND_SIGNER
     let user1, user2
     let feeRecipient
@@ -484,7 +484,7 @@ describe(" -- Testing Factory Contract -- ", function () {
     beforeEach(async function () {
       const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
       factory = deployedContracts.factory
-      fund = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
+      vault = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
     })
 
     /*
@@ -527,11 +527,11 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(await getPercentage()).to.equal(0, "Percentage should still be 0")
 
       // 3. Send 0.2 ETH and ensure that the percentage returned is 20
-      await user1.sendTransaction({ to: fund.address, value: ethers.utils.parseEther("0.2") })
+      await user1.sendTransaction({ to: vault.address, value: ethers.utils.parseEther("0.2") })
       expect(await getPercentage()).to.equal(20, "Percentage should be 20 after sending 0.2 ETH")
 
       // 4. Send 0.2 ETH and ensure that the percentage returned is 33 (days is now lowest progress)
-      await user1.sendTransaction({ to: fund.address, value: ethers.utils.parseEther("0.2") })
+      await user1.sendTransaction({ to: vault.address, value: ethers.utils.parseEther("0.2") })
       expect(await getPercentage()).to.equal(33, "Percentage should be 33 based on time to unlock")
 
       // 5. Move block time fwd another 33 days; percent should be 40 because ETH progress is lowest
@@ -539,7 +539,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(await getPercentage()).to.equal(40, "Percentage should be 40 based on ETH balance/target")
 
       // 6. Send 0.6 ETH and ensure that the percentage returned is 66 (days is now lowest progress)
-      await user1.sendTransaction({ to: fund.address, value: ethers.utils.parseEther("0.6") })
+      await user1.sendTransaction({ to: vault.address, value: ethers.utils.parseEther("0.6") })
       expect(await getPercentage()).to.equal(66, "Percentage should be 66 based on time to unlock")
 
       // 5. Move block time fwd another 44 days; percent should now be 100 because ETH and time == 100
@@ -573,12 +573,12 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
 
     it("should fail when sending non-native tokens to the factory contract", async function () {
-      const fundAddress = await makeVault(factory, owner, owner)
-      await expect(factory.connect(owner).safeTransferFrom(owner.address, fundAddress, 0, 2, "0x")).to.be.reverted
+      const vaultAddress = await makeVault(factory, owner, owner)
+      await expect(factory.connect(owner).safeTransferFrom(owner.address, vaultAddress, 0, 2, "0x")).to.be.reverted
     })
 
     it("should transfer a quantity of NTFs from one holder to another", async function () {
-      const fundAddress = await makeVault(factory, owner, owner)
+      const vaultAddress = await makeVault(factory, owner, owner)
       await factory.connect(owner).safeTransferFrom(owner.address, feeRecipient.address, 0, 2, "0x")
       expect(await factory.balanceOf(feeRecipient.address, 0)).to.equal(2)
     })
@@ -604,11 +604,11 @@ describe(" -- Testing Factory Contract -- ", function () {
 
     it("should generate the metadata on uri query", async function() {
 
-      const expectedName = 'A test fund'
+      const expectedName = 'A test vault'
       const expectedDescription = 'description'
 
       // Generate a sample token and its attributes
-      const fund = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
+      const vault = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
 
       // Retrieve the token's metadata URI
       const metadataURI = await factory.uri(0)
@@ -630,15 +630,15 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(metadata.attributes[2].trait_type).to.equal("Current Balance")
       expect(metadata.attributes[2].value).to.equal("0 ETH")
       expect(metadata.attributes[3].trait_type).to.equal("Receive Address")
-      expect(metadata.attributes[3].value).to.equal(fund.address.toLowerCase())
+      expect(metadata.attributes[3].value).to.equal(vault.address.toLowerCase())
     })
 
-    it("should return correct metadata for unlocked fund", async function() {
-      const expectedName = 'A 100-edition test fund'
+    it("should return correct metadata for unlocked vault", async function() {
+      const expectedName = 'A 100-edition test vault'
       const expectedDescription = 'no unlock time'
 
       // Generate a sample token and its attributes
-      const fund = await makeVault_100edition_target100_noUnlockTime(
+      const vault = await makeVault_100edition_target100_noUnlockTime(
         factory,
         INITIAL_DEFAULT_ADMIN_AND_SIGNER,
         user1
@@ -647,9 +647,9 @@ describe(" -- Testing Factory Contract -- ", function () {
       //send enough ETH
       const amountToSend = ethers.utils.parseEther("10")
 
-      // Send the ETH to the fund contract
+      // Send the ETH to the vault contract
       await user2.sendTransaction({
-        to: fund.address,
+        to: vault.address,
         value: amountToSend,
       })
 
@@ -675,7 +675,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(metadata.attributes[2].trait_type).to.equal("Current Balance")
       expect(metadata.attributes[2].value).to.equal("10.00000 ETH")
       expect(metadata.attributes[3].trait_type).to.equal("Receive Address")
-      expect(metadata.attributes[3].value).to.equal(fund.address.toLowerCase())
+      expect(metadata.attributes[3].value).to.equal(vault.address.toLowerCase())
       expect(metadata.attributes[4].display_type).to.equal("boost_percentage")
       expect(metadata.attributes[4].trait_type).to.equal("Percent Complete")
       expect(metadata.attributes[4].value).to.equal(10)

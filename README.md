@@ -1,36 +1,36 @@
 # ZebraFramework
 
-This is the official README for ZebraFramework, providing a foundation for diverse fundraising models.
+This is the official README for ZebraFramework, providing a foundation for diverse vaultraising models.
 
 ## Mission
 
-Our mission is to empower organisations, communities, and individuals to raise funds in a transparent and secure manner, and contribute to social impact initiatives through the innovative use of blockchain technology.
+Our mission is to empower organisations, communities, and individuals to raise vaults in a transparent and secure manner, and contribute to social impact initiatives through the innovative use of blockchain technology.
 
 ## Project Overview
 
-ZebraFramework provides a white-label solution for fundraising platforms. Vaults build on this framework feature the following characteristics:
+ZebraFramework provides a white-label solution for vaultraising platforms. Vaults build on this framework feature the following characteristics:
 
-- **Unlock Mechanism:** Each fund can be set to unlock according to parameters determined at the time of fund-creation.
+- **Unlock Mechanism:** Each vault can be set to unlock according to parameters determined at the time of vault-creation.
 
-- **Access to Vaults:** funds are distributed via tokens that are NFTs based on the ERC-1155 standard; each NFT holder has a share of the corresponding fund.
+- **Access to Vaults:** vaults are distributed via tokens that are NFTs based on the ERC-1155 standard; each NFT holder has a share of the corresponding vault.
 
-- **Regenerative Finance:** Once funds have been distributed to all token holders, any further deposits are redistributed proportionally among other funds on the platform.
+- **Regenerative Finance:** Once vaults have been distributed to all token holders, any further deposits are redistributed proportionally among other vaults on the platform.
 
-- **Dynamic Appearance:** ZebraFramework funds are represented by dynamic NFTs that change in appearance over time as they get closer to their maturity date.
+- **Dynamic Appearance:** ZebraFramework vaults are represented by dynamic NFTs that change in appearance over time as they get closer to their maturity date.
 
 ## Use Cases
 
-ZebraFramework fundraising platforms are versatile and can be used for various purposes, including:
+ZebraFramework vaultraising platforms are versatile and can be used for various purposes, including:
 
 1. **NGOs and Nonprofits:** NGOs can build out their own platform that empowers their donors with the transparency and confidence to give more, knowing their donation has already been allocated to the intended beneficiaries.
 
-2. **Disaster Relief:** Instead of collecting donations via sharing Ethereum addresses on social media, ZebraFramework can be used to create funds that have a specific cause in mind. Trustworthy aid organisations can hold fund tokens, making it easy for people worldwide to contribute knowing their funds will go where they are intended.
+2. **Disaster Relief:** Instead of collecting donations via sharing Ethereum addresses on social media, ZebraFramework can be used to create vaults that have a specific cause in mind. Trustworthy aid organisations can hold vault tokens, making it easy for people worldwide to contribute knowing their vaults will go where they are intended.
 
-3. **Personal Savings:** Parents can create a single-edition fund that unlocks on their child's 18th birthday, encouraging long-term savings.
+3. **Personal Savings:** Parents can create a single-edition vault that unlocks on their child's 18th birthday, encouraging long-term savings.
 
-4. **Vaultraising for Projects:** Teams or organisations can divide funds by percentage, making it an ideal way to distribute funds among contributors.
+4. **Vaultraising for Projects:** Teams or organisations can divide vaults by percentage, making it an ideal way to distribute vaults among contributors.
 
-5. **Long-Term Savings:** Self-organised pension funds or long-term savings initiatives can use ZebraFramework with a large number of tokens, unlocking when a specific balance is achieved. The tokens act like shares or bonds, allowing them to be bought and sold within the community. Royalties from token trading can be distributed back in to the community.
+5. **Long-Term Savings:** Self-organised pension vaults or long-term savings initiatives can use ZebraFramework with a large number of tokens, unlocking when a specific balance is achieved. The tokens act like shares or bonds, allowing them to be bought and sold within the community. Royalties from token trading can be distributed back in to the community.
 
 ## Smart Contracts
 
@@ -40,7 +40,7 @@ The `factory.sol` smart contract is the heart of the ZebraFramework ecosystem. I
 
 - **Minting:** Authorized addresses can mint ZebraFramework using signed mint requests.
 
-- **Customizable Fees:** The contract allows for setting fees for creating new ZebraFramework and for withdrawing funds from them.
+- **Customizable Fees:** The contract allows for setting fees for creating new ZebraFramework and for withdrawing vaults from them.
 
 - **Token URI:** The contract generates on-chain metadata for each CryptoVault, providing essential information about its state.
 
@@ -48,20 +48,20 @@ The `factory.sol` smart contract is the heart of the ZebraFramework ecosystem. I
 
 - **Operator Roles:** Roles such as SIGNER_ROLE and DEFAULT_ADMIN_ROLE are defined to control contract operations.
 
-### Vault Contract - `fund.sol`
+### Vault Contract - `vault.sol`
 
-The `Vault.sol` contract serves as the actual vault for each fund. It is cloned with each new fund creation and is responsible for keeping track of the balance, unlocking according to the target or maturity date, and facilitating withdrawals. 
+The `Vault.sol` contract serves as the actual vault for each vault. It is cloned with each new vault creation and is responsible for keeping track of the balance, unlocking according to the target or maturity date, and facilitating withdrawals. 
 
 
 ### Generator Contract - `generator.sol`
 
-The ZebraFramework Generator Contract is designed to generate the on-chain artwork for the ZebraFramework NFTs that represent each fund. This contract can be swapped out, so that the artwork can change over time.
+The ZebraFramework Generator Contract is designed to generate the on-chain artwork for the ZebraFramework NFTs that represent each vault. This contract can be swapped out, so that the artwork can change over time.
 
-- **Dynamic Appearance:** ZebraFramework fund NFTs change in appearance over time, reflecting their progress towards unlocking.
+- **Dynamic Appearance:** ZebraFramework vault NFTs change in appearance over time, reflecting their progress towards unlocking.
 
 ## Getting Started
 
-To get introduced to ZebraFramework, visit our [website](https://zappfundraising.vercel.app//) to create your own fund or explore existing ones. You can also interact with the smart contract on the Ethereum blockchain.
+To get introduced to ZebraFramework, visit our [website](https://zappvaultraising.vercel.app//) to create your own vault or explore existing ones. You can also interact with the smart contract on the Ethereum blockchain.
 
 ## Contributing
 

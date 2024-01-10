@@ -75,12 +75,12 @@ async function main() {
 	const pB = await Lib.deploy();
 	await pB.deployed();
 
-	// 3. deploy cryptofunds Factory contract
-  const VaultFactory = await hre.ethers.getContractFactory("cryptofunds", {
+	// 3. deploy cryptovaults Factory contract
+  const VaultFactory = await hre.ethers.getContractFactory("cryptovaults", {
     libraries: { Utils: lib.address }
   });
-  const fundFactory = await VaultFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient, _implAddress);
-  await fundFactory.deployed();
+  const vaultFactory = await VaultFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps, _primarySaleRecipient, _implAddress);
+  await vaultFactory.deployed();
 
   
 

@@ -7,7 +7,7 @@
   "metadata":"",
   "unlockTime":0,
   "targetBalance":0,
-  "fund":"0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+  "vault":"0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
 }
 
 ["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",99999999,"","","",0,0,"0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"]
@@ -24,7 +24,7 @@ function callback(x) {
 
 async function main() {
 
-  const _name = 'cryptofunds'
+  const _name = 'cryptovaults'
   const _symbol = 'CPG'
   const _royaltyRecipient = '0x92abb8F1238a81E55C5310C6D1baf399Be1b483C'
   const _royaltyBps = '400'
@@ -37,7 +37,7 @@ async function main() {
   console.log('got library at ', lib.address);
   
   // Get contract that we want to deploy
-  const VaultFactory = await hre.ethers.getContractFactory("cryptofunds", {
+  const VaultFactory = await hre.ethers.getContractFactory("cryptovaults", {
     libraries: {
       CP_Utils_v2: lib.address,
     }}
@@ -52,7 +52,7 @@ async function main() {
   // Get contract address
   console.log('Factory address:', deployedFactory.address)
 
-  /*// then deploy the implementation fund bank that the factory can then clone:
+  /*// then deploy the implementation vault bank that the factory can then clone:
   const Vault = await hre.ethers.getContractFactory("Vault");
 
   const deployedVault = await Vault.deploy();
@@ -67,11 +67,11 @@ async function main() {
     supply: 1,
     externalUrl: '',
     targetBalance: ethers.BigNumber.from(99),
-    fund: owner
+    vault: owner
   }*/
 
 
-/*  // deploy fundbank implementation
+/*  // deploy vaultbank implementation
   const Vault = await ethers.getContractFactory("Vault");
   const deployedVaultImplementation = await Vault.deploy();
   await deployedVaultImplementation.deployed();

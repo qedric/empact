@@ -68,12 +68,12 @@ describe(" -- Testing Permissions & Access -- ", function () {
 
     it("should allow DEFAULT ADMIN run setVaultImplementation()", async function () {
       await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).setVaultImplementation(FAKE_FUND_IMPL.address)
-      const updatedImplementation = await factory.fundImplementation()
+      const updatedImplementation = await factory.vaultImplementation()
       expect(updatedImplementation).to.equal(FAKE_FUND_IMPL.address)
     })
 
     it("should not allow non DEFAULT ADMIN run setVaultImplementation()", async function () {
-      const newVaultImplementation = await (factory, user1) // Deploy a new mock fund contract
+      const newVaultImplementation = await (factory, user1) // Deploy a new mock vault contract
       await expect(factory.connect(user2).setVaultImplementation(newVaultImplementation.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
     })
 
@@ -296,7 +296,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
       await expect(treasury.connect(user1).removeSupportedToken(token.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
     })
 
-    it("should not allow non-Factory to move a fund to the openVaults array", async function () {
+    it("should not allow non-Factory to move a vault to the openVaults array", async function () {
 
       const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
       const VaultImplementation = await ethers.getContractFactory("Vault")
@@ -310,16 +310,16 @@ describe(" -- Testing Permissions & Access -- ", function () {
       // wait for it to finish deploying
       await fake_factory.deployed()
 
-      // set fake fund implementation & treasury
+      // set fake vault implementation & treasury
       const fake_treasury = await Treasury.deploy(fake_factory.address)
       await fake_treasury.deployed()
 
-      // deploy the fund implementation that will be cloned for each new fund
-      const fake_fundImplementation = await VaultImplementation.deploy(fake_factory.address, fake_treasury.address)
-      await fake_fundImplementation.deployed()
+      // deploy the vault implementation that will be cloned for each new vault
+      const fake_vaultImplementation = await VaultImplementation.deploy(fake_factory.address, fake_treasury.address)
+      await fake_vaultImplementation.deployed()
 
       //set the implementation in the contract
-      await fake_factory.setVaultImplementation(fake_fundImplementation.address)
+      await fake_factory.setVaultImplementation(fake_vaultImplementation.address)
 
       //set the generator in the contract
       await fake_factory.setTreasury(fake_treasury.address)
@@ -338,18 +338,18 @@ describe(" -- Testing Permissions & Access -- ", function () {
         mr_fake.typedData.message, mr_fake.signature, { value: makeVaultFee })
       const txFakeReceipt = await txFakeMint.wait()
 
-      // get the real fund that we want to set to open in the real treasury, with our fake factory
-      const fundCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
+      // get the real vault that we want to set to open in the real treasury, with our fake factory
+      const vaultCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
       const Vault = await ethers.getContractFactory("Vault")
-      const fund = Vault.attach(fundCreatedEvent.args.fund)
+      const vault = Vault.attach(vaultCreatedEvent.args.vault)
 
-      // now we have two identical mints, we swap the fake treasury and fund for the real ones...
+      // now we have two identical mints, we swap the fake treasury and vault for the real ones...
 
-      // get the real fund implementation from the real factory
-      const fundImpl = await factory.fundImplementation()
+      // get the real vault implementation from the real factory
+      const vaultImpl = await factory.vaultImplementation()
 
-      //set the real fund implementation in the fake contract
-      await fake_factory.setVaultImplementation(fundImpl)
+      //set the real vault implementation in the fake contract
+      await fake_factory.setVaultImplementation(vaultImpl)
 
       // set the real treasurey in our fake factory:
       await fake_factory.setTreasury(treasury.address)
@@ -357,23 +357,23 @@ describe(" -- Testing Permissions & Access -- ", function () {
       // move time forward 100 days
       await helpers.time.increase(60 * 60 * 24 * 100)
 
-      // send 1 ETH to the fund to unlock it
+      // send 1 ETH to the vault to unlock it
       const amountToSend = ethers.utils.parseEther("1")
       await user2.sendTransaction({
-        to: fund.address,
+        to: vault.address,
         value: amountToSend,
       })
 
       // call our fake payout function:
-      const txFakePayout = await expect(fake_factory.connect(user1).fake_payout(0, fund.address)).to.be.revertedWith('onlyFactory')
+      const txFakePayout = await expect(fake_factory.connect(user1).fake_payout(0, vault.address)).to.be.revertedWith('onlyFactory')
     })
 
     /*collect*/
-    it("should allow TREASURER to collect open funds", async function () {
+    it("should allow TREASURER to collect open vaults", async function () {
       // Grant TREASURER_ROLE to the user
       await treasury.grantRole(await treasury.TREASURER_ROLE(), TREASURER.address);
 
-      // Mint a new fund and move it to the openVaults array
+      // Mint a new vault and move it to the openVaults array
       // get the deployed factory
       const factory = deployedContracts.factory
       const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
@@ -382,18 +382,18 @@ describe(" -- Testing Permissions & Access -- ", function () {
         mr.typedData.message, mr.signature, { value: makeVaultFee })
       const txReceipt = await tx.wait()
 
-      // get the fund
-      const fundCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
+      // get the vault
+      const vaultCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
       const Vault = await ethers.getContractFactory("Vault")
-      const fund = Vault.attach(fundCreatedEvent.args.fund)
+      const vault = Vault.attach(vaultCreatedEvent.args.vault)
 
       // move time forward 100 days
       await helpers.time.increase(60 * 60 * 24 * 100)
 
-      // send 1 ETH to the fund to unlock it
+      // send 1 ETH to the vault to unlock it
       const amountToSend = ethers.utils.parseEther("1")
       await user2.sendTransaction({
-        to: fund.address,
+        to: vault.address,
         value: amountToSend,
       })
 
@@ -403,11 +403,11 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const filter = treasury.filters.AddedOpenVault();
       const events = await treasury.queryFilter(filter, txPayoutReceipt.blockNumber)
 
-      expect(events[0].args[0]).to.equal(fund.address)
+      expect(events[0].args[0]).to.equal(vault.address)
 
-      // send another 1 ETH to the fund so there's something to collect
+      // send another 1 ETH to the vault so there's something to collect
       await user2.sendTransaction({
-        to: fund.address,
+        to: vault.address,
         value: amountToSend,
       })
 
@@ -429,17 +429,17 @@ describe(" -- Testing Permissions & Access -- ", function () {
       expect(finalTreasuryBalance).to.be.gt(initialTreasuryBalance);
     });
 
-    it("should not allow non-TREASURER to collect open funds", async function () {
-      // Attempt to collect open funds as a non-TREASURER user
+    it("should not allow non-TREASURER to collect open vaults", async function () {
+      // Attempt to collect open vaults as a non-TREASURER user
       await expect(treasury.connect(user1).collect()).to.be.revertedWith(/AccessControl: account .* is missing role .*/);
     });
 
     /*distributeNativeTokenRewards*/
-    it("should allow TREASURER to distribute native token balance to locked funds", async function () {
+    it("should allow TREASURER to distribute native token balance to locked vaults", async function () {
       // Grant TREASURER_ROLE to the user
       await treasury.grantRole(await treasury.TREASURER_ROLE(), TREASURER.address);
 
-      // Mint a new locked fund
+      // Mint a new locked vault
       // get the deployed factory
       const factory = deployedContracts.factory
       const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
@@ -448,15 +448,15 @@ describe(" -- Testing Permissions & Access -- ", function () {
         mr.typedData.message, mr.signature, { value: makeVaultFee })
       const txReceipt = await tx.wait()
 
-      // get the fund
-      const fundCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
+      // get the vault
+      const vaultCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
       const Vault = await ethers.getContractFactory("Vault")
-      const fund = Vault.attach(fundCreatedEvent.args.fund)
+      const vault = Vault.attach(vaultCreatedEvent.args.vault)
 
-      // send 0.9 ETH to the fund to keep it locked
+      // send 0.9 ETH to the vault to keep it locked
       const amountToSendToLockedVault = ethers.utils.parseEther("0.9")
       await user2.sendTransaction({
-        to: fund.address,
+        to: vault.address,
         value: amountToSendToLockedVault,
       })
 
@@ -479,14 +479,14 @@ describe(" -- Testing Permissions & Access -- ", function () {
       expect(distributedNativeTokensToLockedVaultsEvent).to.exist;
     });
 
-    it("should not allow non-TREASURER to distribute native token balance to locked funds", async function () {
-      // Attempt to distribute funds as a non-TREASURER user
+    it("should not allow non-TREASURER to distribute native token balance to locked vaults", async function () {
+      // Attempt to distribute vaults as a non-TREASURER user
       await expect(treasury.connect(user1).distributeNativeTokenRewards()).to.be.revertedWith(/AccessControl: account .* is missing role .*/);
     });
 
     /*distributeSupportedTokens*/
-    it("should not allow non-TREASURER to distribute native token balance to locked funds", async function () {
-      // Attempt to distribute funds as a non-TREASURER user
+    it("should not allow non-TREASURER to distribute native token balance to locked vaults", async function () {
+      // Attempt to distribute vaults as a non-TREASURER user
       await expect(treasury.connect(user1).distributeSupportedTokenRewards(user1.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/);
     });
 
@@ -494,7 +494,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
 
   describe("Testing Vault Roles & permissions", function () {
 
-    let fund, factory, treasury
+    let vault, factory, treasury
     let INITIAL_DEFAULT_ADMIN_AND_SIGNER, FEE_RECIPIENT, TREASURER, user1, user2
 
     before(async function () {
@@ -524,14 +524,14 @@ describe(" -- Testing Permissions & Access -- ", function () {
       expect(balance).to.equal(4)
 
       // const mintedEvent = txReceipt.events.find(event => event.event === 'TokensMintedWithSignature')
-      const fundCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
+      const vaultCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
 
       const Vault = await ethers.getContractFactory("Vault")
-      fund = Vault.attach(fundCreatedEvent.args.fund)
+      vault = Vault.attach(vaultCreatedEvent.args.vault)
     })
 
     it("should revert when calling initialize after initialization", async function () {
-      await expect(fund.connect(user1).initialize({}, 500)).to.be.reverted
+      await expect(vault.connect(user1).initialize({}, 500)).to.be.reverted
     })
 
     it("should allow Factory to call payout function", async function () {
@@ -541,18 +541,18 @@ describe(" -- Testing Permissions & Access -- ", function () {
 
     it("should not allow User to call payout function", async function () {
       // Attempt to call the payout function using onlyFactory modifier by a non-Factory account
-      await expect(fund.connect(user1).payout(user1.address, FEE_RECIPIENT.address, 1, 1)).to.be.revertedWith("onlyFactory")
+      await expect(vault.connect(user1).payout(user1.address, FEE_RECIPIENT.address, 1, 1)).to.be.revertedWith("onlyFactory")
     })
 
     it("should allow Treasury to call sendToTreasury", async function () {
       // Call a function using onlyTreasury modifier
-      await expect (treasury.connect(TREASURER).collect()).to.be.revertedWith('No open funds to collect from')
+      await expect (treasury.connect(TREASURER).collect()).to.be.revertedWith('No open vaults to collect from')
       // No revert is expected
     })
 
     it("should not allow User to call sendToTreasury", async function () {
       // Attempt to call a function using onlyTreasury modifier by a non-Treasury account
-      await expect(fund.connect(user1).sendToTreasury()).to.be.revertedWith("onlyTreasury")
+      await expect(vault.connect(user1).sendToTreasury()).to.be.revertedWith("onlyTreasury")
     })
   })
 

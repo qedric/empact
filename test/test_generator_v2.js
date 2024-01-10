@@ -40,7 +40,7 @@ describe(" -- Testing Generator v2 Contract -- ", function () {
     }
 
     // Generate a sample token and its attributes
-    const fund = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
+    const vault = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
 
     // Deploy the new generator 
     const generatorV2 = await deployGenerator("Generator_v3")

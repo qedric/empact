@@ -96,7 +96,7 @@ describe(" -- Testing Generator v1 Contract -- ", function () {
     }
 
     // Generate a sample token and its attributes
-    const fund = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
+    const vault = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
 
     // Regular expression to match the fill declarations in the svg
     const regex1 = /\.cls-1{fill:#[0-9a-fA-F]+;}/
@@ -129,7 +129,7 @@ describe(" -- Testing Generator v1 Contract -- ", function () {
     expect(parseInt(v.height)).to.equal(1080, `Height should be 1080`)
 
     // 3. Send 0.2 ETH and ensure that the percentage returned is 20
-    await user1.sendTransaction({ to: fund.address, value: ethers.utils.parseEther("0.2") })
+    await user1.sendTransaction({ to: vault.address, value: ethers.utils.parseEther("0.2") })
     // 20%
     v = await checkValues()
     // Check the 'fill' attributes of elements
@@ -141,7 +141,7 @@ describe(" -- Testing Generator v1 Contract -- ", function () {
     expect(parseInt(v.height)).to.be.closeTo(1080*.8, 10, `Height should be close to 20% -  ${1080*.8}`)
 
     // 4. Send 0.2 ETH and ensure that the percentage returned is 33 (days is now lowest progress)
-    await user1.sendTransaction({ to: fund.address, value: ethers.utils.parseEther("0.2") })
+    await user1.sendTransaction({ to: vault.address, value: ethers.utils.parseEther("0.2") })
     // 33%
     v = await checkValues()
     // Check the 'fill' attributes of elements
@@ -165,7 +165,7 @@ describe(" -- Testing Generator v1 Contract -- ", function () {
     expect(parseInt(v.height)).to.closeTo(1080*.6,20, `Height should be close to 40% - ${1080*.6}`)
 
     // 6. Send 0.6 ETH and ensure that the percentage returned is 66 (days is now lowest progress)
-    await user1.sendTransaction({ to: fund.address, value: ethers.utils.parseEther("0.6") })
+    await user1.sendTransaction({ to: vault.address, value: ethers.utils.parseEther("0.6") })
     v = await checkValues()
     // 66%
     // Check the 'fill' attributes of elements
