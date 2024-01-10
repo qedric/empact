@@ -108,11 +108,11 @@ contract Factory is
     Events
     //////////////////////////////////////////////////////////////*/
 
-    event FundDeployed(address indexed vault, address indexed msgSender);
+    event VaultDeployed(address indexed vault, address indexed msgSender);
     event FeeRecipientUpdated(address indexed recipient);
-    event MakeFundFeeUpdated(uint256 fee);
-    event BreakFundBpsUpdated(uint16 bps);
-    event FundImplementationUpdated(address indexed implementation);
+    event MakeVaultFeeUpdated(uint256 fee);
+    event BreakVaultBpsUpdated(uint16 bps);
+    event VaultImplementationUpdated(address indexed implementation);
     event GeneratorUpdated(address indexed generator);
     event TreasuryUpdated(address indexed treasury);
     event Payout(address indexed vaultAddress, uint256 tokenId);
@@ -128,14 +128,14 @@ contract Factory is
     /// @dev prefix for the token url
     string private _tokenUrlPrefix;
 
-    /// @notice The fee to create a new Fund.
-    uint256 public makeFundFee = 0.004 ether;
+    /// @notice The fee to create a new Vault.
+    uint256 public makeVaultFee = 0.004 ether;
 
     /// @notice The fee deducted with each withdrawal from a vault, in basis points
     uint16 public withdrawalFeeBps = 400;
 
-    /// @notice The Fund implementation contract that is cloned for each new vault
-    IFund public vaultImplementation;
+    /// @notice The Vault implementation contract that is cloned for each new vault
+    IVault public vaultImplementation;
 
     /// @notice The contract that generates the on-chain metadata
     IGenerator public generator;
@@ -156,7 +156,7 @@ contract Factory is
      */
     mapping(uint256 => uint256) public totalSupply;
 
-    /// @dev Funds are mapped to the tokenId of the NFT they are tethered to
+    /// @dev Vaults are mapped to the tokenId of the NFT they are tethered to
     mapping(uint256 => address) public vaults;
 
     /*//////////////////////////////////////////////////////////////
@@ -184,10 +184,10 @@ contract Factory is
     //////////////////////////////////////////////////////////////*/
     function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {
         return generator.uri(
-            IFund(address(vaults[tokenId])).attributes(),
+            IVault(address(vaults[tokenId])).attributes(),
             address(vaults[tokenId]),
             _getPercent(tokenId),
-            IFund(address(vaults[tokenId])).getTotalBalance(),
+            IVault(address(vaults[tokenId])).getTotalBalance(),
             _tokenUrlPrefix,
             tokenId
         );
@@ -231,7 +231,7 @@ contract Factory is
             string description;
         }
         */
-        IFund.Attr memory vaultData = IFund.Attr(
+        IVault.Attr memory vaultData = IVault.Attr(
             tokenIdToMint,
             _req.unlockTime,
             block.timestamp,
@@ -248,12 +248,12 @@ contract Factory is
         _mint(_req.to, tokenIdToMint, _req.quantity, "");
         
         // Collect price
-        _collectMakeFundFee(); 
+        _collectMakeVaultFee(); 
     }
 
-    /// @dev Every time a new token is minted, a Fund proxy contract is deployed to hold the vaults
+    /// @dev Every time a new token is minted, a Vault proxy contract is deployed to hold the vaults
     function _deployProxyByImplementation(
-        IFund.Attr memory _vaultData,
+        IVault.Attr memory _vaultData,
         bytes32 _salt
     ) internal returns (address deployedProxy) {
 
@@ -263,9 +263,9 @@ contract Factory is
             salthash
         );
 
-        IFund(deployedProxy).initialize(_vaultData, withdrawalFeeBps);
+        IVault(deployedProxy).initialize(_vaultData, withdrawalFeeBps);
 
-        emit FundDeployed(deployedProxy, msg.sender);
+        emit VaultDeployed(deployedProxy, msg.sender);
     }
 
     /// @dev If sender balance > 0 then burn sender balance and call payout function in the vault contract
@@ -281,16 +281,16 @@ contract Factory is
         // burn the tokens so the owner can't claim twice
         _burn(msg.sender, tokenId, thisOwnerBalance);
 
-        try IFund(payable(vaults[tokenId])).payout{value: 0} (
+        try IVault(payable(vaults[tokenId])).payout{value: 0} (
             msg.sender,
             feeRecipient,
             thisOwnerBalance,
             totalSupplyBeforePayout
-        ) returns (IFund.State state) {
+        ) returns (IVault.State state) {
             emit Payout(address(vaults[tokenId]), tokenId);
-            if (state == IFund.State.Open) {
+            if (state == IVault.State.Open) {
                 // vault is now open; update the treasury
-                treasury.addOpenFund(address(vaults[tokenId]));
+                treasury.addOpenVault(address(vaults[tokenId]));
             }
         } catch Error(string memory reason) {
             revert(reason);
@@ -310,15 +310,15 @@ contract Factory is
     }
 
     /// @notice Sets the fee for creating a new vault
-    function setMakeFundFee(uint256 fee) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit MakeFundFeeUpdated(fee);
-        makeFundFee = fee;
+    function setMakeVaultFee(uint256 fee) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit MakeVaultFeeUpdated(fee);
+        makeVaultFee = fee;
     }
 
-    /// @notice Sets the fee for withdrawing the vaults from a Fund - does not affect existing vaults
-    function setBreakFundBps(uint16 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    /// @notice Sets the fee for withdrawing the vaults from a Vault - does not affect existing vaults
+    function setBreakVaultBps(uint16 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(bps <= 900, "Don't be greedy!");
-        emit BreakFundBpsUpdated(bps);
+        emit BreakVaultBpsUpdated(bps);
         withdrawalFeeBps = bps;
     }
 
@@ -335,8 +335,8 @@ contract Factory is
      *  @notice         Sets an implementation for the vault clones
      *                  ** Ensure this is called before using this contract! **
      */
-    function setFundImplementation(IFund _vaultImplementationAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit FundImplementationUpdated(address(_vaultImplementationAddress));
+    function setVaultImplementation(IVault _vaultImplementationAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit VaultImplementationUpdated(address(_vaultImplementationAddress));
         vaultImplementation = _vaultImplementationAddress;
     }
 
@@ -393,19 +393,19 @@ contract Factory is
         uint256 percentageBasedOnTime = 0;
         uint256 percentageBasedOnBalance = 0;
 
-        if (block.timestamp >= IFund(address(vaults[tokenId])).attributes().unlockTime) {
+        if (block.timestamp >= IVault(address(vaults[tokenId])).attributes().unlockTime) {
             percentageBasedOnTime = 100;
         } else {
-            uint256 totalTime = IFund(address(vaults[tokenId])).attributes().unlockTime - IFund(address(vaults[tokenId])).attributes().startTime;
-            uint256 timeElapsed = block.timestamp - IFund(address(vaults[tokenId])).attributes().startTime;
+            uint256 totalTime = IVault(address(vaults[tokenId])).attributes().unlockTime - IVault(address(vaults[tokenId])).attributes().startTime;
+            uint256 timeElapsed = block.timestamp - IVault(address(vaults[tokenId])).attributes().startTime;
             percentageBasedOnTime = uint256((timeElapsed * 100) / totalTime);
         }
 
-        uint256 balance = IFund(address(vaults[tokenId])).getTotalBalance();
-        if (balance >= IFund(address(vaults[tokenId])).attributes().targetBalance) {
+        uint256 balance = IVault(address(vaults[tokenId])).getTotalBalance();
+        if (balance >= IVault(address(vaults[tokenId])).attributes().targetBalance) {
             percentageBasedOnBalance = 100;
-        } else if (IFund(address(vaults[tokenId])).attributes().targetBalance > 0 && balance > 0) {
-            percentageBasedOnBalance = uint256((balance * 100) / IFund(address(vaults[tokenId])).attributes().targetBalance);
+        } else if (IVault(address(vaults[tokenId])).attributes().targetBalance > 0 && balance > 0) {
+            percentageBasedOnBalance = uint256((balance * 100) / IVault(address(vaults[tokenId])).attributes().targetBalance);
         }
 
         // Return the lower value between percentageBasedOnBalance and percentageBasedOnTime
@@ -447,11 +447,11 @@ contract Factory is
     }
 
     /// @dev Collects and distributes the primary sale value of NFTs being claimed.
-    function _collectMakeFundFee() internal virtual {
-        if (makeFundFee == 0) {
+    function _collectMakeVaultFee() internal virtual {
+        if (makeVaultFee == 0) {
             return;
         }
-        require(msg.value == makeFundFee, "Must send the correct fee");
+        require(msg.value == makeVaultFee, "Must send the correct fee");
         feeRecipient.transfer(msg.value);
     }
 }

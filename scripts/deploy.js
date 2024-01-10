@@ -37,14 +37,14 @@ async function main() {
   console.log('got library at ', lib.address);
   
   // Get contract that we want to deploy
-  const FundFactory = await hre.ethers.getContractFactory("cryptofunds", {
+  const VaultFactory = await hre.ethers.getContractFactory("cryptofunds", {
     libraries: {
       CP_Utils_v2: lib.address,
     }}
   );
 
   // deploy
-  const deployedFactory = await FundFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps);
+  const deployedFactory = await VaultFactory.deploy(_name, _symbol, _royaltyRecipient, _royaltyBps);
 
   // Wait for this transaction to be mined
   await deployedFactory.deployed();
@@ -53,12 +53,12 @@ async function main() {
   console.log('Factory address:', deployedFactory.address)
 
   /*// then deploy the implementation fund bank that the factory can then clone:
-  const Fund = await hre.ethers.getContractFactory("Fund");
+  const Vault = await hre.ethers.getContractFactory("Vault");
 
-  const deployedFund = await Fund.deploy();
+  const deployedVault = await Vault.deploy();
 
-  await deployedFund.deployed();
-  console.log(deployedFund);*/
+  await deployedVault.deployed();
+  console.log(deployedVault);*/
 
   /*const data = {
     owner: owner,
@@ -72,11 +72,11 @@ async function main() {
 
 
 /*  // deploy fundbank implementation
-  const Fund = await ethers.getContractFactory("Fund");
-  const deployedFundImplementation = await Fund.deploy();
-  await deployedFundImplementation.deployed();
+  const Vault = await ethers.getContractFactory("Vault");
+  const deployedVaultImplementation = await Vault.deploy();
+  await deployedVaultImplementation.deployed();
 
-  //console.log('deployed Fund:', deployedFundImplementation)
+  //console.log('deployed Vault:', deployedVaultImplementation)
 
   //https://portal.thirdweb.com/typescript/sdk.erc1155signaturemintable
 

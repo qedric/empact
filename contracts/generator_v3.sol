@@ -4,7 +4,7 @@ pragma solidity ^0.8.11;
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./IGenerator.sol";
-import "./IFund.sol";
+import "./IVault.sol";
 
 contract Generator_v3 is IGenerator, AccessControl {
 
@@ -12,7 +12,7 @@ contract Generator_v3 is IGenerator, AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 	}
 
-    function uri(IFund.Attr calldata attributes, address vaultAddress, uint256 percent, uint256 balance, string memory tokenUrl, uint256 tokenId) external pure returns (string memory) {    
+    function uri(IVault.Attr calldata attributes, address vaultAddress, uint256 percent, uint256 balance, string memory tokenUrl, uint256 tokenId) external pure returns (string memory) {    
         return string(
             abi.encodePacked(
                 "data:application/json;base64,",
@@ -43,7 +43,7 @@ contract Generator_v3 is IGenerator, AccessControl {
         );
     }
 
-    function generateAttributes(IFund.Attr calldata attributes, address receiveAddress, uint256 percent, uint256 balance) internal pure returns(string memory) {
+    function generateAttributes(IVault.Attr calldata attributes, address receiveAddress, uint256 percent, uint256 balance) internal pure returns(string memory) {
         return string(abi.encodePacked(
             'attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
             uint2str(attributes.unlockTime),

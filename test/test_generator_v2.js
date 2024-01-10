@@ -2,7 +2,7 @@
 const { expect, assert } = require("chai")
 const { ethers, upgrades, network } = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-network-helpers")
-const { deploy, deployFundImplementation, deployGenerator, deployTreasury, getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, deployMockOETHToken, generateMintRequest, makeFund, makeFund_100edition_target100_noUnlockTime, makeFund_100edition_notarget_99days } = require("./test_helpers")
+const { deploy, deployVaultImplementation, deployGenerator, deployTreasury, getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, deployMockOETHToken, generateMintRequest, makeVault, makeVault_100edition_target100_noUnlockTime, makeVault_100edition_notarget_99days } = require("./test_helpers")
 
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
@@ -40,7 +40,7 @@ describe(" -- Testing Generator v2 Contract -- ", function () {
     }
 
     // Generate a sample token and its attributes
-    const fund = await makeFund(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
+    const fund = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
 
     // Deploy the new generator 
     const generatorV2 = await deployGenerator("Generator_v3")

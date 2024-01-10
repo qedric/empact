@@ -2,7 +2,7 @@
 const { expect, assert } = require("chai")
 const { ethers, upgrades, network } = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-network-helpers")
-const { deploy, deployFundImplementation, deployGenerator, deployTreasury, getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, deployMockOETHToken, generateMintRequest, makeFund, makeFund_100edition_target100_noUnlockTime, makeFund_100edition_notarget_99days } = require("./test_helpers")
+const { deploy, deployVaultImplementation, deployGenerator, deployTreasury, getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, deployMockOETHToken, generateMintRequest, makeVault, makeVault_100edition_target100_noUnlockTime, makeVault_100edition_notarget_99days } = require("./test_helpers")
 
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
@@ -73,22 +73,22 @@ describe(" -- Testing Treasury Contract -- ", function () {
     })
   })
 
-  describe("Fund State arrays", function () {
+  describe("Vault State arrays", function () {
 
-    /*addOpenFund*/
-    it("should add a fund to the openFunds array", async function () {
+    /*addOpenVault*/
+    it("should add a fund to the openVaults array", async function () {
       // get the deployed factory
       const factory = deployedContracts.factory
-      const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+      const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
       const mr = await generateMintRequest(factory.address, user1, user1.address)
       const tx = await factory.connect(user1).mintWithSignature(
-        mr.typedData.message, mr.signature, { value: makeFundFee })
+        mr.typedData.message, mr.signature, { value: makeVaultFee })
       const txReceipt = await tx.wait()
 
       // get the fund
-      const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
-      const Fund = await ethers.getContractFactory("Fund")
-      const fund = Fund.attach(fundCreatedEvent.args.fund)
+      const fundCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
+      const Vault = await ethers.getContractFactory("Vault")
+      const fund = Vault.attach(fundCreatedEvent.args.fund)
 
       // move time forward 100 days
       await helpers.time.increase(60 * 60 * 24 * 100)
@@ -103,21 +103,21 @@ describe(" -- Testing Treasury Contract -- ", function () {
       const txPayout = await factory.connect(user1).payout(0)
       const txPayoutReceipt = await txPayout.wait()
 
-      const filter = treasury.filters.AddedOpenFund();
+      const filter = treasury.filters.AddedOpenVault();
       const events = await treasury.queryFilter(filter, txPayoutReceipt.blockNumber)
 
       expect(events[0].args[0]).to.equal(fund.address)
 
       // Verify that the fund address is a member of the open funds array
-      const openFund = await treasury.openFunds(0)
-      expect(openFund).to.equal(fund.address)
-      expect(await treasury.isOpenFund(fund.address)).to.be.true
+      const openVault = await treasury.openVaults(0)
+      expect(openVault).to.equal(fund.address)
+      expect(await treasury.isOpenVault(fund.address)).to.be.true
     })
   })
 
   describe("Collect & Distribute", function () {
     let deployedContracts, factory, treasury
-    let lockedFund, unlockedFund, openFund
+    let lockedVault, unlockedVault, openVault
     let user1, user2
     let feeRecipient
     let token1, token2
@@ -135,9 +135,9 @@ describe(" -- Testing Treasury Contract -- ", function () {
       deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
-      lockedFund = await makeFund_100edition_target100_noUnlockTime(factory, user1, user1)
-      unlockedFund = await makeFund_100edition_target100_noUnlockTime(factory, user1, user1)
-      openFund = await makeFund_100edition_target100_noUnlockTime(factory, user1, user1)
+      lockedVault = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
+      unlockedVault = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
+      openVault = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
       
       const treasurerRole = treasury.TREASURER_ROLE()
       await treasury.grantRole(treasurerRole, user1.address)
@@ -155,19 +155,19 @@ describe(" -- Testing Treasury Contract -- ", function () {
 
       // Transfer enough tokens to reach 66% target amount of unlocked and open funds
       let tokenAmount = ethers.utils.parseUnits("33", 18)
-      await token1.transfer(unlockedFund.address, tokenAmount)
-      await token2.transfer(unlockedFund.address, tokenAmount)
-      await token1.transfer(openFund.address, tokenAmount)
-      await token2.transfer(openFund.address, tokenAmount)
+      await token1.transfer(unlockedVault.address, tokenAmount)
+      await token2.transfer(unlockedVault.address, tokenAmount)
+      await token1.transfer(openVault.address, tokenAmount)
+      await token2.transfer(openVault.address, tokenAmount)
 
       // send the remaining required ETH:
       let ethToSend = ethers.utils.parseUnits("34", 18)
       await user2.sendTransaction({
-        to: unlockedFund.address,
+        to: unlockedVault.address,
         value: ethToSend,
       })
       await user2.sendTransaction({
-        to: openFund.address,
+        to: openVault.address,
         value: ethToSend,
       })
 
@@ -177,50 +177,50 @@ describe(" -- Testing Treasury Contract -- ", function () {
 
       // Transfer some tokens to the open fund
       tokenAmount = ethers.utils.parseUnits("60", 18)
-      await token1.transfer(openFund.address, tokenAmount)
-      await token2.transfer(openFund.address, tokenAmount)
+      await token1.transfer(openVault.address, tokenAmount)
+      await token2.transfer(openVault.address, tokenAmount)
 
       // and some ETH:
       ethToSend = ethers.utils.parseUnits("60", 18)
       await user2.sendTransaction({
-        to: openFund.address,
+        to: openVault.address,
         value: ethToSend,
       })
 
       // confirm we have one of each fund
-      expect(await treasury.isOpenFund(openFund.address)).to.be.true
-      expect(await treasury.isOpenFund(lockedFund.address)).to.be.false
-      expect(await treasury.isOpenFund(unlockedFund.address)).to.be.false
+      expect(await treasury.isOpenVault(openVault.address)).to.be.true
+      expect(await treasury.isOpenVault(lockedVault.address)).to.be.false
+      expect(await treasury.isOpenVault(unlockedVault.address)).to.be.false
 
-      expect(await lockedFund.state()).to.equal(0)
-      expect(await unlockedFund.state()).to.equal(1)
-      expect(await openFund.state()).to.equal(2)
+      expect(await lockedVault.state()).to.equal(0)
+      expect(await unlockedVault.state()).to.equal(1)
+      expect(await openVault.state()).to.equal(2)
 
-      /*console.log('lockedFund.address', lockedFund.address)
-      console.log('unlockedFund.address', unlockedFund.address)
-      console.log('openFund.address', openFund.address)*/
+      /*console.log('lockedVault.address', lockedVault.address)
+      console.log('unlockedVault.address', unlockedVault.address)
+      console.log('openVault.address', openVault.address)*/
     })
 
     it("should send open funds and not locked funds or unlocked funds to treasury", async function () {
 
       // verify that the locked fund is in the Locked state
-      expect(await lockedFund.state()).to.equal(0)
+      expect(await lockedVault.state()).to.equal(0)
       // verify that the unlocked fund is in the Unlocked state
-      expect(await unlockedFund.state()).to.equal(1)
+      expect(await unlockedVault.state()).to.equal(1)
       // verify that the open fund is in the Open state
-      expect(await openFund.state()).to.equal(2)
-      expect(await treasury.isOpenFund(openFund.address)).to.be.true
+      expect(await openVault.state()).to.equal(2)
+      expect(await treasury.isOpenVault(openVault.address)).to.be.true
 
       // Get the initial balances of native tokens and supported tokens
       const initialEthBalance = await ethers.provider.getBalance(treasury.address)
       const initialToken1Balance = await token1.balanceOf(treasury.address)
       const initialToken2Balance = await token2.balanceOf(treasury.address)
 
-      // call collect on the treasury which should pull balance from the Open Fund only
+      // call collect on the treasury which should pull balance from the Open Vault only
       const tx = await treasury.connect(user1).collect()
       const txReceipt = await tx.wait()
 
-      // Get the updated balances after collecting from the Open Fund
+      // Get the updated balances after collecting from the Open Vault
       const updatedEthBalance = await ethers.provider.getBalance(treasury.address)
       const updatedToken1Balance = await token1.balanceOf(treasury.address)
       const updatedToken2Balance = await token2.balanceOf(treasury.address)
@@ -234,86 +234,86 @@ describe(" -- Testing Treasury Contract -- ", function () {
 
     it("should distribute native token balance to locked funds", async function () {
 
-      // deploy a couple more lockedFunds
-      const lockedFund2 = await makeFund_100edition_target100_noUnlockTime(factory, user1, user1)
-      const lockedFund3 = await makeFund_100edition_target100_noUnlockTime(factory, user1, user1)
+      // deploy a couple more lockedVaults
+      const lockedVault2 = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
+      const lockedVault3 = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
       
       // Count the number of locked and open funds
-      let numLockedFunds = 0
-      let numFunds = 0
+      let numLockedVaults = 0
+      let numVaults = 0
       let f
 
       // Count the number of locked funds
       while (true) {
         try {
-          const F = await ethers.getContractFactory("Fund")
-          const fAddress = await factory.funds(numFunds)
+          const F = await ethers.getContractFactory("Vault")
+          const fAddress = await factory.funds(numVaults)
           const fund = F.attach(fAddress)
           if (await fund.state() == 0) {
-            numLockedFunds++
+            numLockedVaults++
           }
-          numFunds++
+          numVaults++
         } catch {
           break
         }
           
       }
-      expect(await ethers.provider.getBalance(lockedFund.address)).to.equal(0)
-      expect(await ethers.provider.getBalance(lockedFund2.address)).to.equal(0)
-      expect(await ethers.provider.getBalance(lockedFund3.address)).to.equal(0)
-      expect(await ethers.provider.getBalance(openFund.address)).to.equal(ethers.utils.parseEther("60"))
-      expect(numLockedFunds).to.equal(3)
+      expect(await ethers.provider.getBalance(lockedVault.address)).to.equal(0)
+      expect(await ethers.provider.getBalance(lockedVault2.address)).to.equal(0)
+      expect(await ethers.provider.getBalance(lockedVault3.address)).to.equal(0)
+      expect(await ethers.provider.getBalance(openVault.address)).to.equal(ethers.utils.parseEther("60"))
+      expect(numLockedVaults).to.equal(3)
 
-      const openFundNativeBalance = await ethers.provider.getBalance(openFund.address)
-      //console.log('open fund balance:', openFundNativeBalance)
+      const openVaultNativeBalance = await ethers.provider.getBalance(openVault.address)
+      //console.log('open fund balance:', openVaultNativeBalance)
 
       // send some ETH to funds 2 & 3:
       await user2.sendTransaction({
-        to: lockedFund2.address,
+        to: lockedVault2.address,
         value: ethers.utils.parseUnits("20", 18),
       })
-      expect(await ethers.provider.getBalance(lockedFund2.address)).to.equal(ethers.utils.parseUnits("20", 18))
+      expect(await ethers.provider.getBalance(lockedVault2.address)).to.equal(ethers.utils.parseUnits("20", 18))
       // send some ETH to funds 2 & 3:
       await user2.sendTransaction({
-        to: lockedFund3.address,
+        to: lockedVault3.address,
         value: ethers.utils.parseUnits("30", 18),
       })
-      expect(await ethers.provider.getBalance(lockedFund3.address)).to.equal(ethers.utils.parseUnits("30", 18))
+      expect(await ethers.provider.getBalance(lockedVault3.address)).to.equal(ethers.utils.parseUnits("30", 18))
 
       // check that all our locked funds are actually locked
-      expect(await lockedFund.state()).to.equal(0)
-      expect(await lockedFund2.state()).to.equal(0)
-      expect(await lockedFund3.state()).to.equal(0)
+      expect(await lockedVault.state()).to.equal(0)
+      expect(await lockedVault2.state()).to.equal(0)
+      expect(await lockedVault3.state()).to.equal(0)
 
       // there should be nothing yet to distribute
       await expect(treasury.distributeNativeTokenRewards()).to.be.revertedWith('No native tokens')
 
-      // call collect on the treasury which should pull balance from the Open Fund only
+      // call collect on the treasury which should pull balance from the Open Vault only
       const collectTx = await treasury.connect(user1).collect()
       const txReceipt = await collectTx.wait()
-      expect(await ethers.provider.getBalance(openFund.address)).to.equal(0)
+      expect(await ethers.provider.getBalance(openVault.address)).to.equal(0)
 
       // Check if the locked funds received the expected amount of native token (ETH)
       let treasuryBalanceBefore = await ethers.provider.getBalance(treasury.address)
-      let balance1Before = await ethers.provider.getBalance(lockedFund.address)
-      let balance2Before = await ethers.provider.getBalance(lockedFund2.address)
-      let balance3Before = await ethers.provider.getBalance(lockedFund3.address)
+      let balance1Before = await ethers.provider.getBalance(lockedVault.address)
+      let balance2Before = await ethers.provider.getBalance(lockedVault2.address)
+      let balance3Before = await ethers.provider.getBalance(lockedVault3.address)
 
       // Distribute funds to the locked funds
       const tx = await treasury.distributeNativeTokenRewards() // Distribute to the three locked funds
-      const distFundEvents = await treasury.queryFilter("DistributedNativeTokensToLockedFund")
-      const distEvents = await treasury.queryFilter("DistributedNativeTokensToLockedFunds")
+      const distVaultEvents = await treasury.queryFilter("DistributedNativeTokensToLockedVault")
+      const distEvents = await treasury.queryFilter("DistributedNativeTokensToLockedVaults")
       expect(distEvents[0].args.balanceBeforeDistribution).to.equal(treasuryBalanceBefore)
       expect(distEvents[0].args.numberOfRecipients).to.equal(2)
 
       // Retrieve Receive events emitted by each locked fund
-      const receiveEvents1 = await lockedFund3.queryFilter("Received")
+      const receiveEvents1 = await lockedVault3.queryFilter("Received")
       //console.log(receiveEvents1)
 
       // Check if the locked funds received the expected amount of native token (ETH)
-      const balance1After = await ethers.provider.getBalance(lockedFund.address)
-      const balance2After = await ethers.provider.getBalance(lockedFund2.address)
-      const balance3After = await ethers.provider.getBalance(lockedFund3.address)
+      const balance1After = await ethers.provider.getBalance(lockedVault.address)
+      const balance2After = await ethers.provider.getBalance(lockedVault2.address)
+      const balance3After = await ethers.provider.getBalance(lockedVault3.address)
       /*console.log('locked fund 1 after distribute:', balance1After)
       console.log('locked fund 2 after distribute:', balance2After)
       console.log('locked fund 3 after distribute:', balance3After)*/
@@ -329,40 +329,40 @@ describe(" -- Testing Treasury Contract -- ", function () {
 
     it("should distribute supported token balances to locked funds", async function () {
 
-      // deploy a couple more lockedFunds
-      const lockedFund2 = await makeFund_100edition_target100_noUnlockTime(factory, user1, user1)
-      const lockedFund3 = await makeFund_100edition_target100_noUnlockTime(factory, user1, user1)
+      // deploy a couple more lockedVaults
+      const lockedVault2 = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
+      const lockedVault3 = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
 
       // Transfer supported tokens to lockedfund 
-      await token1.transfer(lockedFund.address, ethers.utils.parseUnits("1", 18))
-      await token2.transfer(lockedFund.address, ethers.utils.parseUnits("10", 18))
+      await token1.transfer(lockedVault.address, ethers.utils.parseUnits("1", 18))
+      await token2.transfer(lockedVault.address, ethers.utils.parseUnits("10", 18))
 
       // Transfer supported tokens to lockedfund 3
-      await token1.transfer(lockedFund3.address, ethers.utils.parseUnits("25", 18))
-      await token2.transfer(lockedFund3.address, ethers.utils.parseUnits("0.5", 18))
+      await token1.transfer(lockedVault3.address, ethers.utils.parseUnits("25", 18))
+      await token2.transfer(lockedVault3.address, ethers.utils.parseUnits("0.5", 18))
 
-      expect(await token1.balanceOf(lockedFund.address)).to.equal(ethers.utils.parseUnits("1", 18))
-      expect(await token2.balanceOf(lockedFund.address)).to.equal(ethers.utils.parseUnits("10", 18))
+      expect(await token1.balanceOf(lockedVault.address)).to.equal(ethers.utils.parseUnits("1", 18))
+      expect(await token2.balanceOf(lockedVault.address)).to.equal(ethers.utils.parseUnits("10", 18))
 
-      expect(await token1.balanceOf(lockedFund2.address)).to.equal(ethers.utils.parseUnits("0", 18))
-      expect(await token2.balanceOf(lockedFund2.address)).to.equal(ethers.utils.parseUnits("0", 18))
+      expect(await token1.balanceOf(lockedVault2.address)).to.equal(ethers.utils.parseUnits("0", 18))
+      expect(await token2.balanceOf(lockedVault2.address)).to.equal(ethers.utils.parseUnits("0", 18))
 
-      expect(await token1.balanceOf(lockedFund3.address)).to.equal(ethers.utils.parseUnits("25", 18))
-      expect(await token2.balanceOf(lockedFund3.address)).to.equal(ethers.utils.parseUnits("0.5", 18))
+      expect(await token1.balanceOf(lockedVault3.address)).to.equal(ethers.utils.parseUnits("25", 18))
+      expect(await token2.balanceOf(lockedVault3.address)).to.equal(ethers.utils.parseUnits("0.5", 18))
 
       // check that all our locked funds are actually locked
-      expect(await lockedFund.state()).to.equal(0)
-      expect(await lockedFund2.state()).to.equal(0)
-      expect(await lockedFund3.state()).to.equal(0)
+      expect(await lockedVault.state()).to.equal(0)
+      expect(await lockedVault2.state()).to.equal(0)
+      expect(await lockedVault3.state()).to.equal(0)
 
       // there should be nothing yet to distribute
       await expect(treasury.distributeSupportedTokenRewards(token1.address)).to.be.revertedWith('No supported tokens')
       await expect(treasury.distributeSupportedTokenRewards(token2.address)).to.be.revertedWith('No supported tokens')
 
-      // call collect on the treasury which should pull balance from the Open Fund only
+      // call collect on the treasury which should pull balance from the Open Vault only
       const collectTx = await treasury.connect(user1).collect()
       const txReceipt = await collectTx.wait()
-      expect(await ethers.provider.getBalance(openFund.address)).to.equal(0)
+      expect(await ethers.provider.getBalance(openVault.address)).to.equal(0)
 
       // check that the token balances have been collected from open fund into the treasury
       expect(await token1.balanceOf(treasury.address)).to.equal(ethers.utils.parseUnits("60", 18))
@@ -371,12 +371,12 @@ describe(" -- Testing Treasury Contract -- ", function () {
       // Check if the locked funds received the expected amount of supported tokens
       let treasuryTokenBalanceBefore = ethers.utils.parseUnits("60", 18)
 
-      let token1balance1Before = await token1.balanceOf(lockedFund.address)
-      let token1balance2Before = await token1.balanceOf(lockedFund2.address)
-      let token1balance3Before = await token1.balanceOf(lockedFund3.address)
-      let token2balance1Before = await token2.balanceOf(lockedFund.address)
-      let token2balance2Before = await token2.balanceOf(lockedFund2.address)
-      let token2balance3Before = await token2.balanceOf(lockedFund3.address)
+      let token1balance1Before = await token1.balanceOf(lockedVault.address)
+      let token1balance2Before = await token1.balanceOf(lockedVault2.address)
+      let token1balance3Before = await token1.balanceOf(lockedVault3.address)
+      let token2balance1Before = await token2.balanceOf(lockedVault.address)
+      let token2balance2Before = await token2.balanceOf(lockedVault2.address)
+      let token2balance3Before = await token2.balanceOf(lockedVault3.address)
 
       /*console.log('token1balance1Before', token1balance1Before)
       console.log('token1balance2Before', token1balance2Before)
@@ -387,22 +387,22 @@ describe(" -- Testing Treasury Contract -- ", function () {
 
       // Distribute token 1 to the locked funds
       const tx1 = await treasury.distributeSupportedTokenRewards(token1.address)
-      let distFundEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedFund")
-      let distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedFunds")
+      let distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
+      let distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
       expect(distEvents[0].args.supportedToken).to.equal(token1.address)
       expect(distEvents[0].args.balanceBeforeDistribution).to.equal(treasuryTokenBalanceBefore)
       expect(distEvents[0].args.numberOfRecipients).to.equal(2)
 
       // Distribute token 2 to the locked funds
       const tx2 = await treasury.distributeSupportedTokenRewards(token2.address)
-      distFundEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedFund")
-      distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedFunds")
+      distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
+      distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
       expect(distEvents[1].args.supportedToken).to.equal(token2.address)
       expect(distEvents[1].args.balanceBeforeDistribution).to.equal(treasuryTokenBalanceBefore)
       expect(distEvents[1].args.numberOfRecipients).to.equal(2)
 
       // Retrieve Receive events emitted by each locked fund
-      //const receiveEvents1 = await lockedFund2.queryFilter("Received")
+      //const receiveEvents1 = await lockedVault2.queryFilter("Received")
       //console.log(receiveEvents1)
 
       //proportionateShare = (treasuryTokenBalance * lockedBalances[i]) / tokenTotalBalance;
@@ -418,12 +418,12 @@ describe(" -- Testing Treasury Contract -- ", function () {
       console.log(token2_share_fund3)*/
 
       // Check if the locked funds received the expected amount of native token (ETH)
-      let token1balance1After = await token1.balanceOf(lockedFund.address)
-      let token1balance2After = await token1.balanceOf(lockedFund2.address)
-      let token1balance3After = await token1.balanceOf(lockedFund3.address)
-      let token2balance1After = await token2.balanceOf(lockedFund.address)
-      let token2balance2After = await token2.balanceOf(lockedFund2.address)
-      let token2balance3After = await token2.balanceOf(lockedFund3.address)
+      let token1balance1After = await token1.balanceOf(lockedVault.address)
+      let token1balance2After = await token1.balanceOf(lockedVault2.address)
+      let token1balance3After = await token1.balanceOf(lockedVault3.address)
+      let token2balance1After = await token2.balanceOf(lockedVault.address)
+      let token2balance2After = await token2.balanceOf(lockedVault2.address)
+      let token2balance3After = await token2.balanceOf(lockedVault3.address)
       /*console.log('locked fund 1 after distribute:', balance1After)
       console.log('locked fund 2 after distribute:', balance2After)
       console.log('locked fund 3 after distribute:', balance3After)*/
@@ -454,22 +454,22 @@ describe(" -- Testing Treasury Contract -- ", function () {
 
       // first, create n funds
       //
-      const nLockedFunds = 100
+      const nLockedVaults = 100
 
-      const lockedFunds = []
-      for (var i = nLockedFunds - 1; i >= 0; i--) {
+      const lockedVaults = []
+      for (var i = nLockedVaults - 1; i >= 0; i--) {
 
         const randomNum1 = 0.1 + Math.random() * (100 - 0.1)
         const randomNum2 = 0.1 + Math.random() * (100 - 0.1)
 
-        lockedFunds[i] = await makeFund_100edition_target100_noUnlockTime(factory, user1, user1)
+        lockedVaults[i] = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
 
         // Transfer supported tokens to lockedfund 
-        await token1.transfer(lockedFunds[i].address, ethers.utils.parseUnits(randomNum1.toString(), 18))
-        await token2.transfer(lockedFunds[i].address, ethers.utils.parseUnits(randomNum2.toString(), 18))
+        await token1.transfer(lockedVaults[i].address, ethers.utils.parseUnits(randomNum1.toString(), 18))
+        await token2.transfer(lockedVaults[i].address, ethers.utils.parseUnits(randomNum2.toString(), 18))
 
-        expect(await token1.balanceOf(lockedFunds[i].address)).to.equal(ethers.utils.parseUnits(randomNum1.toString(), 18))
-        expect(await token2.balanceOf(lockedFunds[i].address)).to.equal(ethers.utils.parseUnits(randomNum2.toString(), 18))
+        expect(await token1.balanceOf(lockedVaults[i].address)).to.equal(ethers.utils.parseUnits(randomNum1.toString(), 18))
+        expect(await token2.balanceOf(lockedVaults[i].address)).to.equal(ethers.utils.parseUnits(randomNum2.toString(), 18))
       }
 
       // transfer tokens to the treasury so there's something to distribute
@@ -488,22 +488,22 @@ describe(" -- Testing Treasury Contract -- ", function () {
       // Distribute supported token 1 to the locked funds
       //
       const tx1 = await treasury.distributeSupportedTokenRewards(token1.address)
-      let distFundEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedFund")
-      let distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedFunds")
-      expect(distFundEvents.length).to.equal(nLockedFunds)
+      let distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
+      let distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
+      expect(distVaultEvents.length).to.equal(nLockedVaults)
       expect(distEvents[0].args.supportedToken).to.equal(token1.address)
       expect(distEvents[0].args.balanceBeforeDistribution).to.equal(token1Amount)
-      expect(distEvents[0].args.numberOfRecipients).to.equal(nLockedFunds)
+      expect(distEvents[0].args.numberOfRecipients).to.equal(nLockedVaults)
 
       // Distribute supported token 2 to the locked funds
       //
       const tx2 = await treasury.distributeSupportedTokenRewards(token2.address)
-      distFundEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedFund")
-      distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedFunds")
-      expect(distFundEvents.length).to.equal(nLockedFunds * 2)
+      distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
+      distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
+      expect(distVaultEvents.length).to.equal(nLockedVaults * 2)
       expect(distEvents[1].args.supportedToken).to.equal(token2.address)
       expect(distEvents[1].args.balanceBeforeDistribution).to.equal(token2Amount)
-      expect(distEvents[1].args.numberOfRecipients).to.equal(nLockedFunds)
+      expect(distEvents[1].args.numberOfRecipients).to.equal(nLockedVaults)
 
       //console.log('distribution summary:',distEvents)
 

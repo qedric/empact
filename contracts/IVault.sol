@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.11;
 
-interface IFund {
+interface IVault {
 
     enum State { Locked, Unlocked, Open }
 
-    struct Attr { 
+    struct Attr {
+        address baseToken;
         uint256 tokenId;
         uint256 unlockTime;
         uint256 startTime;
@@ -14,7 +15,7 @@ interface IFund {
         string description;
     }
 
-    event FundInitialised(Attr attributes);
+    event VaultInitialised(Attr attributes);
     event StateChanged(State newState);
     event Received(address _from, uint _amount);
     event Withdrawal(address who, uint amount, uint balance);
@@ -25,7 +26,7 @@ interface IFund {
     event SendNativeTokenToTreasury(address indexed vaultAddress, address treasuryAddress, uint amount);
     event SendSupportedTokenToTreasury(address indexed vaultAddress, address treasuryAddress, address indexed tokenAddress, uint tokenBalance);
 
-    function initialize(Attr calldata _data, uint16 _breakFundBps) external;
+    function initialize(Attr calldata _data, uint16 _breakVaultBps) external;
     function state() external view returns(State);
     function getTotalBalance() external view returns(uint256 totalBalance);
     function getNativeTokenBalance() external view returns(uint256 balance);

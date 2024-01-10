@@ -3,7 +3,7 @@ pragma solidity ^0.8.11;
 
 import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@thirdweb-dev/contracts/extension/Initializable.sol";
-import "./IFund.sol";
+import "./IVault.sol";
 import "./ITreasury.sol";
 
 /*
@@ -17,7 +17,7 @@ interface IOETHToken {
     function rebaseOptIn() external;
 }
 
-contract Fund is IFund, Initializable {
+contract Vault is IVault, Initializable {
     using SafeERC20 for IERC20;
 
     State public state = State.Locked; // Initialize as locked
@@ -48,10 +48,10 @@ contract Fund is IFund, Initializable {
         _disableInitializers();
     }
 
-    function initialize(Attr calldata _data, uint16 _breakFundBps) external onlyFactory initializer {
+    function initialize(Attr calldata _data, uint16 _breakVaultBps) external onlyFactory initializer {
         _attributes = _data;
-        withdrawalFeeBps = _breakFundBps;
-        emit FundInitialised(_data);
+        withdrawalFeeBps = _breakVaultBps;
+        emit VaultInitialised(_data);
     }
 
     /*  @notice this needs to be called if target is reached with non native tokens.
@@ -62,17 +62,17 @@ contract Fund is IFund, Initializable {
 
         require(
             state == State.Locked,
-            'Fund is not locked'
+            'Vault is not locked'
         );
 
         require(
             _getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance,
-            'Fund has not met target'
+            'Vault has not met target'
         );
 
         require(
             block.timestamp > _attributes.unlockTime,
-            'Fund has not reached maturity'
+            'Vault has not reached maturity'
         );
 
         // set to Unlocked
@@ -96,7 +96,7 @@ contract Fund is IFund, Initializable {
         }
     }
 
-    function attributes() external view returns (IFund.Attr memory) {
+    function attributes() external view returns (IVault.Attr memory) {
         return _attributes;
     }
 
@@ -124,7 +124,7 @@ contract Fund is IFund, Initializable {
 
         require(
             state == State.Unlocked,
-            "Fund must be Unlocked"
+            "Vault must be Unlocked"
         );
 
         // set the state to Open if it's the last payout
@@ -140,7 +140,7 @@ contract Fund is IFund, Initializable {
 
         require(
             payoutAmount > 0,
-            "Fund is empty"
+            "Vault is empty"
         );
 
         // send the withdrawal event and pay the owner
@@ -177,7 +177,7 @@ contract Fund is IFund, Initializable {
 
         require(
             state == State.Open,
-            'Fund must be Open'
+            'Vault must be Open'
         );
 
         emit SendNativeTokenToTreasury(address(this), msg.sender, address(this).balance);

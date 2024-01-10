@@ -5,12 +5,12 @@ interface ITreasury {
 
     event SupportedTokenAdded(address tokenAddress);
     event SupportedTokenRemoved(address tokenAddress);
-    event AddedOpenFund(address vaultAddress);
-    event CollectedOpenFunds();
-    event DistributedNativeTokensToLockedFund(address indexed vaultAddress, uint amount);
-    event DistributedNativeTokensToLockedFunds(uint balanceBeforeDistribution, uint numberOfRecipients);
-    event DistributedSupportedTokenToLockedFund(address indexed supportedToken, address indexed vaultAddress, uint amount);
-    event DistributedSupportedTokensToLockedFunds(address indexed supportedToken, uint balanceBeforeDistribution, uint numberOfRecipients);
+    event AddedOpenVault(address vaultAddress);
+    event CollectedOpenVaults();
+    event DistributedNativeTokensToLockedVault(address indexed vaultAddress, uint amount);
+    event DistributedNativeTokensToLockedVaults(uint balanceBeforeDistribution, uint numberOfRecipients);
+    event DistributedSupportedTokenToLockedVault(address indexed supportedToken, address indexed vaultAddress, uint amount);
+    event DistributedSupportedTokensToLockedVaults(address indexed supportedToken, uint balanceBeforeDistribution, uint numberOfRecipients);
     event OriginProtocolTokenUpdated(address oldAddress, address newAddress);
     event Received(address _from, uint _amount);
 
@@ -23,7 +23,7 @@ interface ITreasury {
      * @notice Add an open vault address to the treasury
      * @param vaultAddress The address of the open vault
      */
-    function addOpenFund(address vaultAddress) external;
+    function addOpenVault(address vaultAddress) external;
     
 	/**
      *  @notice Iterates through all the open vaults and calls the sendToTreasury() method on them

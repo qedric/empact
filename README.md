@@ -8,11 +8,11 @@ Our mission is to empower organisations, communities, and individuals to raise f
 
 ## Project Overview
 
-ZebraFramework provides a white-label solution for fundraising platforms. Funds build on this framework feature the following characteristics:
+ZebraFramework provides a white-label solution for fundraising platforms. Vaults build on this framework feature the following characteristics:
 
 - **Unlock Mechanism:** Each fund can be set to unlock according to parameters determined at the time of fund-creation.
 
-- **Access to Funds:** funds are distributed via tokens that are NFTs based on the ERC-1155 standard; each NFT holder has a share of the corresponding fund.
+- **Access to Vaults:** funds are distributed via tokens that are NFTs based on the ERC-1155 standard; each NFT holder has a share of the corresponding fund.
 
 - **Regenerative Finance:** Once funds have been distributed to all token holders, any further deposits are redistributed proportionally among other funds on the platform.
 
@@ -28,7 +28,7 @@ ZebraFramework fundraising platforms are versatile and can be used for various p
 
 3. **Personal Savings:** Parents can create a single-edition fund that unlocks on their child's 18th birthday, encouraging long-term savings.
 
-4. **Fundraising for Projects:** Teams or organisations can divide funds by percentage, making it an ideal way to distribute funds among contributors.
+4. **Vaultraising for Projects:** Teams or organisations can divide funds by percentage, making it an ideal way to distribute funds among contributors.
 
 5. **Long-Term Savings:** Self-organised pension funds or long-term savings initiatives can use ZebraFramework with a large number of tokens, unlocking when a specific balance is achieved. The tokens act like shares or bonds, allowing them to be bought and sold within the community. Royalties from token trading can be distributed back in to the community.
 
@@ -42,15 +42,15 @@ The `factory.sol` smart contract is the heart of the ZebraFramework ecosystem. I
 
 - **Customizable Fees:** The contract allows for setting fees for creating new ZebraFramework and for withdrawing funds from them.
 
-- **Token URI:** The contract generates on-chain metadata for each CryptoFund, providing essential information about its state.
+- **Token URI:** The contract generates on-chain metadata for each CryptoVault, providing essential information about its state.
 
 - **ERC-1155 Compliance:** ZebraFramework are compliant with the ERC-1155 standard, making them tradable and transferable.
 
 - **Operator Roles:** Roles such as SIGNER_ROLE and DEFAULT_ADMIN_ROLE are defined to control contract operations.
 
-### Fund Contract - `fund.sol`
+### Vault Contract - `fund.sol`
 
-The `Fund.sol` contract serves as the actual vault for each fund. It is cloned with each new fund creation and is responsible for keeping track of the balance, unlocking according to the target or maturity date, and facilitating withdrawals. 
+The `Vault.sol` contract serves as the actual vault for each fund. It is cloned with each new fund creation and is responsible for keeping track of the balance, unlocking according to the target or maturity date, and facilitating withdrawals. 
 
 
 ### Generator Contract - `generator.sol`
@@ -73,4 +73,4 @@ If you have any questions or need assistance, feel free to contact us.
 
 Thank you for being a part of the ZebraFramework community!
 
-**Happy Saving, Fundraising, and Impacting!** 🐷🚀
+**Happy Saving, Vaultraising, and Impacting!** 🐷🚀

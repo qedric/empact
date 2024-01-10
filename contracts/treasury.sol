@@ -4,7 +4,7 @@ pragma solidity ^0.8.11;
 import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "./IFund.sol";
+import "./IVault.sol";
 import "./ITreasury.sol";
 
 interface IFactory {
@@ -30,7 +30,7 @@ contract Treasury is ITreasury, AccessControl {
 
     /// @notice         The address of Origin Protocol OETH token
     address payable private _oETHTokenAddress;
-    address[] public openFunds;
+    address[] public openVaults;
 
     /// @notice Checks that the `msg.sender` is the factory.
     modifier onlyFactory() {
@@ -84,12 +84,12 @@ contract Treasury is ITreasury, AccessControl {
     }
 
     /**
-     *  @notice         Moves a vault from the lockedFunds to the openFunds treasurey register
+     *  @notice         Moves a vault from the lockedVaults to the openVaults treasurey register
      */
-    function addOpenFund(address vaultAddress) external onlyFactory {
-        require(!isOpenFund(vaultAddress), "Fund already Open");
-        openFunds.push(vaultAddress);
-        emit AddedOpenFund(vaultAddress);
+    function addOpenVault(address vaultAddress) external onlyFactory {
+        require(!isOpenVault(vaultAddress), "Vault already Open");
+        openVaults.push(vaultAddress);
+        emit AddedOpenVault(vaultAddress);
     }
 
     /**
@@ -97,14 +97,14 @@ contract Treasury is ITreasury, AccessControl {
      */
     function collect() external onlyRole(TREASURER_ROLE) {
 
-        require(openFunds.length > 0, "No open vaults to collect from");
+        require(openVaults.length > 0, "No open vaults to collect from");
 
-        emit CollectedOpenFunds();
+        emit CollectedOpenVaults();
 
-        for (uint256 i = 0; i < openFunds.length; i++) {
-            address vaultAddress = openFunds[i];
+        for (uint256 i = 0; i < openVaults.length; i++) {
+            address vaultAddress = openVaults[i];
             // Call the sendToTreasury() method on the vault
-            IFund vault = IFund(vaultAddress);
+            IVault vault = IVault(vaultAddress);
             vault.sendToTreasury();
         }
     }
@@ -116,28 +116,28 @@ contract Treasury is ITreasury, AccessControl {
 
         require(address(this).balance > 0, 'No native tokens');
 
-        address[] memory lockedFunds;
+        address[] memory lockedVaults;
         uint256[] memory lockedBalances;
         uint256 totalLockedBalance;
 
         uint256 nRecipients = 0;
 
-        (lockedFunds, lockedBalances, totalLockedBalance) = _lockedFundsWithBalance(address(0));
+        (lockedVaults, lockedBalances, totalLockedBalance) = _lockedVaultsWithBalance(address(0));
 
         uint256 balanceBeforeDistribution = address(this).balance;
 
         // calculate & distribute each locked vault's percentage of rewards
-        for (uint256 i = 0; i < lockedFunds.length; i++) {
-            if (lockedFunds[i] != address(0)) {
+        for (uint256 i = 0; i < lockedVaults.length; i++) {
+            if (lockedVaults[i] != address(0)) {
                 uint256 reward = (balanceBeforeDistribution * lockedBalances[i]) / totalLockedBalance;
-                emit DistributedNativeTokensToLockedFund(lockedFunds[i], reward);
+                emit DistributedNativeTokensToLockedVault(lockedVaults[i], reward);
                 nRecipients++;
-                Address.sendValue(payable(lockedFunds[i]), reward);
+                Address.sendValue(payable(lockedVaults[i]), reward);
                 
             }
         }
 
-        emit DistributedNativeTokensToLockedFunds(balanceBeforeDistribution, nRecipients);
+        emit DistributedNativeTokensToLockedVaults(balanceBeforeDistribution, nRecipients);
         
     }
 
@@ -152,7 +152,7 @@ contract Treasury is ITreasury, AccessControl {
 
         require(token.balanceOf(address(this)) > 0, 'No supported tokens');
 
-        address[] memory targetFunds;
+        address[] memory targetVaults;
         uint256[] memory lockedBalances;
         uint256 tokenTotalBalance;
         uint256 nRecipients = 0;
@@ -161,39 +161,39 @@ contract Treasury is ITreasury, AccessControl {
 
         if (treasuryTokenBalance > 0) {
 
-            (targetFunds, lockedBalances, tokenTotalBalance) = _lockedFundsWithBalance(supportedTokenAddress);
+            (targetVaults, lockedBalances, tokenTotalBalance) = _lockedVaultsWithBalance(supportedTokenAddress);
 
             if (tokenTotalBalance > 0) {
-                for (uint256 i = 0; i < targetFunds.length; i++) {
-                    if (targetFunds[i] != address(0)) {
+                for (uint256 i = 0; i < targetVaults.length; i++) {
+                    if (targetVaults[i] != address(0)) {
                         // Calculate the proportionate share of tokens to distribute
                         uint256 proportionateShare = (treasuryTokenBalance * lockedBalances[i]) / tokenTotalBalance;
-                        emit DistributedSupportedTokenToLockedFund(address(token), targetFunds[i], proportionateShare);
+                        emit DistributedSupportedTokenToLockedVault(address(token), targetVaults[i], proportionateShare);
                         nRecipients++;
                         // Transfer tokens to the vault
-                        token.safeTransfer(targetFunds[i], proportionateShare);
+                        token.safeTransfer(targetVaults[i], proportionateShare);
                     }
                 }
-                emit DistributedSupportedTokensToLockedFunds(address(token), treasuryTokenBalance, nRecipients);
+                emit DistributedSupportedTokensToLockedVaults(address(token), treasuryTokenBalance, nRecipients);
             }
         }
     }
 
-    function _lockedFundsWithBalance(address supportedToken) internal view returns (
+    function _lockedVaultsWithBalance(address supportedToken) internal view returns (
         address[] memory, uint256[] memory, uint256) {
 
         uint256 totalLockedBalance = 0;
-        uint256 nFunds = factory.nextTokenIdToMint(); // total number of all vaults
+        uint256 nVaults = factory.nextTokenIdToMint(); // total number of all vaults
 
-        address[] memory lockedFunds = new address[](nFunds);
-        uint256[] memory lockedBalances = new uint256[](nFunds);
+        address[] memory lockedVaults = new address[](nVaults);
+        uint256[] memory lockedBalances = new uint256[](nVaults);
 
         // find the total balance of all locked vaults and keep track of their individual balances
-        for (uint256 tokenId = 0; tokenId < nFunds; tokenId++) {
+        for (uint256 tokenId = 0; tokenId < nVaults; tokenId++) {
             address vaultAddress = factory.vaults(tokenId);
-            IFund vault = IFund(vaultAddress);
+            IVault vault = IVault(vaultAddress);
 
-            if (vault.state() == IFund.State.Locked) {
+            if (vault.state() == IVault.State.Locked) {
                 uint256 vaultBalance;
                 if (address(supportedToken) == address(0)) {
                     // If it's a zero address, consider native token balance
@@ -205,14 +205,14 @@ contract Treasury is ITreasury, AccessControl {
                 }
 
                 if (vaultBalance > 0) {
-                    lockedFunds[tokenId] = vaultAddress;
+                    lockedVaults[tokenId] = vaultAddress;
                     lockedBalances[tokenId] = vaultBalance;
                     totalLockedBalance += vaultBalance;
                 }
             }
         }
 
-        return (lockedFunds, lockedBalances, totalLockedBalance);
+        return (lockedVaults, lockedBalances, totalLockedBalance);
     }
 
     function grantTreasurerRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -236,9 +236,9 @@ contract Treasury is ITreasury, AccessControl {
      * @param vaultAddress The address of the vault to check
      * @return true if the vault is already added, false otherwise
      */
-    function isOpenFund(address vaultAddress) public view returns (bool) {
-        for (uint256 i = 0; i < openFunds.length; i++) {
-            if (openFunds[i] == vaultAddress) {
+    function isOpenVault(address vaultAddress) public view returns (bool) {
+        for (uint256 i = 0; i < openVaults.length; i++) {
+            if (openVaults[i] == vaultAddress) {
                 return true; // The vault is already added
             }
         }

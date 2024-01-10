@@ -2,12 +2,12 @@ const { expect, assert } = require("chai")
 const { ethers, upgrades, network } = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-network-helpers")
 
-async function deployFundImplementation(factory_address, treasury_address) {
+async function deployVaultImplementation(factory_address, treasury_address) {
 
-  const FundImplementation = await ethers.getContractFactory("Fund")
+  const VaultImplementation = await ethers.getContractFactory("Vault")
 
   // deploy the fund implementation that will be cloned for each new fund
-  const fundImplementation = await FundImplementation.deploy(factory_address, treasury_address)
+  const fundImplementation = await VaultImplementation.deploy(factory_address, treasury_address)
   await fundImplementation.deployed()
 
   return fundImplementation
@@ -50,10 +50,10 @@ async function deploy(feeRecipient, tokenUrlPrefix) {
   const treasury = await deployTreasury(factory.address)
 
   // deploy the fund implementation that will be cloned for each new fund
-  const fundImplementation = await deployFundImplementation(factory.address, treasury.address)
+  const fundImplementation = await deployVaultImplementation(factory.address, treasury.address)
 
   //set the implementation in the contract
-  await factory.setFundImplementation(fundImplementation.address)
+  await factory.setVaultImplementation(fundImplementation.address)
 
   //set the generator in the contract
   await factory.setGenerator(generator.address)
@@ -172,23 +172,23 @@ async function generateMintRequest(factory_address, signer, to_address, typedDat
   return { signature, typedData }
 }
 
-async function makeFund(factory, signer, to) {
+async function makeVault(factory, signer, to) {
   const mintRequest = await generateMintRequest(factory.address, signer, to.address)
   
-  const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+  const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
 
-  const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeFundFee })
+  const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeVaultFee })
   const txReceipt = await tx.wait()
 
-  const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
+  const fundCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
 
-  const Fund = await ethers.getContractFactory("Fund")
-  const fund = Fund.attach(fundCreatedEvent.args.fund)
+  const Vault = await ethers.getContractFactory("Vault")
+  const fund = Vault.attach(fundCreatedEvent.args.fund)
 
-  // Find the FundInitialised event within the Fund contract
-  const fundInitialisedEvent = await fund.queryFilter(fund.filters.FundInitialised(), txReceipt.blockHash);
+  // Find the VaultInitialised event within the Vault contract
+  const fundInitialisedEvent = await fund.queryFilter(fund.filters.VaultInitialised(), txReceipt.blockHash);
 
-  expect(fundInitialisedEvent.length).to.equal(1); // Ensure only one FundInitialised event was emitted
+  expect(fundInitialisedEvent.length).to.equal(1); // Ensure only one VaultInitialised event was emitted
   expect(fundInitialisedEvent[0].args.attributes[0]).to.equal(0)
   expect(fundInitialisedEvent[0].args.attributes[4]).to.equal('A test fund')
   expect(fundInitialisedEvent[0].args.attributes[5]).to.equal('description')
@@ -196,7 +196,7 @@ async function makeFund(factory, signer, to) {
   return fund
 }
 
-async function makeFund_100edition_target100_noUnlockTime(factory, signer, to) {
+async function makeVault_100edition_target100_noUnlockTime(factory, signer, to) {
 
   const timestamp = await getCurrentBlockTime()
   const targetBalance = ethers.utils.parseUnits("100", "ether").toString()
@@ -214,26 +214,26 @@ async function makeFund_100edition_target100_noUnlockTime(factory, signer, to) {
 
   const mintRequest = await generateMintRequest(factory.address, signer, to.address, typedData)
 
-  const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+  const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
 
-  const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeFundFee })
+  const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeVaultFee })
   const txReceipt = await tx.wait()
 
-  const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
+  const fundCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
 
-  const Fund = await ethers.getContractFactory("Fund")
-  const fund = Fund.attach(fundCreatedEvent.args.fund)
+  const Vault = await ethers.getContractFactory("Vault")
+  const fund = Vault.attach(fundCreatedEvent.args.fund)
 
-  // Find the FundInitialised event within the Fund contract
-  const fundInitialisedEvent = await fund.queryFilter(fund.filters.FundInitialised(), txReceipt.blockHash);
-  expect(fundInitialisedEvent.length).to.equal(1); // Ensure only one FundInitialised event was emitted
+  // Find the VaultInitialised event within the Vault contract
+  const fundInitialisedEvent = await fund.queryFilter(fund.filters.VaultInitialised(), txReceipt.blockHash);
+  expect(fundInitialisedEvent.length).to.equal(1); // Ensure only one VaultInitialised event was emitted
   expect(fundInitialisedEvent[0].args.attributes[4]).to.equal('A 100-edition test fund')
   expect(fundInitialisedEvent[0].args.attributes[5]).to.equal('no unlock time')
 
   return fund
 }
 
-async function makeFund_100edition_notarget_99days(factory, signer, to) {
+async function makeVault_100edition_notarget_99days(factory, signer, to) {
 
   const timestamp = await getCurrentBlockTime()
   const typedData = await getTypedData(
@@ -250,19 +250,19 @@ async function makeFund_100edition_notarget_99days(factory, signer, to) {
 
   const mintRequest = await generateMintRequest(factory.address, signer, to.address, typedData)
 
-  const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+  const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
 
-  const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeFundFee })
+  const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeVaultFee })
   const txReceipt = await tx.wait()
 
-  const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
+  const fundCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
 
-  const Fund = await ethers.getContractFactory("Fund")
-  const fund = Fund.attach(fundCreatedEvent.args.fund)
+  const Vault = await ethers.getContractFactory("Vault")
+  const fund = Vault.attach(fundCreatedEvent.args.fund)
 
-  // Find the FundInitialised event within the Fund contract
-  const fundInitialisedEvent = await fund.queryFilter(fund.filters.FundInitialised(), txReceipt.blockHash);
-  expect(fundInitialisedEvent.length).to.equal(1); // Ensure only one FundInitialised event was emitted
+  // Find the VaultInitialised event within the Vault contract
+  const fundInitialisedEvent = await fund.queryFilter(fund.filters.VaultInitialised(), txReceipt.blockHash);
+  expect(fundInitialisedEvent.length).to.equal(1); // Ensure only one VaultInitialised event was emitted
   expect(fundInitialisedEvent[0].args.attributes[0]).to.equal(2)
   expect(fundInitialisedEvent[0].args.attributes[4]).to.equal('A 100-edition test fund')
   expect(fundInitialisedEvent[0].args.attributes[5]).to.equal('99 days, no target')
@@ -273,7 +273,7 @@ async function makeFund_100edition_notarget_99days(factory, signer, to) {
 // Export the functions
 module.exports = {
   deploy,
-  deployFundImplementation,
+  deployVaultImplementation,
   deployGenerator,
   deployTreasury,
   getTypedData,
@@ -282,7 +282,7 @@ module.exports = {
   deployMockToken,
   deployMockOETHToken,
   generateMintRequest,
-  makeFund,
-  makeFund_100edition_target100_noUnlockTime,
-  makeFund_100edition_notarget_99days
+  makeVault,
+  makeVault_100edition_target100_noUnlockTime,
+  makeVault_100edition_notarget_99days
 }

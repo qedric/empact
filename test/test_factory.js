@@ -2,12 +2,12 @@
 const { expect, assert } = require("chai")
 const { ethers, upgrades, network } = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-network-helpers")
-const { deploy, deployFundImplementation, deployGenerator, deployTreasury, getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, generateMintRequest, makeFund, makeFund_100edition_target100_noUnlockTime } = require("./test_helpers")
+const { deploy, deployVaultImplementation, deployGenerator, deployTreasury, getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, generateMintRequest, makeVault, makeVault_100edition_target100_noUnlockTime } = require("./test_helpers")
 
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
 describe(" -- Testing Factory Contract -- ", function () {
-  describe("Minting & Fund Creation", function () {
+  describe("Minting & Vault Creation", function () {
 
     let factory
     let INITIAL_DEFAULT_ADMIN_AND_SIGNER, NEW_SIGNER
@@ -28,15 +28,15 @@ describe(" -- Testing Factory Contract -- ", function () {
       1. calls factory mintWithSignature()
       2. checks that user received the minted tokens
       3. checks that TokensMintedWithSignature' event was fired with correct args
-      4. checks that FundDeployed event was fired with correct args
+      4. checks that VaultDeployed event was fired with correct args
     */
     it("should successfully mint new tokens and initalise funds", async function () {
-      const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+      const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
       const mr = await generateMintRequest(factory.address, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
 
       const initialBalanceUser1 = await factory.balanceOf(user1.address, 0)
 
-      const tx = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(mr.typedData.message, mr.signature, { value: makeFundFee })
+      const tx = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(mr.typedData.message, mr.signature, { value: makeVaultFee })
 
       // Verify that the token was minted and assigned to the correct recipient
       const finalBalanceUser1 = await factory.balanceOf(user1.address, 0)
@@ -49,11 +49,11 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(tokensMintedEvent[0].args.mintedTo).to.equal(user1.address)
       expect(tokensMintedEvent[0].args.tokenIdMinted.toNumber()).to.equal(0)
 
-      const fundDeployedEvent = await factory.queryFilter('FundDeployed', tx.blockHash)
+      const fundDeployedEvent = await factory.queryFilter('VaultDeployed', tx.blockHash)
       expect(fundDeployedEvent.length).to.equal(1)
       expect(fundDeployedEvent[0].args.msgSender).to.equal(INITIAL_DEFAULT_ADMIN_AND_SIGNER.address)
 
-      // Retrieve the fund address from the FundDeployed event
+      // Retrieve the fund address from the VaultDeployed event
       const fundAddress = fundDeployedEvent[0].args.fund
     })
 
@@ -86,12 +86,12 @@ describe(" -- Testing Factory Contract -- ", function () {
         typedData
       )
 
-      const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+      const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
 
       await expect(factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
         mr.typedData.message,
         mr.signature,
-        { value: makeFundFee })
+        { value: makeVaultFee })
       ).to.be.revertedWith("Request expired")
     })
 
@@ -123,12 +123,12 @@ describe(" -- Testing Factory Contract -- ", function () {
         typedData
       )
 
-      const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+      const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
 
       await expect(factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
         mr.typedData.message,
         mr.signature,
-        { value: makeFundFee })
+        { value: makeVaultFee })
       ).to.be.revertedWith("Request expired")
     }) 
 
@@ -161,11 +161,11 @@ describe(" -- Testing Factory Contract -- ", function () {
         typedData
       )
 
-      const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+      const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
       await expect(factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
         mr.typedData.message,
         mr.signature,
-        { value: makeFundFee })
+        { value: makeVaultFee })
       ).to.be.revertedWith("Unlock time should be in the future, or target balance greater than 0")
     })
 
@@ -199,11 +199,11 @@ describe(" -- Testing Factory Contract -- ", function () {
         typedData
       )
 
-      const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+      const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
       await expect(factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
         mr.typedData.message,
         mr.signature,
-        { value: makeFundFee })
+        { value: makeVaultFee })
       ).to.be.revertedWith("Minting zero tokens.")
     })
   })
@@ -235,26 +235,26 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(event.args.newPrefix).to.equal(newTokenUrlPrefix)
     })
 
-    it("should set the make fund fee and emit the MakeFundFeeUpdated event", async function () {
-      const newMakeFundFee = ethers.utils.parseUnits("0.005", "ether")
-      const receipt = await factory.connect(owner).setMakeFundFee(newMakeFundFee)
+    it("should set the make fund fee and emit the MakeVaultFeeUpdated event", async function () {
+      const newMakeVaultFee = ethers.utils.parseUnits("0.005", "ether")
+      const receipt = await factory.connect(owner).setMakeVaultFee(newMakeVaultFee)
 
-      const events = await factory.queryFilter("MakeFundFeeUpdated", receipt.blockHash)
+      const events = await factory.queryFilter("MakeVaultFeeUpdated", receipt.blockHash)
       expect(events.length).to.equal(1)
 
       const event = events[0]
-      expect(event.args.fee).to.equal(newMakeFundFee)
+      expect(event.args.fee).to.equal(newMakeVaultFee)
     })
 
-    it("should set the break fund fee basis points and emit the BreakFundBpsUpdated event", async function () {
-      const newBreakFundBps = 500 // 5% represented in basis points
-      const receipt = await factory.connect(owner).setBreakFundBps(newBreakFundBps)
+    it("should set the break fund fee basis points and emit the BreakVaultBpsUpdated event", async function () {
+      const newBreakVaultBps = 500 // 5% represented in basis points
+      const receipt = await factory.connect(owner).setBreakVaultBps(newBreakVaultBps)
 
-      const events = await factory.queryFilter("BreakFundBpsUpdated", receipt.blockHash)
+      const events = await factory.queryFilter("BreakVaultBpsUpdated", receipt.blockHash)
       expect(events.length).to.equal(1)
 
       const event = events[0]
-      expect(event.args.bps).to.equal(newBreakFundBps)
+      expect(event.args.bps).to.equal(newBreakVaultBps)
     })
 
     it("should set the fee recipient and emit the FeeRecipientUpdated event", async function () {
@@ -268,15 +268,15 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(event.args.recipient).to.equal(newFeeRecipient)
     })
 
-    it("should set the Fund implementation address and emit the FundImplementationUpdated event", async function () {
-      const newFundImplementation = await deployFundImplementation(factory.address, treasury.address)
-      const receipt = await factory.connect(owner).setFundImplementation(newFundImplementation.address)
+    it("should set the Vault implementation address and emit the VaultImplementationUpdated event", async function () {
+      const newVaultImplementation = await deployVaultImplementation(factory.address, treasury.address)
+      const receipt = await factory.connect(owner).setVaultImplementation(newVaultImplementation.address)
 
-      const events = await factory.queryFilter("FundImplementationUpdated", receipt.blockHash)
+      const events = await factory.queryFilter("VaultImplementationUpdated", receipt.blockHash)
       expect(events.length).to.equal(1)
 
       const event = events[0]
-      expect(event.args.implementation).to.equal(newFundImplementation.address)
+      expect(event.args.implementation).to.equal(newVaultImplementation.address)
     })
 
     it("should set the Generator address and emit the GeneratorUpdated event", async function () {
@@ -317,7 +317,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
-      fund = await makeFund(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
+      fund = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
     })
 
     /*
@@ -366,7 +366,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       2. issue fund with 4 shares, divide between 2 users
       3. ensure fund is moved to open on last payout
     */
-    it("Should call treasury.addOpenFund if it is the last payout", async function () {
+    it("Should call treasury.addOpenVault if it is the last payout", async function () {
       // Generate a signature for the mint request
       const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
       // getBlock returns a block object and it has a timestamp property.
@@ -395,17 +395,17 @@ describe(" -- Testing Factory Contract -- ", function () {
         typedData
       )
 
-      const makeFundFee = ethers.utils.parseUnits("0.004", "ether")
+      const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
 
       const tx = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
         mr.typedData.message,
         mr.signature,
-        { value: makeFundFee }
+        { value: makeVaultFee }
       )
       const txReceipt = await tx.wait()
-      const fundCreatedEvent = txReceipt.events.find(event => event.event === 'FundDeployed')
-      const Fund = await ethers.getContractFactory("Fund")
-      const fund1 = Fund.attach(fundCreatedEvent.args.fund)
+      const fundCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
+      const Vault = await ethers.getContractFactory("Vault")
+      const fund1 = Vault.attach(fundCreatedEvent.args.fund)
 
       // Verify that the initial fund's tokens were minted and assigned to the correct recipient
       const balanceUser1 = await factory.balanceOf(user1.address, 0)
@@ -435,19 +435,19 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(await factory.balanceOf(user1.address, 0)).to.equal(2)
       expect(await factory.balanceOf(user2.address, 0)).to.equal(2)
 
-      // call payout on 1st fund and make sure that AddedOpenFund event NOT emitted
+      // call payout on 1st fund and make sure that AddedOpenVault event NOT emitted
       tx1 = await factory.connect(user1).payout(0)
-      const payout1Event = await treasury.queryFilter('AddedOpenFund', tx1.blockHash)
+      const payout1Event = await treasury.queryFilter('AddedOpenVault', tx1.blockHash)
       expect(payout1Event).to.be.empty
 
-      // call payout on 2nd fund and make sure that AddedOpenFund event was emitted
+      // call payout on 2nd fund and make sure that AddedOpenVault event was emitted
       tx2 = await factory.connect(user2).payout(1)
-      const payout2Event = await treasury.queryFilter('AddedOpenFund', tx2.blockHash)
+      const payout2Event = await treasury.queryFilter('AddedOpenVault', tx2.blockHash)
       expect(payout2Event.length).to.be.gt(0)
 
-      // call payout on 1st fund with user2, and make sure that AddedOpenFund event was emitted
+      // call payout on 1st fund with user2, and make sure that AddedOpenVault event was emitted
       tx3 = await factory.connect(user2).payout(0)
-      const payout3Event = await treasury.queryFilter('AddedOpenFund', tx3.blockHash)
+      const payout3Event = await treasury.queryFilter('AddedOpenVault', tx3.blockHash)
       expect(payout3Event.length).to.be.gt(0)
     })
 
@@ -484,7 +484,7 @@ describe(" -- Testing Factory Contract -- ", function () {
     beforeEach(async function () {
       const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
       factory = deployedContracts.factory
-      fund = await makeFund(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
+      fund = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
     })
 
     /*
@@ -573,12 +573,12 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
 
     it("should fail when sending non-native tokens to the factory contract", async function () {
-      const fundAddress = await makeFund(factory, owner, owner)
+      const fundAddress = await makeVault(factory, owner, owner)
       await expect(factory.connect(owner).safeTransferFrom(owner.address, fundAddress, 0, 2, "0x")).to.be.reverted
     })
 
     it("should transfer a quantity of NTFs from one holder to another", async function () {
-      const fundAddress = await makeFund(factory, owner, owner)
+      const fundAddress = await makeVault(factory, owner, owner)
       await factory.connect(owner).safeTransferFrom(owner.address, feeRecipient.address, 0, 2, "0x")
       expect(await factory.balanceOf(feeRecipient.address, 0)).to.equal(2)
     })
@@ -608,7 +608,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const expectedDescription = 'description'
 
       // Generate a sample token and its attributes
-      const fund = await makeFund(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
+      const fund = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
 
       // Retrieve the token's metadata URI
       const metadataURI = await factory.uri(0)
@@ -638,7 +638,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const expectedDescription = 'no unlock time'
 
       // Generate a sample token and its attributes
-      const fund = await makeFund_100edition_target100_noUnlockTime(
+      const fund = await makeVault_100edition_target100_noUnlockTime(
         factory,
         INITIAL_DEFAULT_ADMIN_AND_SIGNER,
         user1

@@ -14,7 +14,7 @@ async function main() {
       const targetBalance = ethers.utils.parseUnits("0", "ether").toString()
       const to = owner.address
       const quantity = 100
-      const name = 'Example Fund'
+      const name = 'Example Vault'
       const description = 'This fund has 100 impact tokens, and will unlock 1 year from creation. It has no target amount.'
 
       const typedData = getTypedData(
