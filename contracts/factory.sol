@@ -140,6 +140,7 @@ contract Factory is
 
         /*
         struct Attr {
+            address baseToken;
             uint256 tokenId;
             uint256 unlockTime;
             uint256 startTime;
@@ -149,6 +150,7 @@ contract Factory is
         }
         */
         IVault.Attr memory vaultData = IVault.Attr(
+            _req.baseToken,
             tokenIdToMint,
             _req.unlockTime,
             block.timestamp,

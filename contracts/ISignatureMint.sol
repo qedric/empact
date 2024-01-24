@@ -13,6 +13,7 @@ interface ISignatureMint {
      */
     struct MintRequest {
         address to;
+        address baseToken;
         uint128 validityStartTimestamp;
         uint128 validityEndTimestamp;
         uint256 quantity;
