@@ -24,7 +24,13 @@ contract Treasury is ITreasury, AccessControl {
     IFactory public immutable factory;
 
     /// @notice         The addresses of tokens that will count toward the ETH balance
-    /// @notice         This is intended to contain supported ETH Staking tokens only.
+    /// @notice         This is intended to contain supported ETH Staking tokens only
+    /// @notice         This is intended to contain erc20 compliant tokens only
+    mapping(address => uint256) public nativeStakedTokensIndex;
+    address[] private _nativeStakedTokens;
+
+    /// @notice         The addresses of tokens that are approved to be locked in vaults
+    /// @notice         This is intended to contain erc20 compliant tokens only
     mapping(address => uint256) public supportedTokensIndex;
     address[] private _supportedTokens;
 
@@ -81,6 +87,37 @@ contract Treasury is ITreasury, AccessControl {
         delete supportedTokensIndex[token];
 
         emit SupportedTokenRemoved(address(token));
+    }
+
+    /**
+     *  @notice         Add a native staked token address
+     */
+    function addNativeStakedToken(address token) external onlyRole(TREASURER_ROLE) {
+        require(nativeStakedTokensIndex[token] == 0, "Address already exists");
+        _nativeStakedTokens.push(token);
+        nativeStakedTokensIndex[token] = _nativeStakedTokens.length;
+        emit NativeStakedTokenAdded(address(token));
+    }
+
+    /**
+     *  @notice         Remove a native staked token address
+     */
+    function removeNativeStakedToken(address token) external onlyRole(TREASURER_ROLE) {
+        require(nativeStakedTokensIndex[token] != 0, "Address doesn't exist");
+
+        uint256 indexToRemove = nativeStakedTokensIndex[token] - 1;
+        uint256 lastIndex = _nativeStakedTokens.length - 1;
+
+        if (indexToRemove != lastIndex) {
+            address lastToken = _nativeStakedTokens[lastIndex];
+            _nativeStakedTokens[indexToRemove] = lastToken;
+            nativeStakedTokensIndex[lastToken] = indexToRemove + 1;
+        }
+
+        _nativeStakedTokens.pop();
+        delete nativeStakedTokensIndex[token];
+
+        emit NativeStakedTokenRemoved(address(token));
     }
 
     /**
@@ -146,7 +183,7 @@ contract Treasury is ITreasury, AccessControl {
      */
     function distributeSupportedTokenRewards(address supportedTokenAddress) external onlyRole(TREASURER_ROLE) {
         
-        require(_isSupportedToken(supportedTokenAddress), 'Unsupported token');
+        require(supportedTokensIndex[supportedTokenAddress] != 0 || nativeStakedTokensIndex[supportedTokenAddress] != 0, "Unsupported token");
 
         IERC20 token = IERC20(supportedTokenAddress);
 
@@ -197,7 +234,7 @@ contract Treasury is ITreasury, AccessControl {
                 uint256 vaultBalance;
                 if (address(supportedToken) == address(0)) {
                     // If it's a zero address, consider native token balance
-                    vaultBalance = vault.getNativeTokenBalance();
+                    vaultBalance = address(vault).balance;
                 } else {
                     // If a supported token address is provided, consider the balance of that token
                     IERC20 token = IERC20(supportedToken);
@@ -227,6 +264,10 @@ contract Treasury is ITreasury, AccessControl {
         return _supportedTokens;
     }
 
+    function nativeStakedTokens() external view returns (address[] memory) {
+        return _nativeStakedTokens;
+    }
+
     function oETHTokenAddress() external view returns (address payable) {
         return _oETHTokenAddress;
     }
@@ -243,15 +284,6 @@ contract Treasury is ITreasury, AccessControl {
             }
         }
         return false; // The vault is not in the array
-    }
-
-    function _isSupportedToken(address tokenAddress) internal view returns (bool) {
-        for (uint256 i = 0; i < _supportedTokens.length; i++) {
-            if (_supportedTokens[i] == tokenAddress) {
-                return true;
-            }
-        }
-        return false;
     }
 
     receive() external payable {

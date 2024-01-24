@@ -5,6 +5,8 @@ interface ITreasury {
 
     event SupportedTokenAdded(address tokenAddress);
     event SupportedTokenRemoved(address tokenAddress);
+    event NativeStakedTokenAdded(address tokenAddress);
+    event NativeStakedTokenRemoved(address tokenAddress);
     event AddedOpenVault(address vaultAddress);
     event CollectedOpenVaults();
     event DistributedNativeTokensToLockedVault(address indexed vaultAddress, uint amount);
@@ -18,6 +20,11 @@ interface ITreasury {
      * @notice returns array of supported tokens
      */
     function supportedTokens() external view returns (address[] memory);
+
+    /**
+     * @notice returns array of staked tokens that are treated as equal in value to the native token
+     */
+    function nativeStakedTokens() external view returns (address[] memory);
 
     /**
      * @notice Add an open vault address to the treasury

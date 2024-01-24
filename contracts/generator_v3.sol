@@ -3,10 +3,9 @@ pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./IGenerator.sol";
 import "./IVault.sol";
 
-contract Generator_v3 is IGenerator, AccessControl {
+contract Generator_v3 is AccessControl {
 
 	constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);

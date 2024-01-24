@@ -17,7 +17,7 @@ abstract contract MockSignatureMint is EIP712, ISignatureMint {
 
     bytes32 internal constant TYPEHASH =
         keccak256(
-            "MintRequest(address to,uint128 validityStartTimestamp,uint128 validityEndTimestamp,uint256 quantity,uint256 unlockTime,uint256 targetBalance,string name,string description)"
+            "MintRequest(address to, address baseToken,uint128 validityStartTimestamp,uint128 validityEndTimestamp,uint256 quantity,uint256 unlockTime,uint256 targetBalance,string name,string description)"
         );
 
     constructor() EIP712("SignatureMintERC1155", "1") {}
@@ -66,6 +66,7 @@ abstract contract MockSignatureMint is EIP712, ISignatureMint {
     /*
     struct MintRequest {
         address to;
+        address baseToken;
         uint128 validityStartTimestamp;
         uint128 validityEndTimestamp;
         uint256 quantity;
@@ -84,6 +85,7 @@ abstract contract MockSignatureMint is EIP712, ISignatureMint {
             abi.encode(
                 TYPEHASH,
                 _req.to,
+                _req.baseToken,
                 _req.validityStartTimestamp,
                 _req.validityEndTimestamp,
                 _req.quantity,
@@ -184,12 +186,9 @@ contract MockFactory is
     //////////////////////////////////////////////////////////////*/
     function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {
         return generator.uri(
-            IVault(address(vaults[tokenId])).attributes(),
-            address(vaults[tokenId]),
-            _getPercent(tokenId),
-            IVault(address(vaults[tokenId])).getTotalBalance(),
             _tokenUrlPrefix,
-            tokenId
+            tokenId,
+            address(vaults[tokenId])
         );
     }
 
@@ -223,6 +222,7 @@ contract MockFactory is
 
         /*
         struct Attr {
+            address baseToken;
             uint256 tokenId;
             uint256 unlockTime;
             uint256 startTime;
@@ -232,6 +232,7 @@ contract MockFactory is
         }
         */
         IVault.Attr memory vaultData = IVault.Attr(
+            _req.baseToken,
             tokenIdToMint,
             _req.unlockTime,
             block.timestamp,

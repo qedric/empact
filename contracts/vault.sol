@@ -6,10 +6,10 @@ import "@thirdweb-dev/contracts/extension/Initializable.sol";
 import "./IVault.sol";
 import "./ITreasury.sol";
 
-/*
+/* @notice
     Origin Protocol staked tokens are treated differently to other supported tokens
     because its contract requires a call to be made from the vault contract address
-    to opt-in to staking rewards. 
+    to opt-in to receive staking rewards. 
 
     Origin Protocol still needs to be added as a supported token via the factory contract
 */
@@ -55,19 +55,14 @@ contract Vault is IVault, Initializable {
     }
 
     /*  @notice this needs to be called if target is reached with non native tokens.
-                this needs to be called if no vaults are received after unlock time has been reached.
+                this needs to be called if no tokens are received after unlock time has been reached.
                 this call is not necessary if the target is reached with native tokens only.
     */
     function setStateUnlocked() external {
 
         require(
             state == State.Locked,
-            'Vault is not locked'
-        );
-
-        require(
-            _getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance,
-            'Vault has not met target'
+            'Vault not locked'
         );
 
         require(
@@ -75,18 +70,28 @@ contract Vault is IVault, Initializable {
             'Vault has not reached maturity'
         );
 
+        if (_attributes.targetBalance > 0) {
+            if (_attributes.baseToken == address(0)) { // native token balance
+                require(
+                    _getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance,
+                    'Target not met'
+                );
+            } else {
+                require(
+                    _getTokenBalance(_attributes.baseToken) >= _attributes.targetBalance,
+                    'Target not met'
+                );
+            }
+        }
+
         // set to Unlocked
         state = State.Unlocked;
         emit StateChanged(State.Unlocked);
     }
 
-    /// @notice Supported staked tokens can contribute to the target balance.
+    /// @notice Supported staked tokens can contribute to the native target balance.
     function getTotalBalance() external view returns(uint256 totalBalance) {
         totalBalance = _getStakedTokenBalance() + address(this).balance;
-    }
-
-    function getNativeTokenBalance() external view returns(uint256 balance) {
-        return address(this).balance;
     }
 
     function _getStakedTokenBalance() internal view returns(uint256 totalStakedTokenBalance) {
@@ -113,7 +118,8 @@ contract Vault is IVault, Initializable {
         oETHToken.rebaseOptIn();
     }
 
-    /// @notice transfers the share of available vaults to the recipient and fee recipient
+    /// @notice transfers the share of native & staked tokens OR supported tokens to the recipient
+    /// @notice distributes fees to the fee recipient
     /// @notice If this is the last payout, set state to Open
     function payout(
         address recipient,
@@ -124,49 +130,56 @@ contract Vault is IVault, Initializable {
 
         require(
             state == State.Unlocked,
-            "Vault must be Unlocked"
+            "Must be Unlocked"
         );
+
+        assert(totalSupply > 0);
+        assert(thisOwnerBalance > 0);
 
         // set the state to Open if it's the last payout
         if (totalSupply - thisOwnerBalance == 0 ) {
             // set to Open
             emit StateChanged(State.Open);
             state = State.Open;
-        } 
+        }
 
-        // calculate the ETH amount owed
-        uint256 payoutAmount = address(this).balance * thisOwnerBalance / totalSupply;
-        uint256 payoutFee = payoutAmount * withdrawalFeeBps / 10000;
+        if (_attributes.baseToken == address(0)) { // native token
 
-        require(
-            payoutAmount > 0,
-            "Vault is empty"
-        );
+            // calculate the native token amount owed
+            uint256 payoutAmount = address(this).balance * thisOwnerBalance / totalSupply;
 
-        // send the withdrawal event and pay the owner
-        emit Withdrawal(recipient, payoutAmount - payoutFee, thisOwnerBalance);
-        payable(recipient).transfer(payoutAmount - payoutFee);
+            if (payoutAmount > 0) {
+                // calculate the fee amount
+                uint256 payoutFee = payoutAmount * withdrawalFeeBps / 10000;
 
-        // send the fee to the factory contract owner
-        emit WithdrawalFeePaid(feeRecipient, payoutFee);
-        feeRecipient.transfer(payoutFee);
+                // send the withdrawal event and pay the owner
+                emit Withdrawal(recipient, payoutAmount - payoutFee, thisOwnerBalance);
+                payable(recipient).transfer(payoutAmount - payoutFee);
 
-        // Withdraw supported tokens and calculate the amounts
-        for (uint256 i = 0; i < ITreasury(treasury).supportedTokens().length; i++) {
-            address tokenAddress = ITreasury(treasury).supportedTokens()[i];
-            IERC20 token = IERC20(tokenAddress);
-            uint256 tokenBalance = token.balanceOf(address(this));
+                // send the fee to the factory contract owner
+                emit WithdrawalFeePaid(feeRecipient, payoutFee);
+                feeRecipient.transfer(payoutFee);
+            }
 
-            // Calculate the amount of supported tokens to be withdrawn
-            uint256 tokenPayoutAmount = tokenBalance * thisOwnerBalance / totalSupply;
-            uint256 tokenPayoutFee = tokenPayoutAmount * withdrawalFeeBps / 10000;
+            // withdraw tokens to the recipient & pay fees
+            _withdrawTokens(
+                ITreasury(treasury).nativeStakedTokens(),
+                recipient,
+                feeRecipient,
+                thisOwnerBalance,
+                totalSupply
+            );      
 
-            // Send the withdrawal event and pay the owner with supported tokens
-            emit SupportedTokenWithdrawal(tokenAddress, recipient, tokenPayoutAmount, thisOwnerBalance);
-            token.safeTransfer(recipient, tokenPayoutAmount - tokenPayoutFee);
+        } else { // supported token
 
-            // send the fee to the factory contract owner
-            token.safeTransfer(feeRecipient, tokenPayoutFee);
+            // Withdraw supported tokens and calculate the amounts
+            _withdrawTokens(
+                ITreasury(treasury).supportedTokens(),
+                recipient,
+                feeRecipient,
+                thisOwnerBalance,
+                totalSupply
+            );
         }
 
         return state;
@@ -180,29 +193,74 @@ contract Vault is IVault, Initializable {
             'Vault must be Open'
         );
 
-        emit SendNativeTokenToTreasury(address(this), msg.sender, address(this).balance);
+        emit SendNativeTokenToTreasury(msg.sender, address(this).balance);
 
         // Transfer native ETH balance to the treasury
         payable(msg.sender).transfer(address(this).balance);
 
-        // Transfer all tokens to the treasury
+        // Transfer all supported tokens to the treasury
         for (uint256 i = 0; i < ITreasury(treasury).supportedTokens().length; i++) {
-            address tokenAddress = ITreasury(treasury).supportedTokens()[i];
-            IERC20 token = IERC20(tokenAddress);
-            uint256 tokenBalance = token.balanceOf(address(this));
+            _sendToken(ITreasury(treasury).supportedTokens()[i]);
+        }
+
+        // Transfer all native staked tokens to the treasury
+        for (uint256 i = 0; i < ITreasury(treasury).nativeStakedTokens().length; i++) {
+            _sendToken(ITreasury(treasury).nativeStakedTokens()[i]);
+        }
+    }
+
+    /// @notice sends full balance of a given token to sender
+    function _sendToken(address tokenAddress) internal {
+        IERC20 token = IERC20(tokenAddress);
+        uint256 tokenBalance = token.balanceOf(address(this));
+        if (tokenBalance > 0) {
+            emit SendToken(tokenAddress, msg.sender, tokenBalance);
+            token.safeTransfer(msg.sender, tokenBalance);
+        }
+    }
+
+    /// @notice withdraws a share of token balances to a recipient & sends fees
+    function _withdrawTokens(
+        address[] memory tokens,
+        address recipient,
+        address feeRecipient,
+        uint256 ownerBalance,
+        uint256 totalSupply) internal {
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            IERC20 token = IERC20(tokens[i]);
+            uint256 tokenBalance = _getTokenBalance(tokens[i]);
+
             if (tokenBalance > 0) {
-                emit SendSupportedTokenToTreasury(address(this), msg.sender, tokenAddress, tokenBalance);
-                token.safeTransfer(msg.sender, tokenBalance);
+                uint256 amount = tokenBalance * ownerBalance / totalSupply;
+                uint256 fee = amount * withdrawalFeeBps / 10000;
+
+                // Send the withdrawal event and pay the owner with supported tokens
+                emit TokenWithdrawal(tokens[i], recipient, amount, fee, ownerBalance);
+                token.safeTransfer(recipient, amount - fee);
+
+                // send the fee to the factory contract owner
+                if (fee > 0) {
+                    token.safeTransfer(feeRecipient, fee);  
+                }
             }
         }
     }
 
+    /// @notice gets the vault's current balance of a non-native token
+    function _getTokenBalance(address tokenAddress) internal view returns (uint256) {
+        IERC20 token = IERC20(tokenAddress);
+        return token.balanceOf(address(this));
+    }
+
+    // if native tokens are received
     receive() external payable {
         emit Received(msg.sender, msg.value);
-        if (
-            _getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance &&
-            block.timestamp > _attributes.unlockTime &&
-            state == State.Locked
+        if ( 
+                state == State.Locked &&
+                _attributes.baseToken == address(0) &&
+                block.timestamp > _attributes.unlockTime &&
+                _getStakedTokenBalance() + address(this).balance >= _attributes.targetBalance
             ) {
             // set to Unlocked
             emit StateChanged(State.Unlocked);

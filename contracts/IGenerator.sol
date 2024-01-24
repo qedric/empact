@@ -4,5 +4,5 @@ pragma solidity ^0.8.11;
 import "./IVault.sol";
 
 interface IGenerator {
-	function uri(IVault.Attr calldata attributes, address vaultAddress, uint256 percent, uint256 balance, string memory tokenUrl, uint256 tokenId) external view returns (string memory);
+	function uri(string memory tokenUrl, uint256 tokenId, address vaultAddress) external view returns (string memory);
 }
