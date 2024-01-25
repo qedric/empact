@@ -17,7 +17,7 @@ abstract contract MockSignatureMint is EIP712, ISignatureMint {
 
     bytes32 internal constant TYPEHASH =
         keccak256(
-            "MintRequest(address to, address baseToken,uint128 validityStartTimestamp,uint128 validityEndTimestamp,uint256 quantity,uint256 unlockTime,uint256 targetBalance,string name,string description)"
+            "MintRequest(address to,address baseToken,uint128 validityStartTimestamp,uint128 validityEndTimestamp,uint256 quantity,uint256 unlockTime,uint256 targetBalance,string name,string description)"
         );
 
     constructor() EIP712("SignatureMintERC1155", "1") {}
@@ -127,9 +127,6 @@ contract MockFactory is
     /// @dev The tokenId of the next NFT to mint.
     uint256 internal nextTokenIdToMint_;
 
-    /// @dev prefix for the token url
-    string private _tokenUrlPrefix;
-
     /// @notice The fee to create a new Vault.
     uint256 public makeVaultFee = 0.004 ether;
 
@@ -176,7 +173,6 @@ contract MockFactory is
     //////////////////////////////////////////////////////////////*/
     constructor(address payable _feeRecipient, string memory tokenUrlPrefix) ERC1155('') {
         feeRecipient = _feeRecipient;
-        _tokenUrlPrefix = tokenUrlPrefix;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SIGNER_ROLE, msg.sender);
     }
@@ -329,12 +325,6 @@ contract MockFactory is
     /*//////////////////////////////////////////////////////////////
     Configuration
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice this will display in NFT metadata
-    function setTokenUrlPrefix(string memory tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit TokenUrlPrefixUpdated(_tokenUrlPrefix, tokenUrlPrefix);
-        _tokenUrlPrefix = tokenUrlPrefix;
-    }
 
     /// @notice Sets the fee for creating a new vault
     function setMakeVaultFee(uint256 fee) external onlyRole(DEFAULT_ADMIN_ROLE) {

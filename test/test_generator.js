@@ -6,9 +6,10 @@ const { deploy, deployVaultImplementation, deployGenerator, deployTreasury, getT
 
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
-describe(" -- Testing Generator v2 Contract -- ", function () {
+describe(" -- Testing Generator Contract -- ", function () {
 
   let factory
+  let generator
   let INITIAL_DEFAULT_ADMIN_AND_SIGNER
   let user1
   let feeRecipient
@@ -18,7 +19,7 @@ describe(" -- Testing Generator v2 Contract -- ", function () {
   })
 
   beforeEach(async function () {
-    const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+    const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
     factory = deployedContracts.factory
     generator = deployedContracts.generator
   })
@@ -43,13 +44,25 @@ describe(" -- Testing Generator v2 Contract -- ", function () {
     const vault = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
 
     // Deploy the new generator 
-    const generatorV2 = await deployGenerator("Generator_v3")
-    await generatorV2.deployed()
+    const generator = await deployGenerator("Generator")
+    await generator.deployed()
 
     //set the new generator in the contract
-    await factory.setGenerator(generatorV2.address)
+    await factory.setGenerator(generator.address)
 
     let r = await getImage() // 0%
     console.log(r)
+  })
+
+  it("should set the token URL prefix and emit the TokenUrlPrefixUpdated event", async function () {
+    const newTokenUrlPrefix = "https://new-prefix.com/"
+    const receipt = await generator.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).setTokenUrlPrefix(newTokenUrlPrefix)
+
+    const events = await generator.queryFilter("TokenUrlPrefixUpdated", receipt.blockHash)
+    expect(events.length).to.equal(1)
+
+    const event = events[0]
+    expect(event.args.oldPrefix).to.equal("https://zebra.xyz/")
+    expect(event.args.newPrefix).to.equal(newTokenUrlPrefix)
   })
 })

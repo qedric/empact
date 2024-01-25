@@ -13,12 +13,12 @@ async function deployVaultImplementation(factory_address, treasury_address) {
   return vaultImplementation
 }
 
-async function deployGenerator(contractName) {
+async function deployGenerator(contractName, chainSymbol, tokenUrlPrefix, factory_address) {
 
   const Generator = await ethers.getContractFactory(contractName)
 
   // deploy the generator contract
-  const generator = await Generator.deploy()
+  const generator = await Generator.deploy(chainSymbol, tokenUrlPrefix, factory_address)
   await generator.deployed()
 
   return generator
@@ -35,16 +35,16 @@ async function deployTreasury(factory_address) {
   return treasury
 }
 
-async function deploy(feeRecipient, tokenUrlPrefix) {
+async function deploy(feeRecipient, chainSymbol, tokenUrlPrefix) {
 
   const Factory = await ethers.getContractFactory("Factory")
-  
-  // deploy the generator contract
-  const generator = await deployGenerator('Generator_v1')
 
   // deploy the factory
-  const factory = await Factory.deploy(feeRecipient, tokenUrlPrefix)
+  const factory = await Factory.deploy(feeRecipient)
   await factory.deployed()
+
+  // deploy the generator contract
+  const generator = await deployGenerator('Generator', chainSymbol, tokenUrlPrefix, factory.address)
 
   // deploy the treasury
   const treasury = await deployTreasury(factory.address)
@@ -70,6 +70,7 @@ async function deploy(feeRecipient, tokenUrlPrefix) {
 async function getTypedData(
   factory_address,
   to,
+  baseToken,
   validityStartTimestamp,
   validityEndTimestamp,
   quantity,
@@ -82,6 +83,7 @@ async function getTypedData(
     types: {
       MintRequest: [
         { name: "to", type: "address" },
+        { name: "baseToken", type: "address" },
         { name: "validityStartTimestamp", type: "uint128" },
         { name: "validityEndTimestamp", type: "uint128" },
         { name: "quantity", type: "uint256" },
@@ -100,6 +102,7 @@ async function getTypedData(
     primaryType: 'MintRequest',
     message: {
       to: to,
+      baseToken: baseToken,
       validityStartTimestamp: validityStartTimestamp,
       validityEndTimestamp: validityEndTimestamp,
       quantity: quantity,
@@ -152,6 +155,7 @@ async function generateMintRequest(factory_address, signer, to_address, typedDat
     typedData = await getTypedData(
       factory_address,
       to_address,
+      ethers.constants.AddressZero,
       timestamp,
       endTime,
       4,
@@ -187,11 +191,14 @@ async function makeVault(factory, signer, to) {
 
   // Find the VaultInitialised event within the Vault contract
   const vaultInitialisedEvent = await vault.queryFilter(vault.filters.VaultInitialised(), txReceipt.blockHash);
-
+  
+  //console.log(vaultInitialisedEvent[0].args)
+  
   expect(vaultInitialisedEvent.length).to.equal(1); // Ensure only one VaultInitialised event was emitted
-  expect(vaultInitialisedEvent[0].args.attributes[0]).to.equal(0)
-  expect(vaultInitialisedEvent[0].args.attributes[4]).to.equal('A test vault')
-  expect(vaultInitialisedEvent[0].args.attributes[5]).to.equal('description')
+  expect(vaultInitialisedEvent[0].args.attributes[0]).to.equal(ethers.constants.AddressZero)
+  expect(vaultInitialisedEvent[0].args.attributes[1]).to.equal(0)
+  expect(vaultInitialisedEvent[0].args.attributes[5]).to.equal('A test vault')
+  expect(vaultInitialisedEvent[0].args.attributes[6]).to.equal('description')
 
   return vault
 }
@@ -203,6 +210,7 @@ async function makeVault_100edition_target100_noUnlockTime(factory, signer, to) 
   const typedData = await getTypedData(
     factory.address,
     to.address,
+    ethers.constants.AddressZero,
     timestamp,
     Math.floor(timestamp + 60 * 60 * 24),
     100,
@@ -227,8 +235,8 @@ async function makeVault_100edition_target100_noUnlockTime(factory, signer, to) 
   // Find the VaultInitialised event within the Vault contract
   const vaultInitialisedEvent = await vault.queryFilter(vault.filters.VaultInitialised(), txReceipt.blockHash);
   expect(vaultInitialisedEvent.length).to.equal(1); // Ensure only one VaultInitialised event was emitted
-  expect(vaultInitialisedEvent[0].args.attributes[4]).to.equal('A 100-edition test vault')
-  expect(vaultInitialisedEvent[0].args.attributes[5]).to.equal('no unlock time')
+  expect(vaultInitialisedEvent[0].args.attributes[5]).to.equal('A 100-edition test vault')
+  expect(vaultInitialisedEvent[0].args.attributes[6]).to.equal('no unlock time')
 
   return vault
 }
@@ -239,6 +247,7 @@ async function makeVault_100edition_notarget_99days(factory, signer, to) {
   const typedData = await getTypedData(
     factory.address,
     to.address,
+    ethers.constants.AddressZero,
     timestamp,
     Math.floor(timestamp + 60 * 60 * 24),
     100,
@@ -263,9 +272,9 @@ async function makeVault_100edition_notarget_99days(factory, signer, to) {
   // Find the VaultInitialised event within the Vault contract
   const vaultInitialisedEvent = await vault.queryFilter(vault.filters.VaultInitialised(), txReceipt.blockHash);
   expect(vaultInitialisedEvent.length).to.equal(1); // Ensure only one VaultInitialised event was emitted
-  expect(vaultInitialisedEvent[0].args.attributes[0]).to.equal(2)
-  expect(vaultInitialisedEvent[0].args.attributes[4]).to.equal('A 100-edition test vault')
-  expect(vaultInitialisedEvent[0].args.attributes[5]).to.equal('99 days, no target')
+  expect(vaultInitialisedEvent[0].args.attributes[1]).to.equal(2)
+  expect(vaultInitialisedEvent[0].args.attributes[5]).to.equal('A 100-edition test vault')
+  expect(vaultInitialisedEvent[0].args.attributes[6]).to.equal('99 days, no target')
 
   return vault
 }

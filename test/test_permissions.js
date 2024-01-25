@@ -20,16 +20,8 @@ describe(" -- Testing Permissions & Access -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
-    })
-
-    it("should allow DEFAULT ADMIN run setTokenUrlPrefix()", async function () {
-      expect(await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).setTokenUrlPrefix("https://example.com/"))
-    })
-
-    it("should not allow non DEFAULT ADMIN run setTokenUrlPrefix()", async function () {
-      await expect(factory.connect(user1).setTokenUrlPrefix("https://example.com/")).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
     })
 
     it("should allow DEFAULT ADMIN run setMakeVaultFee()", async function () {
@@ -153,7 +145,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
     })
 
     beforeEach(async function () {
-      deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       treasury = deployedContracts.treasury
     })
 
@@ -489,21 +481,20 @@ describe(" -- Testing Permissions & Access -- ", function () {
       // Attempt to distribute vaults as a non-TREASURER user
       await expect(treasury.connect(user1).distributeSupportedTokenRewards(user1.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/);
     });
-
   })
 
   describe("Testing Vault Roles & permissions", function () {
 
     let vault, factory, treasury
-    let INITIAL_DEFAULT_ADMIN_AND_SIGNER, FEE_RECIPIENT, TREASURER, user1, user2
+    let INITIAL_DEFAULT_ADMIN_AND_SIGNER, feeRecipient, TREASURER, user1, user2
 
     before(async function () {
-      [INITIAL_DEFAULT_ADMIN_AND_SIGNER, FEE_RECIPIENT, TREASURER, user1, user2] = await ethers.getSigners()
+      [INITIAL_DEFAULT_ADMIN_AND_SIGNER, feeRecipient, TREASURER, user1, user2] = await ethers.getSigners()
     })
 
     beforeEach(async function () {
       // Deploy Factory and Treasury contracts
-      const deployedContracts = await deploy(FEE_RECIPIENT.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
 
@@ -536,12 +527,12 @@ describe(" -- Testing Permissions & Access -- ", function () {
 
     it("should allow Factory to call payout function", async function () {
       // Call the payout function using onlyFactory modifier
-      await expect(factory.connect(user1).payout(0)).to.be.revertedWith('Vault must be Unlocked')
+      await expect(factory.connect(user1).payout(0)).to.be.revertedWith('Must be Unlocked')
     })
 
     it("should not allow User to call payout function", async function () {
       // Attempt to call the payout function using onlyFactory modifier by a non-Factory account
-      await expect(vault.connect(user1).payout(user1.address, FEE_RECIPIENT.address, 1, 1)).to.be.revertedWith("onlyFactory")
+      await expect(vault.connect(user1).payout(user1.address, feeRecipient.address, 1, 1)).to.be.revertedWith("onlyFactory")
     })
 
     it("should allow Treasury to call sendToTreasury", async function () {
@@ -567,16 +558,25 @@ describe(" -- Testing Permissions & Access -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       generator = deployedContracts.generator
     })
 
-    it("should allow DEFAULT ADMIN run setSvgColours()", async function () {
-      expect(await generator.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).setSvgColours(0x00300088, 0x300000, 0xf00000, 0x200000, 0xc00000))
+    it("should allow DEFAULT ADMIN run setTokenUrlPrefix()", async function () {
+      expect(await generator.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).setTokenUrlPrefix("https://example.com/"))
     })
 
-    it("should not allow non DEFAULT ADMIN run setSvgColours()", async function () {
-      await expect(generator.connect(user1).setSvgColours(0x00300088, 0x300000, 0xf00000, 0x200000, 0xc00000)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+    it("should not allow non DEFAULT ADMIN run setTokenUrlPrefix()", async function () {
+      await expect(generator.connect(user1).setTokenUrlPrefix("https://example.com/")).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
     })
+
+    /*it("should allow DEFAULT ADMIN run setSvgColours()", async function () {
+      expect(await generator.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).setSvgColours(0x00300088, 0x300000, 0xf00000, 0x200000, 0xc00000))
+    })*/
+
+    /*it("should not allow non DEFAULT ADMIN run setSvgColours()", async function () {
+      //await expect(generator.connect(user1).setSvgColours(0x00300088, 0x300000, 0xf00000, 0x200000, 0xc00000)).to.be.revertedWith(/AccessControl: account .* is missing rol)
+    })
+    */
   })
 })

@@ -20,7 +20,7 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
     })
 
@@ -33,7 +33,6 @@ describe(" -- Testing Factory Contract -- ", function () {
     it("should successfully mint new tokens and initalise vaults", async function () {
       const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
       const mr = await generateMintRequest(factory.address, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
-
       const initialBalanceUser1 = await factory.balanceOf(user1.address, 0)
 
       const tx = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(mr.typedData.message, mr.signature, { value: makeVaultFee })
@@ -69,6 +68,7 @@ describe(" -- Testing Factory Contract -- ", function () {
 
       const typedData = await getTypedData(
         factory.address,
+        ethers.constants.AddressZero,
         user1.address,
         startTime,
         endTime,
@@ -107,6 +107,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const typedData = await getTypedData(
         factory.address,
         user1.address,
+        ethers.constants.AddressZero,
         startTime,
         endTime,
         4,
@@ -145,6 +146,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const typedData = await getTypedData(
         factory.address,
         user1.address,
+        ethers.constants.AddressZero,
         startTime,
         endTime,
         4,
@@ -183,6 +185,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const typedData = await getTypedData(
         factory.address,
         user1.address,
+        ethers.constants.AddressZero,
         startTime,
         endTime,
         0,
@@ -218,21 +221,9 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
-    })
-
-    it("should set the token URL prefix and emit the TokenUrlPrefixUpdated event", async function () {
-      const newTokenUrlPrefix = "https://new-prefix.com/"
-      const receipt = await factory.connect(owner).setTokenUrlPrefix(newTokenUrlPrefix)
-
-      const events = await factory.queryFilter("TokenUrlPrefixUpdated", receipt.blockHash)
-      expect(events.length).to.equal(1)
-
-      const event = events[0]
-      expect(event.args.oldPrefix).to.equal("https://zebra.xyz/")
-      expect(event.args.newPrefix).to.equal(newTokenUrlPrefix)
     })
 
     it("should set the make vault fee and emit the MakeVaultFeeUpdated event", async function () {
@@ -280,7 +271,7 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
 
     it("should set the Generator address and emit the GeneratorUpdated event", async function () {
-      const newGenerator = await deployGenerator('Generator_v1')
+      const newGenerator = await deployGenerator('Generator', 'SepoliaETH', 'https://zebra.xyz/', factory.address)
       const receipt = await factory.connect(owner).setGenerator(newGenerator.address)
 
       const events = await factory.queryFilter("GeneratorUpdated", receipt.blockHash)
@@ -314,7 +305,7 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
       vault = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
@@ -379,6 +370,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const typedData = await getTypedData(
         factory.address,
         user2.address,
+        ethers.constants.AddressZero,
         startTime,
         endTime,
         1,
@@ -482,7 +474,7 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       vault = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
     })
@@ -557,7 +549,7 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
     })
@@ -596,7 +588,7 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
     })

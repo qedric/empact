@@ -20,7 +20,7 @@ describe(" -- Testing Vault Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
     })
 
@@ -66,7 +66,7 @@ describe(" -- Testing Vault Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
       vault = await makeVault(factory, owner, user1)
@@ -122,7 +122,7 @@ describe(" -- Testing Vault Contract -- ", function () {
         value: amountToSend,
       })
 
-      await expect(vault.setStateUnlocked()).to.be.revertedWith('Vault is not locked')
+      await expect(vault.setStateUnlocked()).to.be.revertedWith('Vault not locked')
     })
 
     it("should fail to setStateUnlocked if target is not reached", async function () {
@@ -156,7 +156,7 @@ describe(" -- Testing Vault Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
       vault = await makeVault(factory, owner, user1)
@@ -203,7 +203,7 @@ describe(" -- Testing Vault Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
       vault = await makeVault(factory, owner, user1)
@@ -225,7 +225,7 @@ describe(" -- Testing Vault Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
       vault = await makeVault(factory, owner, user1)
@@ -377,7 +377,7 @@ describe(" -- Testing Vault Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
       vault = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
@@ -391,7 +391,7 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       // Try to transfer tokens out of the vault contract before unlock
       await expect(factory.connect(user1).payout(0))
-        .to.be.revertedWith("Vault must be Unlocked")
+        .to.be.revertedWith("Must be Unlocked")
     })
 
     it("should update the vault state to Open when last payout", async function () {
@@ -919,7 +919,7 @@ describe(" -- Testing Vault Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      const deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
       lockedVault = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)

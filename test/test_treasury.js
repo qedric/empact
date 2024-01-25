@@ -16,7 +16,7 @@ describe(" -- Testing Treasury Contract -- ", function () {
   })
 
   beforeEach(async function () {
-    deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+    deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
     treasury = deployedContracts.treasury
     // grant TREASURY ROLE
     const treasurerRole = treasury.TREASURER_ROLE()
@@ -132,7 +132,7 @@ describe(" -- Testing Treasury Contract -- ", function () {
     })
 
     beforeEach(async function () {
-      deployedContracts = await deploy(feeRecipient.address, 'https://zebra.xyz/')
+      deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
       factory = deployedContracts.factory
       treasury = deployedContracts.treasury
       lockedVault = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
@@ -518,6 +518,5 @@ describe(" -- Testing Treasury Contract -- ", function () {
       expect(await token1.balanceOf(treasury.address)).to.be.closeTo(0, 5000)
       expect(await token2.balanceOf(treasury.address)).to.be.closeTo(0, 5000)
     })
-
   })
 })
