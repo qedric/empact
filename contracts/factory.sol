@@ -118,7 +118,6 @@ contract Factory is
     event GeneratorUpdated(address indexed generator);
     event TreasuryUpdated(address indexed treasury);
     event Payout(address indexed vaultAddress, uint256 tokenId);
-    event TokenUrlPrefixUpdated(string oldPrefix, string newPrefix);
 
     /*//////////////////////////////////////////////////////////////
     State variables
@@ -126,9 +125,6 @@ contract Factory is
 
     /// @dev The tokenId of the next NFT to mint.
     uint256 internal nextTokenIdToMint_;
-
-    /// @dev prefix for the token url
-    string private _tokenUrlPrefix;
 
     /// @notice The fee to create a new Vault.
     uint256 public makeVaultFee = 0.004 ether;
@@ -174,9 +170,8 @@ contract Factory is
     /*//////////////////////////////////////////////////////////////
     Constructor
     //////////////////////////////////////////////////////////////*/
-    constructor(address payable _feeRecipient, string memory tokenUrlPrefix) ERC1155('') {
+    constructor(address payable _feeRecipient) ERC1155('') {
         feeRecipient = _feeRecipient;
-        _tokenUrlPrefix = tokenUrlPrefix;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SIGNER_ROLE, msg.sender);
     }
@@ -185,11 +180,7 @@ contract Factory is
     Overriden metadata logic - On-chain
     //////////////////////////////////////////////////////////////*/
     function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {
-        return generator.uri(
-            _tokenUrlPrefix,
-            tokenId,
-            address(vaults[tokenId])
-        );
+        return generator.uri(tokenId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -303,12 +294,6 @@ contract Factory is
     /*//////////////////////////////////////////////////////////////
     Configuration
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice this will display in NFT metadata
-    function setTokenUrlPrefix(string memory tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit TokenUrlPrefixUpdated(_tokenUrlPrefix, tokenUrlPrefix);
-        _tokenUrlPrefix = tokenUrlPrefix;
-    }
 
     /// @notice Sets the fee for creating a new vault
     function setMakeVaultFee(uint256 fee) external onlyRole(DEFAULT_ADMIN_ROLE) {

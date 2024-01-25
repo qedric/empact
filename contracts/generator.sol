@@ -12,77 +12,81 @@ interface IExtendedERC20 is IERC20 {
     function symbol() external view returns (string memory);
 }
 
-contract Generator is IGenerator, AccessControl {
+interface IFactory {
+    function vaults(uint256 tokenId) external view returns (address);
+}
 
-    string internal _chainSymbol;
+contract Generator is IGenerator, AccessControl {
     using SafeERC20 for IERC20;
 
-    constructor(string memory chainSymbol) {
+    IFactory public immutable factory;
+
+    /// @dev prefix for the token url
+    string private _tokenUrlPrefix;
+    string internal _chainSymbol;
+
+    event TokenUrlPrefixUpdated(string oldPrefix, string newPrefix);
+
+    constructor(string memory chainSymbol, string memory tokenUrlPrefix, address _factory) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _chainSymbol = chainSymbol;
+        _tokenUrlPrefix = tokenUrlPrefix;
+        factory = IFactory(_factory);
     }
 
-    function uri(string memory tokenUrl, uint256 tokenId, address vaultAddress) external view returns (string memory) {
-        
-        IVault.Attr memory attributes = IVault(vaultAddress).attributes();
-        string memory baseAttributes = _generateBaseAttributes(attributes, vaultAddress, _calculatePercent(attributes, _getBalance(attributes, vaultAddress)), _getBalance(attributes, vaultAddress));
+    function uri(uint256 tokenId) external view returns (string memory) {
 
+        // get the vault in question
+        IVault vault = IVault(factory.vaults(tokenId));
+        IVault.Attr memory attributes = vault.attributes();
+
+        uint256 percent = 50;
+        uint256 balance = 23434652345346;
+        
         return string(
             abi.encodePacked(
                 "data:application/json;base64,",
-                Base64.encode(bytes(_generateJson(tokenUrl, tokenId, attributes, baseAttributes, vaultAddress)))
+                Base64.encode(
+                    bytes(
+                        abi.encodePacked(
+                            '{"name":"',
+                            attributes.name,
+                            '","description":"',
+                            attributes.description,
+                            '","image_data":"',
+                            _generateSVG(percent),
+                            '","external_url":"',
+                            _tokenUrlPrefix,
+                            _uint2str(attributes.tokenId),
+                            '","',
+                            _generateAttributes(
+                                attributes,
+                                factory.vaults(tokenId),
+                                percent,
+                                balance
+                            ),
+                            '}'
+                        )
+                    )   
+                )
             )
         );
     }
 
-    function _generateJson(
-        string memory tokenUrl,
-        uint256 tokenId,
-        IVault.Attr memory attributes,
-        string memory baseAttributes,
-        address vaultAddress
-    ) internal view returns (string memory) {
-        return string(abi.encodePacked(
-            '{"name":"', attributes.name,
-            '","description":"', attributes.description,
-            '","image_data":"', _generateSVG(_calculatePercent(attributes, _getBalance(attributes, vaultAddress))),
-            '","external_url":"', tokenUrl,
-            _uint2str(tokenId),
-            '","', baseAttributes, '}'
-        ));
-    }
-
-    function _generateBaseAttributes(
-        IVault.Attr memory attributes,
-        address vaultAddress,
-        uint256 percent,
-        uint256 balance
-    ) internal view returns (string memory) {
+    function _generateAttributes(IVault.Attr memory attributes, address receiveAddress, uint256 percent, uint256 balance) internal pure returns(string memory) {
         return string(abi.encodePacked(
             'attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
             _uint2str(attributes.unlockTime),
             '},{"trait_type":"Target Balance","value":"',
             _convertWeiToEthString(attributes.targetBalance),
-            ' ',
-            _getTokenSymbol(attributes.baseToken),
-            '"},{"trait_type":"Current Balance","value":"',
+            ' ETH"},{"trait_type":"Current Balance","value":"',
             _convertWeiToEthString(balance),
-            ' ',
-            _getTokenSymbol(attributes.baseToken),
-            '"},{"trait_type":"Receive Address","value":"0x',
-            _toAsciiString(vaultAddress),
+            ' ETH"},{"trait_type":"Receive Address","value":"0x',
+            _toAsciiString(receiveAddress),
             '"},{"display_type":"boost_percentage","trait_type":"Percent Complete","value":',
             _uint2str(percent),
             '}]'
         ));
-    }
-
-    function _getBalance(IVault.Attr memory attributes, address vaultAddress) internal view returns (uint256) {
-        if (attributes.baseToken == address(0)) {
-            return IVault(vaultAddress).getTotalBalance();
-        } else {
-            return IERC20(attributes.baseToken).balanceOf(vaultAddress);
-        }
     }
 
     // Check if the IERC20 token has a name and symbol
@@ -137,36 +141,15 @@ contract Generator is IGenerator, AccessControl {
         }
     }
 
-    /// @dev calculates the percentage towards unlock based on time and target balance
-    function _calculatePercent(
-        IVault.Attr memory attributes,
-        uint256 currentBalance
-    ) internal view returns (uint256 percentage) {
-
-        uint256 percentageBasedOnTime = 0;
-        uint256 percentageBasedOnBalance = 0;
-
-        if (block.timestamp >= attributes.unlockTime) {
-            percentageBasedOnTime = 100;
-        } else {
-            uint256 totalTime = attributes.unlockTime - attributes.startTime;
-            uint256 timeElapsed = block.timestamp - attributes.startTime;
-            percentageBasedOnTime = uint256((timeElapsed * 100) / totalTime);
-        }
-
-        if (currentBalance >= attributes.targetBalance) {
-            percentageBasedOnBalance = 100;
-        } else if (attributes.targetBalance > 0 && currentBalance > 0) {
-            percentageBasedOnBalance = uint256((currentBalance * 100) / attributes.targetBalance);
-        }
-
-        // Return the lower value between percentageBasedOnBalance and percentageBasedOnTime
-        percentage = percentageBasedOnBalance < percentageBasedOnTime ? percentageBasedOnBalance : percentageBasedOnTime;
-    }
-
     /*
         UTILS - internal functions only
     */
+
+    /// @notice this will display in NFT metadata
+    function setTokenUrlPrefix(string memory tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit TokenUrlPrefixUpdated(_tokenUrlPrefix, tokenUrlPrefix);
+        _tokenUrlPrefix = tokenUrlPrefix;
+    }
 
     function _uint2str(
         uint _i
