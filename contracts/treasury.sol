@@ -174,8 +174,7 @@ contract Treasury is ITreasury, AccessControl {
             }
         }
 
-        emit DistributedNativeTokensToLockedVaults(balanceBeforeDistribution, nRecipients);
-        
+        emit DistributedNativeTokensToLockedVaults(balanceBeforeDistribution, nRecipients); 
     }
 
     /**

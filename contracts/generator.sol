@@ -40,8 +40,8 @@ contract Generator is IGenerator, AccessControl {
         IVault vault = IVault(factory.vaults(tokenId));
         IVault.Attr memory attributes = vault.attributes();
 
-        uint256 percent = 50;
-        uint256 balance = 23434652345346;
+        uint256 balance = _getBalance(vault);
+        uint256 percent = _getPercent(vault, balance);
         
         return string(
             abi.encodePacked(
@@ -73,44 +73,23 @@ contract Generator is IGenerator, AccessControl {
         );
     }
 
-    function _generateAttributes(IVault.Attr memory attributes, address receiveAddress, uint256 percent, uint256 balance) internal pure returns(string memory) {
+    function _generateAttributes(IVault.Attr memory attributes, address receiveAddress, uint256 percent, uint256 balance) internal view returns(string memory) {
+        string memory baseTokenSymbol = attributes.baseToken == address(0) ? _chainSymbol : IExtendedERC20(attributes.baseToken).symbol();
         return string(abi.encodePacked(
             'attributes":[{"display_type":"date","trait_type":"Maturity Date","value":',
             _uint2str(attributes.unlockTime),
-            '},{"trait_type":"Target Balance","value":"',
+            '},{"trait_type":"Vault Asset","value":"',
+            baseTokenSymbol,
+            '"},{"trait_type":"Target Balance","value":"',
             _convertWeiToEthString(attributes.targetBalance),
-            ' ETH"},{"trait_type":"Current Balance","value":"',
+            '"},{"trait_type":"Current Balance","value":"',
             _convertWeiToEthString(balance),
-            ' ETH"},{"trait_type":"Receive Address","value":"0x',
+            '"},{"trait_type":"Receive Address","value":"0x',
             _toAsciiString(receiveAddress),
             '"},{"display_type":"boost_percentage","trait_type":"Percent Complete","value":',
             _uint2str(percent),
             '}]'
         ));
-    }
-
-    // Check if the IERC20 token has a name and symbol
-    function _getTokenSymbol(address baseTokenAddress) internal view returns (string memory tokenSymbol) {
-        if (baseTokenAddress == address(0)) {
-            tokenSymbol = _chainSymbol;
-        } else {
-            try IExtendedERC20(baseTokenAddress).name() returns (string memory tokenName) {
-                try IExtendedERC20(baseTokenAddress).symbol() returns (string memory tokenSym) {
-                    tokenSymbol = string(abi.encodePacked(tokenName, ' (', tokenSym, ')'));
-                } catch {
-                    // Fallback if symbol() is not available but name() is
-                    tokenSymbol = tokenName;
-                }
-            } catch {
-                try IExtendedERC20(baseTokenAddress).symbol() returns (string memory tokenSym) {
-                    // Fallback if name() is not available but symbol() is
-                    tokenSymbol = tokenSym;
-                } catch {
-                    // Fallback if neither name() nor symbol() is available
-                    tokenSymbol = "";
-                }
-            }
-        }
     }
 
     function _generateSVG(uint256 percent) internal pure returns (bytes memory) {
@@ -139,6 +118,36 @@ contract Generator is IGenerator, AccessControl {
                 'H1200V', _uint2str(yCoordinate), 'Z" fill="white"/>\n'
             ));
         }
+    }
+
+    function _getBalance(IVault vault) internal view returns(uint256) {
+        return vault.attributes().baseToken == address(0)
+            ? vault.getTotalBalance()
+            : IERC20(vault.attributes().baseToken).balanceOf(address(vault));
+    }
+
+     /// @dev calculates the percentage towards unlock based on time and target balance
+    function _getPercent(IVault vault, uint256 balance) internal view returns (uint256 percentage) {
+
+        uint256 percentageBasedOnTime = 0;
+        uint256 percentageBasedOnBalance = 0;
+
+        if (block.timestamp >= vault.attributes().unlockTime) {
+            percentageBasedOnTime = 100;
+        } else {
+            uint256 totalTime = vault.attributes().unlockTime - vault.attributes().startTime;
+            uint256 timeElapsed = block.timestamp - vault.attributes().startTime;
+            percentageBasedOnTime = uint256((timeElapsed * 100) / totalTime);
+        }
+
+        if (balance >= vault.attributes().targetBalance) {
+            percentageBasedOnBalance = 100;
+        } else if (vault.attributes().targetBalance > 0 && balance > 0) {
+            percentageBasedOnBalance = uint256((balance * 100) / vault.attributes().targetBalance);
+        }
+
+        // Return the lower value between percentageBasedOnBalance and percentageBasedOnTime
+        percentage = percentageBasedOnBalance < percentageBasedOnTime ? percentageBasedOnBalance : percentageBasedOnTime;
     }
 
     /*

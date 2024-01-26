@@ -171,7 +171,7 @@ contract MockFactory is
     /*//////////////////////////////////////////////////////////////
     Constructor
     //////////////////////////////////////////////////////////////*/
-    constructor(address payable _feeRecipient, string memory tokenUrlPrefix) ERC1155('') {
+    constructor(address payable _feeRecipient) ERC1155('') {
         feeRecipient = _feeRecipient;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SIGNER_ROLE, msg.sender);

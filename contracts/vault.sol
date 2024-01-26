@@ -118,9 +118,9 @@ contract Vault is IVault, Initializable {
         oETHToken.rebaseOptIn();
     }
 
-    /// @notice transfers the share of native & staked tokens OR supported tokens to the recipient
+    /// @notice transfers the share of native & staked tokens OR supported token to the recipient
     /// @notice distributes fees to the fee recipient
-    /// @notice If this is the last payout, set state to Open
+    /// @notice If this is the last payout, sets state to Open
     function payout(
         address recipient,
         address payable feeRecipient,
@@ -161,7 +161,7 @@ contract Vault is IVault, Initializable {
                 feeRecipient.transfer(payoutFee);
             }
 
-            // withdraw tokens to the recipient & pay fees
+            // withdraw native staked tokens to the recipient & pay fees
             _withdrawTokens(
                 ITreasury(treasury).nativeStakedTokens(),
                 recipient,
@@ -190,13 +190,15 @@ contract Vault is IVault, Initializable {
 
         require(
             state == State.Open,
-            'Vault must be Open'
+            'State not Open'
         );
 
         emit SendNativeTokenToTreasury(msg.sender, address(this).balance);
 
         // Transfer native ETH balance to the treasury
-        payable(msg.sender).transfer(address(this).balance);
+        if (address(this).balance > 0) {
+            payable(msg.sender).transfer(address(this).balance);    
+        }
 
         // Transfer all supported tokens to the treasury
         for (uint256 i = 0; i < ITreasury(treasury).supportedTokens().length; i++) {
@@ -249,8 +251,7 @@ contract Vault is IVault, Initializable {
 
     /// @notice gets the vault's current balance of a non-native token
     function _getTokenBalance(address tokenAddress) internal view returns (uint256) {
-        IERC20 token = IERC20(tokenAddress);
-        return token.balanceOf(address(this));
+        return IERC20(tokenAddress).balanceOf(address(this));
     }
 
     // if native tokens are received
