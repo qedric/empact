@@ -43,15 +43,12 @@ describe(" -- Testing Generator Contract -- ", function () {
     // Generate a sample token and its attributes
     const vault = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
 
-    // Deploy the new generator 
-    const generator = await deployGenerator("Generator")
-    await generator.deployed()
-
-    //set the new generator in the contract
-    await factory.setGenerator(generator.address)
+    //console.log(vault)
 
     let r = await getImage() // 0%
-    console.log(r)
+
+    expect(r.percent).to.equal(0)
+    //console.log(r)
   })
 
   it("should set the token URL prefix and emit the TokenUrlPrefixUpdated event", async function () {

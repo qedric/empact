@@ -298,7 +298,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const factory = deployedContracts.factory
       // now deploy the mock factory
       const MockFactory = await ethers.getContractFactory("MockFactory")
-      const fake_factory = await MockFactory.deploy(feeRecipient.address, '')
+      const fake_factory = await MockFactory.deploy(feeRecipient.address)
       // wait for it to finish deploying
       await fake_factory.deployed()
 

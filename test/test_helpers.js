@@ -279,6 +279,53 @@ async function makeVault_100edition_notarget_99days(factory, signer, to) {
   return vault
 }
 
+async function makeLockedVault(factory, signer, to) {
+
+  // get new vault: 
+  const v = await makeVault_100edition_target100_noUnlockTime(factory, signer, to)
+
+  // verify that it is locked
+  expect(await v.state()).to.equal(0)
+
+  return v
+}
+
+async function makeUnlockedVault(factory, signer, to) {
+
+  // get new vault: 
+  const v = await makeLockedVault(factory, signer, to)
+
+  // send ETH to unlock it:
+  let tokenAmount = ethers.utils.parseUnits("100", 18)
+  await signer.sendTransaction({
+    to: v.address,
+    value: tokenAmount,
+  })
+
+  // verify that it is unlocked
+  expect(await v.state()).to.equal(1)
+
+  return v
+}
+
+async function makeOpenVault(factory, signer, to) {
+
+  // get new Locked vault: 
+  const v = await makeUnlockedVault(factory, signer, to)
+
+  // get the tokenId so we can call payout on it
+  const attributes = await v.attributes()
+
+  // call payout to open it
+  let tx = await factory.connect(signer).payout(attributes.tokenId)
+  tx.wait()
+
+  // verify that it is open
+  expect(await v.state()).to.equal(2)
+
+  return v
+}
+
 // Export the functions
 module.exports = {
   deploy,
@@ -292,6 +339,9 @@ module.exports = {
   deployMockOETHToken,
   generateMintRequest,
   makeVault,
+  makeLockedVault,
+  makeUnlockedVault,
+  makeOpenVault,
   makeVault_100edition_target100_noUnlockTime,
   makeVault_100edition_notarget_99days
 }
