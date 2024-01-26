@@ -2,22 +2,22 @@
 const { expect, assert } = require("chai")
 const { ethers, upgrades, network } = require("hardhat")
 const helpers = require("@nomicfoundation/hardhat-network-helpers")
-const { deploy, deployVaultImplementation, deployGenerator, deployTreasury, getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, deployMockOETHToken, generateMintRequest, makeVault, makeVault_100edition_target100_noUnlockTime, makeVault_100edition_notarget_99days } = require("./test_helpers")
+const { deploy, deployVaultImplementation, deployGenerator, deployTreasury, getTypedData, getRevertReason, getCurrentBlockTime, deployMockToken, deployMockOETHToken, generateMintRequest, makeVault, makeLockedVault, makeOpenVault, makeUnlockedVault } = require("./test_helpers")
 
 const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
 describe(" -- Testing Treasury Contract -- ", function () {
-  let deployedContracts, treasury
-  let user1, TREASURER
-  let feeRecipient
+  let deployedContracts, factory, treasury
+  let user1, user2, feeRecipient, TREASURER
 
   before(async function () {
-    [user1, feeRecipient, TREASURER] = await ethers.getSigners()
+    [user1, user2, feeRecipient, TREASURER] = await ethers.getSigners()
   })
 
   beforeEach(async function () {
     deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
     treasury = deployedContracts.treasury
+    factory = deployedContracts.factory
     // grant TREASURY ROLE
     const treasurerRole = treasury.TREASURER_ROLE()
     await treasury.grantRole(treasurerRole, TREASURER.address)
@@ -44,30 +44,58 @@ describe(" -- Testing Treasury Contract -- ", function () {
       expect(updatedOETHAddress).to.equal(user1.address)
     })
 
-    it("should add and remove supported tokens", async function () {
-      const token1 = await deployMockToken("Token1", "T1");
-      const token2 = await deployMockToken("Token2", "T2");
+    it("should add and remove native staked tokens", async function () {
+      const ns_token1 = await deployMockToken("Token1", "T1");
+      const ns_token2 = await deployMockToken("Token2", "T2");
 
-      // Add token1 as a supported token
-      let tx = await treasury.addSupportedToken(token1.address)
+      // Add ns_token1 as a supported token
+      let tx = await treasury.addNativeStakedToken(ns_token1.address)
+      tx.wait()
+      let supportedTokens = await treasury.nativeStakedTokens()
+      expect(supportedTokens[0]).to.equal(ns_token1.address)
+
+      // Add ns_token2 as a supported token
+      tx = await treasury.addNativeStakedToken(ns_token2.address)
+      tx.wait()
+
+      supportedTokens = await treasury.nativeStakedTokens()
+      expect(supportedTokens[1]).to.equal(ns_token2.address)
+
+      // Remove ns_token1 from supported tokens
+      await treasury.removeNativeStakedToken(ns_token1.address)
+      supportedTokens = await treasury.nativeStakedTokens()
+      expect(supportedTokens[0]).to.equal(ns_token2.address)
+
+      // Remove ns_token2 from supported tokens
+      await treasury.removeNativeStakedToken(ns_token2.address)
+      supportedTokens = await treasury.nativeStakedTokens()
+      expect(supportedTokens.length).to.equal(0)
+    })
+
+    it("should add and remove supported tokens", async function () {
+      const ns_token1 = await deployMockToken("Token1", "T1");
+      const ns_token2 = await deployMockToken("Token2", "T2");
+
+      // Add ns_token1 as a supported token
+      let tx = await treasury.addSupportedToken(ns_token1.address)
       tx.wait()
       let supportedTokens = await treasury.supportedTokens()
-      expect(supportedTokens[0]).to.equal(token1.address)
+      expect(supportedTokens[0]).to.equal(ns_token1.address)
 
-      // Add token2 as a supported token
-      tx = await treasury.addSupportedToken(token2.address)
+      // Add ns_token2 as a supported token
+      tx = await treasury.addSupportedToken(ns_token2.address)
       tx.wait()
 
       supportedTokens = await treasury.supportedTokens()
-      expect(supportedTokens[1]).to.equal(token2.address)
+      expect(supportedTokens[1]).to.equal(ns_token2.address)
 
-      // Remove token1 from supported tokens
-      await treasury.removeSupportedToken(token1.address)
+      // Remove ns_token1 from supported tokens
+      await treasury.removeSupportedToken(ns_token1.address)
       supportedTokens = await treasury.supportedTokens()
-      expect(supportedTokens[0]).to.equal(token2.address)
+      expect(supportedTokens[0]).to.equal(ns_token2.address)
 
-      // Remove token2 from supported tokens
-      await treasury.removeSupportedToken(token2.address)
+      // Remove ns_token2 from supported tokens
+      await treasury.removeSupportedToken(ns_token2.address)
       supportedTokens = await treasury.supportedTokens()
       expect(supportedTokens.length).to.equal(0)
     })
@@ -78,7 +106,6 @@ describe(" -- Testing Treasury Contract -- ", function () {
     /*addOpenVault*/
     it("should add a vault to the openVaults array", async function () {
       // get the deployed factory
-      const factory = deployedContracts.factory
       const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
       const mr = await generateMintRequest(factory.address, user1, user1.address)
       const tx = await factory.connect(user1).mintWithSignature(
@@ -116,82 +143,83 @@ describe(" -- Testing Treasury Contract -- ", function () {
   })
 
   describe("Collect & Distribute", function () {
-    let deployedContracts, factory, treasury
     let lockedVault, unlockedVault, openVault
-    let user1, user2
-    let feeRecipient
-    let token1, token2
+    let ns_token1, ns_token2, s_token1, s_token2
 
-    before(async function () {
-      [user1, user2, feeRecipient] = await ethers.getSigners()
+    beforeEach(async function () {
+
+      lockedVault = await makeLockedVault(factory, user1, user1)
+      unlockedVault = await makeUnlockedVault(factory, user1, user1)
+      openVault = await makeOpenVault(factory, user1, user1)
+
+      // Deploy mock ERC20 tokens for testing native staked tokens
+      const MockToken = await ethers.getContractFactory("MockToken")
+      ns_token1 = await MockToken.deploy("Native Staked Token 1", "ETH1")
+      await ns_token1.deployed()
+      ns_token2 = await MockToken.deploy("Native Staked Token 2", "ETH2")
+      await ns_token2.deployed()
+
+      // Deploy mock ERC20 tokens for testing supported tokens
+      s_token1 = await MockToken.deploy("Supported Token 1", "ST1")
+      await s_token1.deployed()
+      s_token2 = await MockToken.deploy("Supported Token 2", "ST2")
+      await s_token2.deployed()
+
+      // Approve our mock tokens:
+      await treasury.addNativeStakedToken(ns_token1.address)
+      await treasury.addNativeStakedToken(ns_token2.address)
+      await treasury.addSupportedToken(s_token1.address)
+      await treasury.addSupportedToken(s_token2.address)
     })
 
     it("should fail if there are no vaults to collect from", async function () {
-      const treasury_with_no_vaults = await deploy(feeRecipient.address, 'https://zebra.xyz/').then((x) => x.treasury)
-      await expect(treasury_with_no_vaults.collect()).to.be.revertedWith("No open vaults to collect from")
+      const treasury_with_no_vaults = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/').then((x) => x.treasury)
+      await expect(treasury_with_no_vaults.connect(user1).collect()).to.be.revertedWith("No open vaults to collect from")
     })
 
-    beforeEach(async function () {
-      deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
-      factory = deployedContracts.factory
-      treasury = deployedContracts.treasury
-      lockedVault = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
-      unlockedVault = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
-      openVault = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
-      
-      const treasurerRole = treasury.TREASURER_ROLE()
-      await treasury.grantRole(treasurerRole, user1.address)
+    it("should collect open vault assets and not locked or unlocked assets", async function () {
 
-      // Deploy mock ERC20 tokens for testing
-      const MockToken = await ethers.getContractFactory("MockToken")
-      token1 = await MockToken.deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
-      token2 = await MockToken.deploy("Mock Token 2", "MOCK2")
-      await token2.deployed()
+      // 1. setup a locked vault with native, staked, and supported tokens:
 
-      // Approve our mock tokens:
-      await treasury.addSupportedToken(token1.address)
-      await treasury.addSupportedToken(token2.address)
+      let tokenAmount = ethers.utils.parseUnits("10", 18)
 
-      // Transfer enough tokens to reach 66% target amount of unlocked and open vaults
-      let tokenAmount = ethers.utils.parseUnits("33", 18)
-      await token1.transfer(unlockedVault.address, tokenAmount)
-      await token2.transfer(unlockedVault.address, tokenAmount)
-      await token1.transfer(openVault.address, tokenAmount)
-      await token2.transfer(openVault.address, tokenAmount)
-
-      // send the remaining required ETH:
-      let ethToSend = ethers.utils.parseUnits("34", 18)
+      /*
+        Locked vault has 10 of each native, staked, and supported tokens
+      */
       await user2.sendTransaction({
-        to: unlockedVault.address,
-        value: ethToSend,
+        to: lockedVault.address,
+        value: tokenAmount,
       })
+      await ns_token1.transfer(lockedVault.address, tokenAmount)
+      await ns_token2.transfer(lockedVault.address, tokenAmount)
+      await s_token1.transfer(lockedVault.address, tokenAmount)
+      await s_token2.transfer(lockedVault.address, tokenAmount)
+
+      /*
+        UnLocked vault has 50 of each staked & supported tokens
+      */
+      tokenAmount = ethers.utils.parseUnits("50", 18)
+      await ns_token1.transfer(unlockedVault.address, tokenAmount)
+      await ns_token2.transfer(unlockedVault.address, tokenAmount)
+
+      /*
+        Open vault gets 50 of each native, staked, and supported tokens
+      */
       await user2.sendTransaction({
         to: openVault.address,
-        value: ethToSend,
+        value: tokenAmount,
       })
+      await ns_token1.transfer(openVault.address, tokenAmount)
+      await ns_token2.transfer(openVault.address, tokenAmount)
+      await s_token1.transfer(openVault.address, tokenAmount)
+      await s_token2.transfer(openVault.address, tokenAmount)
 
-      // call payout on the open vault (index 2) to set it to Open
-      const tx = await factory.connect(user1).payout(2)
-      tx.wait()
-
-      // Transfer some tokens to the open vault
-      tokenAmount = ethers.utils.parseUnits("60", 18)
-      await token1.transfer(openVault.address, tokenAmount)
-      await token2.transfer(openVault.address, tokenAmount)
-
-      // and some ETH:
-      ethToSend = ethers.utils.parseUnits("60", 18)
-      await user2.sendTransaction({
-        to: openVault.address,
-        value: ethToSend,
-      })
-
-      // confirm we have one of each vault
+      // confirm we have one of each vault in correct states
       expect(await treasury.isOpenVault(openVault.address)).to.be.true
       expect(await treasury.isOpenVault(lockedVault.address)).to.be.false
       expect(await treasury.isOpenVault(unlockedVault.address)).to.be.false
 
+      // check states again using direct method
       expect(await lockedVault.state()).to.equal(0)
       expect(await unlockedVault.state()).to.equal(1)
       expect(await openVault.state()).to.equal(2)
@@ -199,44 +227,58 @@ describe(" -- Testing Treasury Contract -- ", function () {
       /*console.log('lockedVault.address', lockedVault.address)
       console.log('unlockedVault.address', unlockedVault.address)
       console.log('openVault.address', openVault.address)*/
-    })
 
-    it("should send open vaults and not locked vaults or unlocked vaults to treasury", async function () {
+      // Get the initial balances of native tokens and supported tokens in the treasury
+      const initial_ETH_Balance = await ethers.provider.getBalance(treasury.address)
+      const initial_NS_Token1Balance = await ns_token1.balanceOf(treasury.address)
+      const initial_NS_Token2Balance = await ns_token1.balanceOf(treasury.address)
+      const initial_S_Token1Balance = await s_token1.balanceOf(treasury.address)
+      const initial_S_Token2Balance = await s_token1.balanceOf(treasury.address)
 
-      // verify that the locked vault is in the Locked state
-      expect(await lockedVault.state()).to.equal(0)
-      // verify that the unlocked vault is in the Unlocked state
-      expect(await unlockedVault.state()).to.equal(1)
-      // verify that the open vault is in the Open state
-      expect(await openVault.state()).to.equal(2)
-      expect(await treasury.isOpenVault(openVault.address)).to.be.true
-
-      // Get the initial balances of native tokens and supported tokens
-      const initialEthBalance = await ethers.provider.getBalance(treasury.address)
-      const initialToken1Balance = await token1.balanceOf(treasury.address)
-      const initialToken2Balance = await token2.balanceOf(treasury.address)
+      /*console.log('initial native token treasury balance', initial_ETH_Balance)
+      console.log('initial native staked token 1 treasury balance', initial_NS_Token1Balance)
+      console.log('initial native staked token 2 treasury balance', initial_NS_Token2Balance)
+      console.log('initial supported token 1 treasury balance', initial_S_Token1Balance)
+      console.log('initial supported token 2 treasury balance', initial_S_Token2Balance)*/
 
       // call collect on the treasury which should pull balance from the Open Vault only
-      const tx = await treasury.connect(user1).collect()
+      tx = await treasury.connect(user1).collect()
       const txReceipt = await tx.wait()
 
       // Get the updated balances after collecting from the Open Vault
-      const updatedEthBalance = await ethers.provider.getBalance(treasury.address)
-      const updatedToken1Balance = await token1.balanceOf(treasury.address)
-      const updatedToken2Balance = await token2.balanceOf(treasury.address)
+      const updated_ETH_Balance = await ethers.provider.getBalance(treasury.address)
+      const updated_NS_Token1Balance = await ns_token1.balanceOf(treasury.address)
+      const updated_NS_Token2Balance = await ns_token1.balanceOf(treasury.address)
+      const updated_S_Token1Balance = await s_token1.balanceOf(treasury.address)
+      const updated_S_Token2Balance = await s_token1.balanceOf(treasury.address)
+
+      /*console.log('updated Native Token Treasury Balance', updated_ETH_Balance)
+      console.log('updated native staked token 1 treasury balance', updated_NS_Token1Balance)
+      console.log('updated native staked token 2 treasury balance', updated_NS_Token2Balance)
+      console.log('updated supported token 1 treasury balance', updated_S_Token1Balance)
+      console.log('updated supported token 2 treasury balance', updated_S_Token2Balance)*/
 
       // Verify that balances have changed as expected
-      const amountCollectedOfEachToken = ethers.utils.parseUnits("60", 18)
-      expect(updatedEthBalance).to.equal(initialEthBalance.add(amountCollectedOfEachToken))
-      expect(updatedToken1Balance).to.equal(initialToken1Balance.add(amountCollectedOfEachToken))
-      expect(updatedToken2Balance).to.equal(initialToken2Balance.add(amountCollectedOfEachToken))
+      const amountCollectedOfEachToken = ethers.utils.parseUnits("50", 18)
+      expect(updated_ETH_Balance).to.equal(initial_ETH_Balance.add(amountCollectedOfEachToken))
+      expect(updated_NS_Token1Balance).to.equal(initial_NS_Token1Balance.add(amountCollectedOfEachToken))
+      expect(updated_NS_Token2Balance).to.equal(initial_NS_Token2Balance.add(amountCollectedOfEachToken))
+      expect(updated_S_Token1Balance).to.equal(initial_S_Token1Balance.add(amountCollectedOfEachToken))
+      expect(updated_S_Token2Balance).to.equal(initial_S_Token2Balance.add(amountCollectedOfEachToken))
     })
 
     it("should distribute native token balance to locked vaults", async function () {
 
+      // send some native token to the open vault 
+      tokenAmount = ethers.utils.parseUnits("60", 18)
+      await user2.sendTransaction({
+        to: openVault.address,
+        value: tokenAmount,
+      })
+
       // deploy a couple more lockedVaults
-      const lockedVault2 = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
-      const lockedVault3 = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
+      const lockedVault2 = await makeLockedVault(factory, user1, user1)
+      const lockedVault3 = await makeLockedVault(factory, user1, user1)
       
       // Count the number of locked and open vaults
       let numLockedVaults = 0
@@ -256,8 +298,8 @@ describe(" -- Testing Treasury Contract -- ", function () {
         } catch {
           break
         }
-          
       }
+
       expect(await ethers.provider.getBalance(lockedVault.address)).to.equal(0)
       expect(await ethers.provider.getBalance(lockedVault2.address)).to.equal(0)
       expect(await ethers.provider.getBalance(lockedVault3.address)).to.equal(0)
@@ -322,33 +364,36 @@ describe(" -- Testing Treasury Contract -- ", function () {
       expect(balance3After).to.equal(balance3Before.add(ethers.utils.parseEther("36")))
     })
 
-    it("should fail if there are no native tokens in the treasury", async function () {
+    it("distribute should fail if there are no native tokens in the treasury", async function () {
       // there should be nothing yet to distribute
       await expect(treasury.distributeNativeTokenRewards()).to.be.revertedWith('No native tokens')
     })
 
-    it("should distribute supported token balances to locked vaults", async function () {
+    it("should distribute native staked token balances to locked vaults", async function () {
+
+      // send some native token to the open vault 
+      tokenAmount = ethers.utils.parseUnits("60", 18)
 
       // deploy a couple more lockedVaults
-      const lockedVault2 = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
-      const lockedVault3 = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
+      const lockedVault2 = await makeLockedVault(factory, user1, user1)
+      const lockedVault3 = await makeLockedVault(factory, user1, user1)
 
-      // Transfer supported tokens to lockedvault 
-      await token1.transfer(lockedVault.address, ethers.utils.parseUnits("1", 18))
-      await token2.transfer(lockedVault.address, ethers.utils.parseUnits("10", 18))
+      // Transfer staked tokens to lockedvault 
+      await ns_token1.transfer(lockedVault.address, ethers.utils.parseUnits("1", 18))
+      await ns_token2.transfer(lockedVault.address, ethers.utils.parseUnits("10", 18))
 
-      // Transfer supported tokens to lockedvault 3
-      await token1.transfer(lockedVault3.address, ethers.utils.parseUnits("25", 18))
-      await token2.transfer(lockedVault3.address, ethers.utils.parseUnits("0.5", 18))
+      // Transfer staked tokens to lockedvault 3
+      await ns_token1.transfer(lockedVault3.address, ethers.utils.parseUnits("25", 18))
+      await ns_token2.transfer(lockedVault3.address, ethers.utils.parseUnits("0.5", 18))
 
-      expect(await token1.balanceOf(lockedVault.address)).to.equal(ethers.utils.parseUnits("1", 18))
-      expect(await token2.balanceOf(lockedVault.address)).to.equal(ethers.utils.parseUnits("10", 18))
+      expect(await ns_token1.balanceOf(lockedVault.address)).to.equal(ethers.utils.parseUnits("1", 18))
+      expect(await ns_token2.balanceOf(lockedVault.address)).to.equal(ethers.utils.parseUnits("10", 18))
 
-      expect(await token1.balanceOf(lockedVault2.address)).to.equal(ethers.utils.parseUnits("0", 18))
-      expect(await token2.balanceOf(lockedVault2.address)).to.equal(ethers.utils.parseUnits("0", 18))
+      expect(await ns_token1.balanceOf(lockedVault2.address)).to.equal(ethers.utils.parseUnits("0", 18))
+      expect(await ns_token2.balanceOf(lockedVault2.address)).to.equal(ethers.utils.parseUnits("0", 18))
 
-      expect(await token1.balanceOf(lockedVault3.address)).to.equal(ethers.utils.parseUnits("25", 18))
-      expect(await token2.balanceOf(lockedVault3.address)).to.equal(ethers.utils.parseUnits("0.5", 18))
+      expect(await ns_token1.balanceOf(lockedVault3.address)).to.equal(ethers.utils.parseUnits("25", 18))
+      expect(await ns_token2.balanceOf(lockedVault3.address)).to.equal(ethers.utils.parseUnits("0.5", 18))
 
       // check that all our locked vaults are actually locked
       expect(await lockedVault.state()).to.equal(0)
@@ -356,8 +401,8 @@ describe(" -- Testing Treasury Contract -- ", function () {
       expect(await lockedVault3.state()).to.equal(0)
 
       // there should be nothing yet to distribute
-      await expect(treasury.distributeSupportedTokenRewards(token1.address)).to.be.revertedWith('No supported tokens')
-      await expect(treasury.distributeSupportedTokenRewards(token2.address)).to.be.revertedWith('No supported tokens')
+      await expect(treasury.distributeSupportedTokenRewards(ns_token1.address)).to.be.revertedWith('No supported tokens')
+      await expect(treasury.distributeSupportedTokenRewards(ns_token2.address)).to.be.revertedWith('No supported tokens')
 
       // call collect on the treasury which should pull balance from the Open Vault only
       const collectTx = await treasury.connect(user1).collect()
@@ -365,18 +410,18 @@ describe(" -- Testing Treasury Contract -- ", function () {
       expect(await ethers.provider.getBalance(openVault.address)).to.equal(0)
 
       // check that the token balances have been collected from open vault into the treasury
-      expect(await token1.balanceOf(treasury.address)).to.equal(ethers.utils.parseUnits("60", 18))
-      expect(await token2.balanceOf(treasury.address)).to.equal(ethers.utils.parseUnits("60", 18))
+      expect(await ns_token1.balanceOf(treasury.address)).to.equal(ethers.utils.parseUnits("60", 18))
+      expect(await ns_token2.balanceOf(treasury.address)).to.equal(ethers.utils.parseUnits("60", 18))
 
       // Check if the locked vaults received the expected amount of supported tokens
       let treasuryTokenBalanceBefore = ethers.utils.parseUnits("60", 18)
 
-      let token1balance1Before = await token1.balanceOf(lockedVault.address)
-      let token1balance2Before = await token1.balanceOf(lockedVault2.address)
-      let token1balance3Before = await token1.balanceOf(lockedVault3.address)
-      let token2balance1Before = await token2.balanceOf(lockedVault.address)
-      let token2balance2Before = await token2.balanceOf(lockedVault2.address)
-      let token2balance3Before = await token2.balanceOf(lockedVault3.address)
+      let token1balance1Before = await ns_token1.balanceOf(lockedVault.address)
+      let token1balance2Before = await ns_token1.balanceOf(lockedVault2.address)
+      let token1balance3Before = await ns_token1.balanceOf(lockedVault3.address)
+      let token2balance1Before = await ns_token2.balanceOf(lockedVault.address)
+      let token2balance2Before = await ns_token2.balanceOf(lockedVault2.address)
+      let token2balance3Before = await ns_token2.balanceOf(lockedVault3.address)
 
       /*console.log('token1balance1Before', token1balance1Before)
       console.log('token1balance2Before', token1balance2Before)
@@ -386,18 +431,18 @@ describe(" -- Testing Treasury Contract -- ", function () {
       console.log('token2balance3Before', token2balance3Before)*/
 
       // Distribute token 1 to the locked vaults
-      const tx1 = await treasury.distributeSupportedTokenRewards(token1.address)
+      const tx1 = await treasury.distributeSupportedTokenRewards(ns_token1.address)
       let distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
       let distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
-      expect(distEvents[0].args.supportedToken).to.equal(token1.address)
+      expect(distEvents[0].args.supportedToken).to.equal(ns_token1.address)
       expect(distEvents[0].args.balanceBeforeDistribution).to.equal(treasuryTokenBalanceBefore)
       expect(distEvents[0].args.numberOfRecipients).to.equal(2)
 
       // Distribute token 2 to the locked vaults
-      const tx2 = await treasury.distributeSupportedTokenRewards(token2.address)
+      const tx2 = await treasury.distributeSupportedTokenRewards(ns_token2.address)
       distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
       distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
-      expect(distEvents[1].args.supportedToken).to.equal(token2.address)
+      expect(distEvents[1].args.supportedToken).to.equal(ns_token2.address)
       expect(distEvents[1].args.balanceBeforeDistribution).to.equal(treasuryTokenBalanceBefore)
       expect(distEvents[1].args.numberOfRecipients).to.equal(2)
 
@@ -418,9 +463,9 @@ describe(" -- Testing Treasury Contract -- ", function () {
       console.log(token2_share_vault3)*/
 
       // Check if the locked vaults received the expected amount of native token (ETH)
-      let token1balance1After = await token1.balanceOf(lockedVault.address)
-      let token1balance2After = await token1.balanceOf(lockedVault2.address)
-      let token1balance3After = await token1.balanceOf(lockedVault3.address)
+      let token1balance1After = await ns_token1.balanceOf(lockedVault.address)
+      let token1balance2After = await ns_token1.balanceOf(lockedVault2.address)
+      let token1balance3After = await ns_token1.balanceOf(lockedVault3.address)
       let token2balance1After = await token2.balanceOf(lockedVault.address)
       let token2balance2After = await token2.balanceOf(lockedVault2.address)
       let token2balance3After = await token2.balanceOf(lockedVault3.address)
@@ -428,23 +473,140 @@ describe(" -- Testing Treasury Contract -- ", function () {
       console.log('locked vault 2 after distribute:', balance2After)
       console.log('locked vault 3 after distribute:', balance3After)*/
       
-      expect(token1balance1After).to.equal(token1balance1Before.add(token1_share_vault1))
-      expect(token2balance1After).to.equal(token2balance1Before.add(token2_share_vault1))
+      expect(ns_token1balance1After).to.equal(ns_token1balance1Before.add(ns_token1_share_vault1))
+      expect(ns_token2balance1After).to.equal(ns_token2balance1Before.add(ns_token2_share_vault1))
 
-      expect(token1balance2After).to.equal(token1balance2Before)
-      expect(token2balance2After).to.equal(token2balance2Before)
+      expect(ns_token1balance2After).to.equal(ns_token1balance2Before)
+      expect(ns_token2balance2After).to.equal(ns_token2balance2Before)
 
-      expect(token1balance3After).to.equal(token1balance3Before.add(token1_share_vault3))
-      expect(token2balance3After).to.equal(token2balance3Before.add(token2_share_vault3))
+      expect(ns_token1balance3After).to.equal(ns_token1balance3Before.add(ns_token1_share_vault3))
+      expect(ns_token2balance3After).to.equal(ns_token2balance3Before.add(ns_token2_share_vault3))
+    })
+
+    it("distribute should fail if there are no native staked tokens in the treasury", async function () {
+      // there should be nothing yet to distribute
+      await expect(treasury.distributeSupportedTokenRewards(ns_token1.address)).to.be.revertedWith('No supported tokens')
+      await expect(treasury.distributeSupportedTokenRewards(ns_token2.address)).to.be.revertedWith('No supported tokens')
+    })
+
+    it("should distribute supported token balances to locked vaults", async function () {
+
+      // deploy a couple more lockedVaults
+      const lockedVault2 = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
+      const lockedVault3 = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
+
+      // Transfer supported tokens to lockedvault 
+      await ns_token1.transfer(lockedVault.address, ethers.utils.parseUnits("1", 18))
+      await ns_token2.transfer(lockedVault.address, ethers.utils.parseUnits("10", 18))
+
+      // Transfer supported tokens to lockedvault 3
+      await ns_token1.transfer(lockedVault3.address, ethers.utils.parseUnits("25", 18))
+      await ns_token2.transfer(lockedVault3.address, ethers.utils.parseUnits("0.5", 18))
+
+      expect(await ns_token1.balanceOf(lockedVault.address)).to.equal(ethers.utils.parseUnits("1", 18))
+      expect(await ns_token2.balanceOf(lockedVault.address)).to.equal(ethers.utils.parseUnits("10", 18))
+
+      expect(await ns_token1.balanceOf(lockedVault2.address)).to.equal(ethers.utils.parseUnits("0", 18))
+      expect(await ns_token2.balanceOf(lockedVault2.address)).to.equal(ethers.utils.parseUnits("0", 18))
+
+      expect(await ns_token1.balanceOf(lockedVault3.address)).to.equal(ethers.utils.parseUnits("25", 18))
+      expect(await ns_token2.balanceOf(lockedVault3.address)).to.equal(ethers.utils.parseUnits("0.5", 18))
+
+      // check that all our locked vaults are actually locked
+      expect(await lockedVault.state()).to.equal(0)
+      expect(await lockedVault2.state()).to.equal(0)
+      expect(await lockedVault3.state()).to.equal(0)
+
+      // there should be nothing yet to distribute
+      await expect(treasury.distributeSupportedTokenRewards(ns_token1.address)).to.be.revertedWith('No supported tokens')
+      await expect(treasury.distributeSupportedTokenRewards(ns_token2.address)).to.be.revertedWith('No supported tokens')
+
+      // call collect on the treasury which should pull balance from the Open Vault only
+      const collectTx = await treasury.connect(user1).collect()
+      const txReceipt = await collectTx.wait()
+      expect(await ethers.provider.getBalance(openVault.address)).to.equal(0)
+
+      // check that the token balances have been collected from open vault into the treasury
+      expect(await ns_token1.balanceOf(treasury.address)).to.equal(ethers.utils.parseUnits("60", 18))
+      expect(await ns_token2.balanceOf(treasury.address)).to.equal(ethers.utils.parseUnits("60", 18))
+
+      // Check if the locked vaults received the expected amount of supported tokens
+      let treasuryTokenBalanceBefore = ethers.utils.parseUnits("60", 18)
+
+      let ns_token1balance1Before = await ns_token1.balanceOf(lockedVault.address)
+      let ns_token1balance2Before = await ns_token1.balanceOf(lockedVault2.address)
+      let ns_token1balance3Before = await ns_token1.balanceOf(lockedVault3.address)
+      let ns_token2balance1Before = await ns_token2.balanceOf(lockedVault.address)
+      let ns_token2balance2Before = await ns_token2.balanceOf(lockedVault2.address)
+      let ns_token2balance3Before = await ns_token2.balanceOf(lockedVault3.address)
+
+      /*console.log('ns_token1balance1Before', ns_token1balance1Before)
+      console.log('ns_token1balance2Before', ns_token1balance2Before)
+      console.log('ns_token1balance3Before', ns_token1balance3Before)
+      console.log('ns_token2balance1Before', ns_token2balance1Before)
+      console.log('ns_token2balance2Before', ns_token2balance2Before)
+      console.log('ns_token2balance3Before', ns_token2balance3Before)*/
+
+      // Distribute token 1 to the locked vaults
+      const tx1 = await treasury.distributeSupportedTokenRewards(ns_token1.address)
+      let distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
+      let distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
+      expect(distEvents[0].args.supportedToken).to.equal(ns_token1.address)
+      expect(distEvents[0].args.balanceBeforeDistribution).to.equal(treasuryTokenBalanceBefore)
+      expect(distEvents[0].args.numberOfRecipients).to.equal(2)
+
+      // Distribute token 2 to the locked vaults
+      const tx2 = await treasury.distributeSupportedTokenRewards(ns_token2.address)
+      distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
+      distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
+      expect(distEvents[1].args.supportedToken).to.equal(ns_token2.address)
+      expect(distEvents[1].args.balanceBeforeDistribution).to.equal(treasuryTokenBalanceBefore)
+      expect(distEvents[1].args.numberOfRecipients).to.equal(2)
+
+      // Retrieve Receive events emitted by each locked vault
+      //const receiveEvents1 = await lockedVault2.queryFilter("Received")
+      //console.log(receiveEvents1)
+
+      //proportionateShare = (treasuryTokenBalance * lockedBalances[i]) / tokenTotalBalance;
+
+      const ns_token1_share_vault1 = treasuryTokenBalanceBefore.mul(ns_token1balance1Before).div(ns_token1balance1Before.add(ns_token1balance2Before).add(ns_token1balance3Before))
+      const ns_token2_share_vault1 = treasuryTokenBalanceBefore.mul(ns_token2balance1Before).div(ns_token2balance1Before.add(ns_token2balance2Before).add(ns_token2balance3Before))
+
+      const ns_token1_share_vault3 = treasuryTokenBalanceBefore.mul(ns_token1balance3Before).div(ns_token1balance1Before.add(ns_token1balance2Before).add(ns_token1balance3Before))
+      const ns_token2_share_vault3 = treasuryTokenBalanceBefore.mul(ns_token2balance3Before).div(ns_token2balance1Before.add(ns_token2balance2Before).add(ns_token2balance3Before))
+      /*console.log(ns_token1_share_vault1)
+      console.log(ns_token2_share_vault1)
+      console.log(ns_token1_share_vault3)
+      console.log(ns_token2_share_vault3)*/
+
+      // Check if the locked vaults received the expected amount of native token (ETH)
+      let ns_token1balance1After = await ns_token1.balanceOf(lockedVault.address)
+      let ns_token1balance2After = await ns_token1.balanceOf(lockedVault2.address)
+      let ns_token1balance3After = await ns_token1.balanceOf(lockedVault3.address)
+      let ns_token2balance1After = await ns_token2.balanceOf(lockedVault.address)
+      let ns_token2balance2After = await ns_token2.balanceOf(lockedVault2.address)
+      let ns_token2balance3After = await ns_token2.balanceOf(lockedVault3.address)
+      /*console.log('locked vault 1 after distribute:', balance1After)
+      console.log('locked vault 2 after distribute:', balance2After)
+      console.log('locked vault 3 after distribute:', balance3After)*/
+      
+      expect(ns_token1balance1After).to.equal(ns_token1balance1Before.add(ns_token1_share_vault1))
+      expect(ns_token2balance1After).to.equal(ns_token2balance1Before.add(ns_token2_share_vault1))
+
+      expect(ns_token1balance2After).to.equal(ns_token1balance2Before)
+      expect(ns_token2balance2After).to.equal(ns_token2balance2Before)
+
+      expect(ns_token1balance3After).to.equal(ns_token1balance3Before.add(ns_token1_share_vault3))
+      expect(ns_token2balance3After).to.equal(ns_token2balance3Before.add(ns_token2_share_vault3))
     })
 
     it("should fail if there are no supported tokens in the treasury", async function () {
       // there should be nothing yet to distribute
-      await expect(treasury.distributeSupportedTokenRewards(token1.address)).to.be.revertedWith('No supported tokens')
-      await expect(treasury.distributeSupportedTokenRewards(token2.address)).to.be.revertedWith('No supported tokens')
+      await expect(treasury.distributeSupportedTokenRewards(ns_token1.address)).to.be.revertedWith('No supported tokens')
+      await expect(treasury.distributeSupportedTokenRewards(ns_token2.address)).to.be.revertedWith('No supported tokens')
     })
 
-    it("should fail if token is unsupported", async function () {
+    it("should fail to distribute if token is unsupported", async function () {
       // there should be nothing yet to distribute
       await expect(treasury.distributeSupportedTokenRewards(user1.address)).to.be.revertedWith('Unsupported token')
       await expect(treasury.distributeSupportedTokenRewards(factory.address)).to.be.revertedWith('Unsupported token')
@@ -465,58 +627,58 @@ describe(" -- Testing Treasury Contract -- ", function () {
         lockedVaults[i] = await makeVault_100edition_target100_noUnlockTime(factory, user1, user1)
 
         // Transfer supported tokens to lockedvault 
-        await token1.transfer(lockedVaults[i].address, ethers.utils.parseUnits(randomNum1.toString(), 18))
-        await token2.transfer(lockedVaults[i].address, ethers.utils.parseUnits(randomNum2.toString(), 18))
+        await ns_token1.transfer(lockedVaults[i].address, ethers.utils.parseUnits(randomNum1.toString(), 18))
+        await ns_token2.transfer(lockedVaults[i].address, ethers.utils.parseUnits(randomNum2.toString(), 18))
 
-        expect(await token1.balanceOf(lockedVaults[i].address)).to.equal(ethers.utils.parseUnits(randomNum1.toString(), 18))
-        expect(await token2.balanceOf(lockedVaults[i].address)).to.equal(ethers.utils.parseUnits(randomNum2.toString(), 18))
+        expect(await ns_token1.balanceOf(lockedVaults[i].address)).to.equal(ethers.utils.parseUnits(randomNum1.toString(), 18))
+        expect(await ns_token2.balanceOf(lockedVaults[i].address)).to.equal(ethers.utils.parseUnits(randomNum2.toString(), 18))
       }
 
       // transfer tokens to the treasury so there's something to distribute
       //
-      let token1Amount = ethers.utils.parseUnits("250", 18)
-      let token2Amount = ethers.utils.parseUnits("2", 18)
-      await token1.transfer(treasury.address, token1Amount)
-      await token2.transfer(treasury.address, token2Amount)
+      let ns_token1Amount = ethers.utils.parseUnits("250", 18)
+      let ns_token2Amount = ethers.utils.parseUnits("2", 18)
+      await ns_token1.transfer(treasury.address, ns_token1Amount)
+      await ns_token2.transfer(treasury.address, ns_token2Amount)
 
-      let treasuryBalanceToken1 = await token1.balanceOf(treasury.address)
-      let treasuryBalanceToken2 = await token2.balanceOf(treasury.address)
+      let treasuryBalanceToken1 = await ns_token1.balanceOf(treasury.address)
+      let treasuryBalanceToken2 = await ns_token2.balanceOf(treasury.address)
       
       //console.log(treasuryBalanceToken1)
       //console.log(treasuryBalanceToken2)
 
       // Distribute supported token 1 to the locked vaults
       //
-      const tx1 = await treasury.distributeSupportedTokenRewards(token1.address)
+      const tx1 = await treasury.distributeSupportedTokenRewards(ns_token1.address)
       let distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
       let distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
       expect(distVaultEvents.length).to.equal(nLockedVaults)
-      expect(distEvents[0].args.supportedToken).to.equal(token1.address)
-      expect(distEvents[0].args.balanceBeforeDistribution).to.equal(token1Amount)
+      expect(distEvents[0].args.supportedToken).to.equal(ns_token1.address)
+      expect(distEvents[0].args.balanceBeforeDistribution).to.equal(ns_token1Amount)
       expect(distEvents[0].args.numberOfRecipients).to.equal(nLockedVaults)
 
       // Distribute supported token 2 to the locked vaults
       //
-      const tx2 = await treasury.distributeSupportedTokenRewards(token2.address)
+      const tx2 = await treasury.distributeSupportedTokenRewards(ns_token2.address)
       distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
       distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
       expect(distVaultEvents.length).to.equal(nLockedVaults * 2)
-      expect(distEvents[1].args.supportedToken).to.equal(token2.address)
-      expect(distEvents[1].args.balanceBeforeDistribution).to.equal(token2Amount)
+      expect(distEvents[1].args.supportedToken).to.equal(ns_token2.address)
+      expect(distEvents[1].args.balanceBeforeDistribution).to.equal(ns_token2Amount)
       expect(distEvents[1].args.numberOfRecipients).to.equal(nLockedVaults)
 
       //console.log('distribution summary:',distEvents)
 
 
-      treasuryBalanceToken1 = await token1.balanceOf(treasury.address)
-      treasuryBalanceToken2 = await token2.balanceOf(treasury.address)
+      treasuryBalanceToken1 = await ns_token1.balanceOf(treasury.address)
+      treasuryBalanceToken2 = await ns_token2.balanceOf(treasury.address)
       
       //console.log(treasuryBalanceToken1)
       //console.log(treasuryBalanceToken2)
 
       // Expect the treasury to be empty of both tokens now
-      expect(await token1.balanceOf(treasury.address)).to.be.closeTo(0, 5000)
-      expect(await token2.balanceOf(treasury.address)).to.be.closeTo(0, 5000)
+      expect(await ns_token1.balanceOf(treasury.address)).to.be.closeTo(0, 5000)
+      expect(await ns_token2.balanceOf(treasury.address)).to.be.closeTo(0, 5000)
     })
   })
 })
