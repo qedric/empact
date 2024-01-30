@@ -203,14 +203,14 @@ async function makeVault(factory, signer, to) {
   return vault
 }
 
-async function makeVault_100edition_target100_noUnlockTime(factory, signer, to) {
+async function makeVault_100edition_target100_noUnlockTime(factory, signer, to, baseToken) {
 
   const timestamp = await getCurrentBlockTime()
   const targetBalance = ethers.utils.parseUnits("100", "ether").toString()
   const typedData = await getTypedData(
     factory.address,
     to.address,
-    ethers.constants.AddressZero,
+    baseToken || ethers.constants.AddressZero,
     timestamp,
     Math.floor(timestamp + 60 * 60 * 24),
     100,
@@ -279,10 +279,10 @@ async function makeVault_100edition_notarget_99days(factory, signer, to) {
   return vault
 }
 
-async function makeLockedVault(factory, signer, to) {
+async function makeLockedVault(factory, signer, to, baseToken) {
 
   // get new vault: 
-  const v = await makeVault_100edition_target100_noUnlockTime(factory, signer, to)
+  const v = await makeVault_100edition_target100_noUnlockTime(factory, signer, to, baseToken)
 
   // verify that it is locked
   expect(await v.state()).to.equal(0)
