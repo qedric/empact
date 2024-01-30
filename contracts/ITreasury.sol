@@ -48,4 +48,8 @@ interface ITreasury {
     function distributeSupportedTokenRewards(address supportedTokenAddress) external;
 
     function oETHTokenAddress() external returns(address payable);
+
+    function isNativeStakedToken(address tokenAddress) external view returns (bool);
+
+    function isSupportedToken(address tokenAddress) external view returns (bool);
 }

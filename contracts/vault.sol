@@ -78,6 +78,10 @@ contract Vault is IVault, Initializable {
                 );
             } else {
                 require(
+                    ITreasury(treasury).isSupportedToken(_attributes.baseToken),
+                    'Unsupported token'
+                );
+                require(
                     _getTokenBalance(_attributes.baseToken) >= _attributes.targetBalance,
                     'Target not met'
                 );
@@ -95,8 +99,8 @@ contract Vault is IVault, Initializable {
     }
 
     function _getStakedTokenBalance() internal view returns(uint256 totalStakedTokenBalance) {
-        for (uint256 i = 0; i <  ITreasury(treasury).supportedTokens().length; i++) {
-            IERC20 token = IERC20(ITreasury(treasury).supportedTokens()[i]);
+        for (uint256 i = 0; i <  ITreasury(treasury).nativeStakedTokens().length; i++) {
+            IERC20 token = IERC20(ITreasury(treasury).nativeStakedTokens()[i]);
             totalStakedTokenBalance += token.balanceOf(address(this));
         }
     }
@@ -118,7 +122,7 @@ contract Vault is IVault, Initializable {
         oETHToken.rebaseOptIn();
     }
 
-    /// @notice transfers the share of native & staked tokens OR supported token to the recipient
+    /// @notice transfers the share of native & staked tokens OR base token to the recipient
     /// @notice distributes fees to the fee recipient
     /// @notice If this is the last payout, sets state to Open
     function payout(
@@ -170,11 +174,11 @@ contract Vault is IVault, Initializable {
                 totalSupply
             );      
 
-        } else { // supported token
+        } else { // base token
 
             // Withdraw supported tokens and calculate the amounts
-            _withdrawTokens(
-                ITreasury(treasury).supportedTokens(),
+            _withdrawToken(
+                IERC20(_attributes.baseToken),
                 recipient,
                 feeRecipient,
                 thisOwnerBalance,
@@ -221,7 +225,7 @@ contract Vault is IVault, Initializable {
         }
     }
 
-    /// @notice withdraws a share of token balances to a recipient & sends fees
+    /// @notice loops through array of tokens and executes the withdrawToken() function
     function _withdrawTokens(
         address[] memory tokens,
         address recipient,
@@ -230,23 +234,34 @@ contract Vault is IVault, Initializable {
         uint256 totalSupply) internal {
 
         for (uint256 i = 0; i < tokens.length; i++) {
-            IERC20 token = IERC20(tokens[i]);
-            uint256 tokenBalance = _getTokenBalance(tokens[i]);
+            _withdrawToken(IERC20(tokens[i]), recipient, feeRecipient, ownerBalance, totalSupply);
+        }
+    }
 
-            if (tokenBalance > 0) {
-                uint256 amount = tokenBalance * ownerBalance / totalSupply;
-                uint256 fee = amount * withdrawalFeeBps / 10000;
+    /// @notice withdraws a share of a token balance to a recipient & sends fees
+    function _withdrawToken(
+        IERC20 token,
+        address recipient,
+        address feeRecipient,
+        uint256 ownerBalance,
+        uint256 totalSupply) internal {
 
-                // Send the withdrawal event and pay the owner with supported tokens
-                emit TokenWithdrawal(tokens[i], recipient, amount, fee, ownerBalance);
-                token.safeTransfer(recipient, amount - fee);
+        uint256 tokenBalance = _getTokenBalance(address(token));
 
-                // send the fee to the factory contract owner
-                if (fee > 0) {
-                    token.safeTransfer(feeRecipient, fee);  
-                }
+        if (tokenBalance > 0) {
+            uint256 amount = tokenBalance * ownerBalance / totalSupply;
+            uint256 fee = amount * withdrawalFeeBps / 10000;
+
+            // Send the withdrawal event and pay the owner with supported tokens
+            emit TokenWithdrawal(address(token), recipient, amount, fee, ownerBalance);
+            token.safeTransfer(recipient, amount - fee);
+
+            // send the fee to the factory contract owner
+            if (fee > 0) {
+                token.safeTransfer(feeRecipient, fee);  
             }
         }
+        
     }
 
     /// @notice gets the vault's current balance of a non-native token

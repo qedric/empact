@@ -285,6 +285,18 @@ contract Treasury is ITreasury, AccessControl {
         return false; // The vault is not in the array
     }
 
+    function isNativeStakedToken(address tokenAddress) external view returns (bool) {
+        if (_nativeStakedTokens.length == 0) return false;
+        uint256 index = supportedTokensIndex[tokenAddress];
+        return index > 0 || _nativeStakedTokens[0] == tokenAddress;
+    }
+
+    function isSupportedToken(address tokenAddress) external view returns (bool) {
+        if (_supportedTokens.length == 0) return false;
+        uint256 index = supportedTokensIndex[tokenAddress];
+        return index > 0 || _supportedTokens[0] == tokenAddress;
+    }
+
     receive() external payable {
         emit Received(msg.sender, msg.value);
     }
