@@ -19,6 +19,7 @@ interface IOETHToken {
 
 /**
  * @title empact protocol Vault Contract
+ * @author https://github.com/qedric
  * @notice This contract serves as a non-custodial vault to secure assets on-chain. It allows users to lock assets until certain conditions are met, and then facilitate withdrawals.
  */
 contract Vault is IVault, Initializable {
