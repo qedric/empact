@@ -17,6 +17,10 @@ interface IOETHToken {
     function rebaseOptIn() external;
 }
 
+/**
+ * @title empact protocol Vault Contract
+ * @notice This contract serves as a non-custodial vault to secure assets on-chain. It allows users to lock assets until certain conditions are met, and then facilitate withdrawals.
+ */
 contract Vault is IVault, Initializable {
     using SafeERC20 for IERC20;
 
@@ -27,16 +31,15 @@ contract Vault is IVault, Initializable {
     address public immutable factory;
     address public immutable treasury;
 
-    /// @notice Cannot be modified after initialisation
+    /// @notice The fee in basis points charged when withdrawing funds.
+    /// @dev Cannot be modified after initialisation
     uint16 public withdrawalFeeBps;
 
-    /// @notice Checks that the `msg.sender` is the factory.
     modifier onlyFactory() {
         require(msg.sender == address(factory), "onlyFactory");
         _;
     }
 
-    /// @notice Checks that the `msg.sender` is the treasury.
     modifier onlyTreasury() {
         require(msg.sender == address(treasury), "onlyTreasury");
         _;
@@ -48,16 +51,28 @@ contract Vault is IVault, Initializable {
         _disableInitializers();
     }
 
+    /**
+     * @notice Initializes the vault with specific attributes and withdrawal fee.
+     * @dev Can only be called once and only by the factory contract.
+     * @param _data Struct containing initial attributes for the vault.
+     * @param _breakVaultBps The fee in basis points charged when withdrawing funds.
+     */
     function initialize(Attr calldata _data, uint16 _breakVaultBps) external onlyFactory initializer {
         _attributes = _data;
         withdrawalFeeBps = _breakVaultBps;
         emit VaultInitialised(_data);
     }
 
-    /*  @notice this needs to be called if target is reached with non native tokens.
+    /**
+     * @notice Transitions the state of the vault from 'Locked' to 'Unlocked' under specific conditions.
+                this needs to be called if target is reached with non native tokens.
                 this needs to be called if no tokens are received after unlock time has been reached.
                 this call is not necessary if the target is reached with native tokens only.
-    */
+     * @dev Can only be called when the vault is 'Locked'. The state transition depends on the target balance being met and the current time surpassing the unlock time.
+     * @custom:requirement Vault Must Be Locked Requires the vault to be in 'Locked' state.
+     * @custom:requirement Maturity Reached Checks if the current time is greater than the unlock time.
+     * @custom:requirement Target Balance Met Validates if the target balance for unlocking the vault has been met.
+     */
     function setStateUnlocked() external {
 
         require(
@@ -93,7 +108,11 @@ contract Vault is IVault, Initializable {
         emit StateChanged(State.Unlocked);
     }
 
-    /// @notice Supported staked tokens can contribute to the native target balance.
+    /**
+     * @notice Calculates the total balance of the vault, including both native and staked tokens.
+                this should not be used when the vault has a non-native base token.
+     * @return totalBalance The total balance held in the vault, including staked tokens.
+     */
     function getTotalBalance() external view returns(uint256 totalBalance) {
         totalBalance = _getStakedTokenBalance() + address(this).balance;
     }
@@ -105,11 +124,21 @@ contract Vault is IVault, Initializable {
         }
     }
 
+    /**
+     * @notice Returns the attributes of the vault.
+     * @return A struct containing the vault's attributes.
+     */
     function attributes() external view returns (IVault.Attr memory) {
         return _attributes;
     }
 
-    /// opt-in is required to earn yield from oETH (Origin Protocol) tokens held by this vault
+    /// @notice Allows the vault to opt-in for receiving yieled from any Origin Protocol's oETH tokens held.
+    /// @dev This function sets the `oETHRebasingEnabled` flag to true and calls the `rebaseOptIn` method on the oETH contract.
+    ///       It can only be called once as it requires that rebasing is not already enabled.
+    ///       The function also checks that the oETH contract address is set in the treasury.
+    /// @custom:requirement oETH Rebasing Not Already Enabled Ensures that the contract hasn't already opted in for oETH rebasing.
+    /// @custom:requirement oETH Contract Address Set Checks that the oETH contract address is set in the treasury before proceeding.
+    /// @custom:emits OptedInForOriginProtocolRebasing Emits an event when the contract opts in for rebasing in the Origin Protocol.
     function optInForOETHRebasing() external {
         require(!oETHRebasingEnabled, 'oETH rebasing already enabled');
         require(ITreasury(treasury).oETHTokenAddress() != address(0), "oETH contract address is not set");
@@ -122,9 +151,21 @@ contract Vault is IVault, Initializable {
         oETHToken.rebaseOptIn();
     }
 
-    /// @notice transfers the share of native & staked tokens OR base token to the recipient
-    /// @notice distributes fees to the fee recipient
-    /// @notice If this is the last payout, sets state to Open
+    /// @notice Handles the payout process for the vault, including calculating and transferring assets to the recipient and feeRecipient, and handling different asset types (native & staked, or base token).
+    /// @dev This function should only be called when the vault is in the 'Unlocked' state and is only callable by the factory contract.
+    /// @param recipient The address of the recipient who will receive the assets from the vault. Should be the caller of the factory payout function.
+    /// @param feeRecipient The address payable to which the fee (if any) will be paid.
+    /// @param thisOwnerBalance The ERC1155 token balance of the recipient. This determines the share of vault assets that will be paid.
+    /// @param totalSupply The total supply of ERC1155 tokens representing this vault.
+    /// @return state The new state of the vault after the payout, which can either remain 'Unlocked' or change to 'Open' if it's the last payout.
+    /// @custom:modifier onlyFactory Ensures that only the factory ERC1155 contract can call this function.
+    /// @custom:requirement Must be in 'Unlocked' state The function requires the vault to be in the 'Unlocked' state.
+    /// @custom:assertion Total Supply and Owner Balance Asserts that both totalSupply and thisOwnerBalance are greater than 0.
+    /// @custom:emits StateChanged Emits an event when the state changes from 'Unlocked' to 'Open'.
+    /// @custom:emits Withdrawal Emits an event indicating the amount withdrawn by the recipient and their corresponding ERC1155 token balance.
+    /// @custom:emits WithdrawalFeePaid Emits an event indicating the fee paid to the feeRecipient.
+    /// @custom:handling Native Token Checks if the base token is the native token of the chain and handles the payout accordingly, including fee deduction.
+    /// @custom:handling Base Token If the asset is not the native token, handles the payout using the specified base token.
     function payout(
         address recipient,
         address payable feeRecipient,
@@ -189,7 +230,15 @@ contract Vault is IVault, Initializable {
         return state;
     }
 
-    /// @notice transfers all supported tokens to the treasury. Can only be called when the state is Open
+    /// @notice Transfers all assets known to the treasury (native, supported, and staked tokens) from the vault to the treasury.
+    /// @dev Can only be called when the vault is in the 'Open' state and exclusively by the treasury contract.
+    /// @custom:modifier onlyTreasury Ensures that only the treasury contract can call this function.
+    /// @custom:requirement Must be in 'Open' state The function requires the vault to be in the 'Open' state to proceed with the transfer to the treasury.
+    /// @custom:emits SendNativeTokenToTreasury Emits an event when native tokens are sent to the treasury.
+    /// @custom:emits SendToken Emits an event for each token type transferred to the treasury, including supported tokens and native staked tokens.
+    /// @custom:handling Native Token Transfers any native ETH balance to the treasury.
+    /// @custom:handling Supported Tokens Iterates through and transfers all supported tokens to the treasury.
+    /// @custom:handling Native Staked Tokens Iterates through and transfers all native staked tokens to the treasury.
     function sendToTreasury() external payable onlyTreasury {
 
         require(
@@ -215,7 +264,7 @@ contract Vault is IVault, Initializable {
         }
     }
 
-    /// @notice sends full balance of a given token to sender
+    /// @dev This internal function is used by sendToTreasury to transfer full balance of each individual token.
     function _sendToken(address tokenAddress) internal {
         IERC20 token = IERC20(tokenAddress);
         uint256 tokenBalance = token.balanceOf(address(this));
@@ -225,7 +274,7 @@ contract Vault is IVault, Initializable {
         }
     }
 
-    /// @notice loops through array of tokens and executes the withdrawToken() function
+    /// @dev loops through array of tokens and executes the withdrawToken() function
     function _withdrawTokens(
         address[] memory tokens,
         address recipient,
@@ -238,7 +287,7 @@ contract Vault is IVault, Initializable {
         }
     }
 
-    /// @notice withdraws a share of a token balance to a recipient & sends fees
+    /// @dev withdraws a share of a token balance to a recipient & sends fees
     function _withdrawToken(
         IERC20 token,
         address recipient,
@@ -261,15 +310,22 @@ contract Vault is IVault, Initializable {
                 token.safeTransfer(feeRecipient, fee);  
             }
         }
-        
     }
 
-    /// @notice gets the vault's current balance of a non-native token
+    /// @dev gets the vault's current balance of a non-native token
     function _getTokenBalance(address tokenAddress) internal view returns (uint256) {
         return IERC20(tokenAddress).balanceOf(address(this));
     }
 
-    // if native tokens are received
+    /// @notice Handles receiving native tokens (ETH) and potentially changes the vault's state to 'Unlocked'.
+    /// @dev This function is triggered when the vault receives native tokens (ETH).
+    ///       It emits a Received event and may change the state to 'Unlocked' if certain conditions are met.
+    ///       The state changes to 'Unlocked' if the vault is currently 'Locked', the base token is the native token (address(0)),
+    ///       the current block timestamp is greater than the unlock time, and the combined balance of staked tokens and native tokens
+    ///       meets or exceeds the target balance set for unlocking.
+    /// @custom:emits Received Emits an event indicating the sender address and the amount of native tokens received.
+    /// @custom:emits StateChanged Emits an event when the state changes from 'Locked' to 'Unlocked'.
+    /// @custom:handling State Change Checks if the vault should transition from 'Locked' to 'Unlocked' state based on the balance criteria and time conditions.
     receive() external payable {
         emit Received(msg.sender, msg.value);
         if ( 
