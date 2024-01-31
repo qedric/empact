@@ -34,6 +34,8 @@ contract Generator is IGenerator, AccessControl {
         factory = IFactory(_factory);
     }
 
+    /// @notice this returns the dynamic metadata for the erc1155 token
+    /// @dev this should be called by the overriden erc1155 uri function in the factory contract
     function uri(uint256 tokenId) external view returns (string memory) {
 
         // get the vault in question
@@ -71,6 +73,12 @@ contract Generator is IGenerator, AccessControl {
                 )
             )
         );
+    }
+
+    /// @notice this will display in NFT metadata
+    function setTokenUrlPrefix(string memory tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit TokenUrlPrefixUpdated(_tokenUrlPrefix, tokenUrlPrefix);
+        _tokenUrlPrefix = tokenUrlPrefix;
     }
 
     function _generateAttributes(IVault.Attr memory attributes, address receiveAddress, uint256 percent, uint256 balance) internal view returns(string memory) {
@@ -153,12 +161,6 @@ contract Generator is IGenerator, AccessControl {
     /*
         UTILS - internal functions only
     */
-
-    /// @notice this will display in NFT metadata
-    function setTokenUrlPrefix(string memory tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit TokenUrlPrefixUpdated(_tokenUrlPrefix, tokenUrlPrefix);
-        _tokenUrlPrefix = tokenUrlPrefix;
-    }
 
     function _uint2str(
         uint _i

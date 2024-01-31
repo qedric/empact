@@ -97,6 +97,9 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
     }
 }
 
+/// @title A contract for creating and managing vaults that are associated with ERC1155 tokens
+/// @notice This contract handles the creation, management, and interaction with individual vaults, and is compliant with ERC1155 standards.
+/// @dev The contract inherits from ERC1155, ContractMetadata, SignatureMint, and AccessControl.
 contract Factory is
     ERC1155,
     ContractMetadata,
@@ -110,10 +113,18 @@ contract Factory is
     Events
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Emitted when a new vault is deployed
     event VaultDeployed(address indexed vault, address indexed msgSender);
+
+    /// @notice Emitted when the fee recipient is updated
     event FeeRecipientUpdated(address indexed recipient);
+
+    /// @notice Emitted when the fee for vault creation is updated
     event MakeVaultFeeUpdated(uint256 fee);
+
+    /// @notice Emitted when the fee for vault withdrawal is updated
     event BreakVaultBpsUpdated(uint16 bps);
+
     event VaultImplementationUpdated(address indexed implementation);
     event GeneratorUpdated(address indexed generator);
     event TreasuryUpdated(address indexed treasury);
@@ -170,6 +181,8 @@ contract Factory is
     /*//////////////////////////////////////////////////////////////
     Constructor
     //////////////////////////////////////////////////////////////*/
+
+    /// @param _feeRecipient The address that will receive fees collected by the contract
     constructor(address payable _feeRecipient) ERC1155('') {
         feeRecipient = _feeRecipient;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -188,11 +201,11 @@ contract Factory is
     //////////////////////////////////////////////////////////////*/
 
     /**
-     *  @notice          Lets an authorized address mint NFTs to a recipient, via signed mint request
-     *  @dev             The logic in the `_canSignMintRequest` function determines whether the caller is authorized to mint NFTs.
-     *
-     *  @param _req      The signed mint request.
-     *  @param _signature  The signature of an address with the SIGNER role.
+     * @notice Mints new tokens with a signature from an authorized signer, and creates an associated vault
+     * @dev Minting logic includes creating a new erc1155 token, and deploying a new vault
+     * @param _req The signed mint request data
+     * @param _signature The signature of an address with the SIGNER role
+     * @return signer The address of the signer who authorized the mint
      */
     function mintWithSignature(
         MintRequest calldata _req,
@@ -260,7 +273,16 @@ contract Factory is
         emit VaultDeployed(deployedProxy, msg.sender);
     }
 
-    /// @dev If sender balance > 0 then burn sender balance and call payout function in the vault contract
+    /**
+     * @notice Executes the payout process for a given token ID, 
+         burning the sender's token balance and calling the payout function in the associated vault contract.
+     * @dev This function first checks the caller's balance of the specified token ID. 
+        If the balance is greater than zero, it burns the tokens to prevent double claiming. 
+        It then calls the `payout` function of the corresponding vault contract. 
+        If the vault's state changes to 'Open', it updates the treasury contract.
+     * @param tokenId The ID of the token for which the payout is being processed.
+     * @custom:modifier tokenExists Ensures that the token for the given token ID exists before processing the payout.
+     */
     function payout(uint256 tokenId) external tokenExists(tokenId) {
 
         uint256 thisOwnerBalance = balanceOf(msg.sender, tokenId);
@@ -343,10 +365,20 @@ contract Factory is
         treasury = _treasuryAddress;
     }
 
+    /**
+     * @notice Grants the SIGNER role to a specified account.
+     * @dev Only an account with the DEFAULT_ADMIN_ROLE can assign the SIGNER_ROLE.
+     * @param account The address of the account to be granted the SIGNER_ROLE.
+     */
     function grantSignerRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
         grantRole(SIGNER_ROLE, account);
     }
 
+    /**
+     * @notice Revokes the SIGNER_ROLE from a specified account.
+     * @dev Only an account with the DEFAULT_ADMIN_ROLE can revoke the SIGNER_ROLE.
+     * @param account The address of the account from which the SIGNER_ROLE will be revoked.
+     */
     function revokeSignerRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
         revokeRole(SIGNER_ROLE, account);
     }
