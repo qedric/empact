@@ -19,6 +19,7 @@
     "@openzeppelin/contracts": "^4.8.1",
     "@openzeppelin/contracts-upgradeable": "^4.8.1",
     "@thirdweb-dev/contracts": "^3.4.5",
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "solidity-docgen": "^0.6.0-beta.36"
   }
 }
