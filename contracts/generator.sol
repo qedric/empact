@@ -36,7 +36,7 @@ contract Generator is IGenerator, AccessControl {
 
     /// @notice this returns the dynamic metadata for the erc1155 token
     /// @dev this should be called by the overriden erc1155 uri function in the factory contract
-    function uri(uint256 tokenId) external view returns (string memory) {
+    function data(uint256 tokenId) external view returns (string memory) {
 
         // get the vault in question
         IVault vault = IVault(factory.vaults(tokenId));
@@ -56,7 +56,7 @@ contract Generator is IGenerator, AccessControl {
                             '","description":"',
                             attributes.description,
                             '","image_data":"',
-                            _generateSVG(percent),
+                            vault.state() == IVault.State.Unlocked ? _generateUnlockedSVG() : _generateSVG(percent),
                             '","external_url":"',
                             _tokenUrlPrefix,
                             _uint2str(attributes.tokenId),
@@ -75,12 +75,13 @@ contract Generator is IGenerator, AccessControl {
         );
     }
 
-    /// @notice this will display in NFT metadata
+    /// @notice this will be included in the NFT metadata and can to be used to direct a user to a portal or dashboard
     function setTokenUrlPrefix(string memory tokenUrlPrefix) external onlyRole(DEFAULT_ADMIN_ROLE) {
         emit TokenUrlPrefixUpdated(_tokenUrlPrefix, tokenUrlPrefix);
         _tokenUrlPrefix = tokenUrlPrefix;
     }
 
+    /// @notice The NFT metadata which should be compliant with major NFT marketplace standards
     function _generateAttributes(IVault.Attr memory attributes, address receiveAddress, uint256 percent, uint256 balance) internal view returns(string memory) {
         string memory baseTokenSymbol = attributes.baseToken == address(0) ? _chainSymbol : IExtendedERC20(attributes.baseToken).symbol();
         return string(abi.encodePacked(
@@ -110,6 +111,19 @@ contract Generator is IGenerator, AccessControl {
                     '<text x="600" y="600" fill="#fff" alignment-baseline="middle" text-anchor="middle" font-size="440">',
                     _uint2str(percent),
                     '%</text></svg>'
+                )
+            )))
+        );
+    }
+
+    function _generateUnlockedSVG() internal pure returns (bytes memory) {
+        return abi.encodePacked(
+            "data:image/svg+xml;base64,",
+            Base64.encode(bytes(string(
+                abi.encodePacked(
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200" fill="none"><rect width="1200" height="1200" fill="#55a630"/>',
+                    _generatePaths(100),
+                    '<text x="600" y="600" fill="#000" alignment-baseline="middle" text-anchor="middle" font-size="240">Unlocked!</text></svg>'
                 )
             )))
         );

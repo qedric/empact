@@ -193,7 +193,7 @@ contract Factory is
     Overriden metadata logic - On-chain
     //////////////////////////////////////////////////////////////*/
     function uri(uint256 tokenId) public view override tokenExists(tokenId) returns (string memory) {
-        return generator.uri(tokenId);
+        return generator.data(tokenId);
     }
 
     /*//////////////////////////////////////////////////////////////
