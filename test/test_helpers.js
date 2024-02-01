@@ -314,10 +314,12 @@ async function makeOpenVault(factory, signer, to) {
   const v = await makeUnlockedVault(factory, signer, to)
 
   // get the tokenId so we can call payout on it
-  const attributes = await v.attributes()
+  const tokenId = await v.attributes().then(a => a.tokenId)
+
+  console.log('token id of the open vault:', tokenId)
 
   // call payout to open it
-  let tx = await factory.connect(signer).payout(attributes.tokenId)
+  let tx = await factory.connect(to).payout(tokenId)
   tx.wait()
 
   // verify that it is open

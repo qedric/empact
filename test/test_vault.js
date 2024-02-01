@@ -534,7 +534,7 @@ describe(" -- Testing Vault Contract -- ", function () {
       expect(stateChangedEvent[0].args.newState).to.equal(2, 'Event arg newState should equal 2')
 
       // state should now be 2 (Open)
-      expect(await vault.state()).to.equal(2, 'vault should be unlocked')
+      expect(await vault.state()).to.equal(2, 'vault should be open')
     })
 
     /*
