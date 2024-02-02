@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@thirdweb-dev/contracts/extension/ContractMetadata.sol";
 import "./vault.sol";
@@ -101,7 +102,7 @@ abstract contract SignatureMint is EIP712, ISignatureMint {
 /// @notice This contract handles the creation, management, and interaction with individual vaults, and is compliant with ERC1155 standards.
 /// @dev The contract inherits from ERC1155, ContractMetadata, SignatureMint, and AccessControl.
 contract Factory is
-    ERC1155,
+    ERC1155Supply,
     ContractMetadata,
     SignatureMint,
     AccessControl
@@ -159,12 +160,6 @@ contract Factory is
     Mappings & Arrays
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     *  @notice Returns the total supply of NFTs of a given tokenId
-     *  @dev Mapping from tokenId => total circulating supply of NFTs of that tokenId.
-     */
-    mapping(uint256 => uint256) public totalSupply;
-
     /// @dev Vaults are mapped to the tokenId of the NFT they are tethered to
     mapping(uint256 => address) public vaults;
 
@@ -174,7 +169,7 @@ contract Factory is
 
     /// @notice checks to ensure that the token exists before referencing it
     modifier tokenExists(uint256 tokenId) {
-        require(totalSupply[tokenId] > 0, "Token not found");
+        require(exists(tokenId), "Token not found");
         _;
     }
 
@@ -290,7 +285,7 @@ contract Factory is
         require(thisOwnerBalance != 0, "Not authorised!");
 
         // get the total supply before burning
-        uint256 totalSupplyBeforePayout = totalSupply[tokenId];
+        uint256 totalSupplyBeforePayout = totalSupply(tokenId);
 
         // burn the tokens so the owner can't claim twice
         _burn(msg.sender, tokenId, thisOwnerBalance);
@@ -405,6 +400,13 @@ contract Factory is
     Internal / overrideable functions
     //////////////////////////////////////////////////////////////*/
 
+    /**
+     * @dev Total value of tokens in with a given id.
+     */
+    function totalSupplyOf(uint256 id) public view virtual returns (uint256) {
+        return super.totalSupply(id);
+    }
+
     /// @dev Returns whether contract metadata can be set in the given execution context.
     function _canSetContractURI() internal view virtual override returns (bool) {
         return hasRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -415,28 +417,6 @@ contract Factory is
         address _signer
     ) internal view virtual override returns (bool) {
         return hasRole(SIGNER_ROLE, _signer);
-    }
-
-    /// @dev Runs before every token transfer / mint / burn.
-    function _beforeTokenTransfer(
-        address operator,
-        address from,
-        address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
-        bytes memory data
-    ) internal virtual override {
-        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
-        if (from == address(0)) {
-            for (uint256 i = 0; i < ids.length; ++i) {
-                totalSupply[ids[i]] += amounts[i];
-            }
-        }
-        if (to == address(0)) {
-            for (uint256 i = 0; i < ids.length; ++i) {
-                totalSupply[ids[i]] -= amounts[i];
-            }
-        }
     }
 
     /// @dev Collects and distributes the primary sale value of NFTs being claimed.
