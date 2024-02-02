@@ -9,11 +9,11 @@ const { ALCHECMY_API_KEY_TEST, ALCHEMY_API_KEY_SEPOLIA, ETHERSCAN_API_KEY, PK } 
 
 module.exports = {
   solidity: {
-    version: '0.8.11',
+    version: '0.8.20',
     settings: {
       optimizer: {
         enabled: true,
-        runs: 800,
+        runs: 1200,
       },
     },
   },
