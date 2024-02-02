@@ -33,7 +33,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
 
     it("should not allow non DEFAULT ADMIN run setMakeVaultFee()", async function () {
       const newFee = ethers.utils.parseEther("0.005")
-      await expect(factory.connect(user2).setMakeVaultFee(newFee)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+      await expect(factory.connect(user2).setMakeVaultFee(newFee)).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     it("should allow DEFAULT ADMIN run setBreakVaultBps()", async function () {
@@ -45,7 +45,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
 
     it("should not allow non DEFAULT ADMIN run setBreakVaultBps()", async function () {
       const newBps = 500 // 5%
-      await expect(factory.connect(user2).setBreakVaultBps(newBps)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+      await expect(factory.connect(user2).setBreakVaultBps(newBps)).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     it("should allow DEFAULT ADMIN run setFeeRecipient()", async function () {
@@ -55,7 +55,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
     })
 
     it("should not allow non DEFAULT ADMIN run setFeeRecipient()", async function () {
-      await expect(factory.connect(user2).setFeeRecipient(newFeeRecipient.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+      await expect(factory.connect(user2).setFeeRecipient(newFeeRecipient.address)).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     it("should allow DEFAULT ADMIN run setVaultImplementation()", async function () {
@@ -66,7 +66,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
 
     it("should not allow non DEFAULT ADMIN run setVaultImplementation()", async function () {
       const newVaultImplementation = await (factory, user1) // Deploy a new mock vault contract
-      await expect(factory.connect(user2).setVaultImplementation(newVaultImplementation.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+      await expect(factory.connect(user2).setVaultImplementation(newVaultImplementation.address)).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     it("should allow DEFAULT ADMIN run setGenerator()", async function () {
@@ -76,7 +76,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
     })
 
     it("should not allow non DEFAULT ADMIN run setGenerator()", async function () {
-      await expect(factory.connect(user2).setGenerator(FAKE_GENERATOR.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+      await expect(factory.connect(user2).setGenerator(FAKE_GENERATOR.address)).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     it("should allow DEFAULT ADMIN run setTreasury()", async function () {
@@ -86,7 +86,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
     })
 
     it("should not allow non DEFAULT ADMIN run setTreasury()", async function () {
-        await expect(factory.connect(user2).setTreasury(FAKE_TREASURY.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+        await expect(factory.connect(user2).setTreasury(FAKE_TREASURY.address)).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     it("should allow DEFAULT ADMIN to grant SIGNER role", async function () {
@@ -96,7 +96,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
     })
 
     it("should not allow non DEFAULT ADMIN to grant Signer role", async function () {
-        await expect(factory.connect(user2).grantSignerRole(NEW_SIGNER.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+        await expect(factory.connect(user2).grantSignerRole(NEW_SIGNER.address)).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     it("should allow DEFAULT ADMIN to revoke SIGNER role", async function () {
@@ -112,7 +112,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
         // First, grant the Minter role to NEW SIGNER
         await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).grantSignerRole(NEW_SIGNER.address)
         // Then, attempt to revoke the Minter role as a non-admin
-        await expect(factory.connect(user2).revokeSignerRole(NEW_SIGNER.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+        await expect(factory.connect(user2).revokeSignerRole(NEW_SIGNER.address)).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     it("should succesfully run mintWithSignature() if the signer has the SIGNER_ROLE", async function () {
@@ -171,7 +171,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
 
     it("should fail if non DEFAULT ADMIN tries to grant an address the TREASURER_ROLE", async function () {
       await expect(treasury.connect(user2).grantRole(await treasury.TREASURER_ROLE(), NEW_TREASURER.address)).to.be.revertedWith(
-      /AccessControl: account .* is missing role .*/)
+      'AccessControlUnauthorizedAccount')
     })
 
     /*setOETHContractAddress*/
@@ -188,7 +188,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
 
     it("should not allow non-TREASURER to set OETH contract address", async function () {
       // Attempt to set the OETH contract address by a non-TREASURER
-      await expect(treasury.connect(user1).setOETHContractAddress(NEW_TREASURER.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+      await expect(treasury.connect(user1).setOETHContractAddress(NEW_TREASURER.address)).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     /*addSupportedToken*/
@@ -224,7 +224,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const token = await deployMockToken('FAKE', 'FKK')
 
       // Attempt to set the OETH contract address by a non-TREASURER
-      await expect(treasury.connect(user1).addSupportedToken(token.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+      await expect(treasury.connect(user1).addSupportedToken(token.address)).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     /*removeSupportedToken*/
@@ -285,7 +285,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
       expect(supportedTokenAddedEvent.args[0]).to.equal(token.address)
 
       // Attempt to remove the token with a non-Treasurer account
-      await expect(treasury.connect(user1).removeSupportedToken(token.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+      await expect(treasury.connect(user1).removeSupportedToken(token.address)).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     it("should not allow non-Factory to move a vault to the openVaults array", async function () {
@@ -423,7 +423,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
 
     it("should not allow non-TREASURER to collect open vaults", async function () {
       // Attempt to collect open vaults as a non-TREASURER user
-      await expect(treasury.connect(user1).collect()).to.be.revertedWith(/AccessControl: account .* is missing role .*/);
+      await expect(treasury.connect(user1).collect()).to.be.revertedWith('AccessControlUnauthorizedAccount');
     });
 
     /*distributeNativeTokenRewards*/
@@ -473,13 +473,13 @@ describe(" -- Testing Permissions & Access -- ", function () {
 
     it("should not allow non-TREASURER to distribute native token balance to locked vaults", async function () {
       // Attempt to distribute vaults as a non-TREASURER user
-      await expect(treasury.connect(user1).distributeNativeTokenRewards()).to.be.revertedWith(/AccessControl: account .* is missing role .*/);
+      await expect(treasury.connect(user1).distributeNativeTokenRewards()).to.be.revertedWith('AccessControlUnauthorizedAccount');
     });
 
     /*distributeSupportedTokens*/
     it("should not allow non-TREASURER to distribute native token balance to locked vaults", async function () {
       // Attempt to distribute vaults as a non-TREASURER user
-      await expect(treasury.connect(user1).distributeSupportedTokenRewards(user1.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/);
+      await expect(treasury.connect(user1).distributeSupportedTokenRewards(user1.address)).to.be.revertedWith('AccessControlUnauthorizedAccount');
     });
   })
 
@@ -567,7 +567,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
     })
 
     it("should not allow non DEFAULT ADMIN run setTokenUrlPrefix()", async function () {
-      await expect(generator.connect(user1).setTokenUrlPrefix("https://example.com/")).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+      await expect(generator.connect(user1).setTokenUrlPrefix("https://example.com/")).to.be.revertedWith('AccessControlUnauthorizedAccount')
     })
 
     /*it("should allow DEFAULT ADMIN run setSvgColours()", async function () {

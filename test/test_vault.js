@@ -228,7 +228,7 @@ describe(" -- Testing Vault Contract -- ", function () {
 
     it("should fail when sending erc1155 tokens to a vault", async function () {
       await expect(factory.connect(user1).safeTransferFrom(user1.address, vault.address, 0, 2, "0x"))
-      .to.be.revertedWith("ERC1155: transfer to non-ERC1155Receiver implementer")
+      .to.be.revertedWith("ERC1155InvalidReceiver")
     })
   })
 
@@ -1061,7 +1061,7 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       // should payout 75% of the vaults to holder 1, leaving 25% of tokens with holder 2
       let tx = await factory.connect(user1).payout(1)
-      expect(await factory.totalSupply(1)).to.equal(25)
+      expect(await factory.totalSupplyOf(1)).to.equal(25)
 
       // get gas used
       let txReceipt = await ethers.provider.getTransactionReceipt(tx.hash)
@@ -1079,7 +1079,7 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       // should payout remaining 25% of the vaults to holder 2, leaving 0 tokens
       tx = await factory.connect(user3).payout(1)
-      expect(await factory.totalSupply(1)).to.equal(0)
+      expect(await factory.totalSupplyOf(1)).to.equal(0)
 
       // get gas used
       txReceipt = await ethers.provider.getTransactionReceipt(tx.hash)
@@ -1143,7 +1143,7 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       // should payout 75% of the staked tokens to holder 1, leaving 25% of tokens with holder 2
       let tx = await factory.connect(user1).payout(attributes.tokenId)
-      expect(await factory.totalSupply(attributes.tokenId)).to.equal(25)
+      expect(await factory.totalSupplyOf(attributes.tokenId)).to.equal(25)
 
       // get gas used
       let txReceipt = await ethers.provider.getTransactionReceipt(tx.hash)
@@ -1168,7 +1168,7 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       // should payout remaining 25% of the vaults to holder 2, leaving 0 tokens
       tx = await factory.connect(user3).payout(attributes.tokenId)
-      expect(await factory.totalSupply(attributes.tokenId)).to.equal(0)
+      expect(await factory.totalSupplyOf(attributes.tokenId)).to.equal(0)
 
       // get gas used
       txReceipt = await ethers.provider.getTransactionReceipt(tx.hash)
@@ -1227,7 +1227,7 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       // should payout 75% of the vault token to holder 1, leaving 25% with holder 2
       tx = await factory.connect(user1).payout(attributes.tokenId)
-      expect(await factory.totalSupply(attributes.tokenId)).to.equal(25)
+      expect(await factory.totalSupplyOf(attributes.tokenId)).to.equal(25)
 
       // get gas used
       let txReceipt = await ethers.provider.getTransactionReceipt(tx.hash)
@@ -1248,7 +1248,7 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       // should payout remaining 25% of the vault tokens to holder 2, leaving 0 tokens
       tx = await factory.connect(user3).payout(attributes.tokenId)
-      expect(await factory.totalSupply(attributes.tokenId)).to.equal(0)
+      expect(await factory.totalSupplyOf(attributes.tokenId)).to.equal(0)
 
       // get gas used
       txReceipt = await ethers.provider.getTransactionReceipt(tx.hash)
