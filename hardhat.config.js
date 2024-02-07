@@ -1,9 +1,11 @@
 /** @type import('hardhat/config').HardhatUserConfig */
-require("@nomiclabs/hardhat-waffle");
-require("@nomiclabs/hardhat-etherscan");
-require("hardhat-gas-reporter");
-require('dotenv').config();
-require('solidity-docgen');
+require("@nomicfoundation/hardhat-toolbox")
+//require("@nomiclabs/hardhat-ethers")
+require("hardhat-gas-reporter")
+//require("hardhat-contract-sizer")
+require('dotenv').config()
+require('solidity-docgen')
+require("solidity-coverage")
 
 const { ALCHECMY_API_KEY_TEST, ALCHEMY_API_KEY_SEPOLIA, ETHERSCAN_API_KEY, PK } = process.env;
 

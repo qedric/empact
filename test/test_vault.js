@@ -46,8 +46,8 @@ describe(" -- Testing Vault Contract -- ", function () {
       3. gets vault attributes and checks they have expected values
     */
     it("should successfully mint new tokens and initalise vault with correct attributes", async function () {
-      const makeVaultFee = ethers.utils.parseUnits("0.004", "ether")
-      const mr = await generateMintRequest(factory.address, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
+      const makeVaultFee = ethers.parseUnits("0.004", "ether")
+      const mr = await generateMintRequest(factory.target, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
 
       const initialBalanceUser1 = await factory.balanceOf(user1.address, 0)
 
@@ -91,8 +91,8 @@ describe(" -- Testing Vault Contract -- ", function () {
 
     it("should successfully opt in for oETH rebasing and emit event", async function () {
       const oETHToken = await deployMockOETHToken()
-      await treasury.setOETHContractAddress(oETHToken.address)
-      expect(await treasury.oETHTokenAddress()).to.equal(oETHToken.address)
+      await treasury.setOETHContractAddress(oETHToken.target)
+      expect(await treasury.oETHTokenAddress()).to.equal(oETHToken.target)
       const tx = await vault.optInForOETHRebasing()
       const optedInForOriginProtocolRebasingEvent = await vault.queryFilter('OptedInForOriginProtocolRebasing', tx.blockHash)
       expect(optedInForOriginProtocolRebasingEvent.length).to.equal(1)
@@ -100,7 +100,7 @@ describe(" -- Testing Vault Contract -- ", function () {
 
     it("should revert if opting in again", async function () {
       const oETHToken = await deployMockOETHToken()
-      await treasury.setOETHContractAddress(oETHToken.address)
+      await treasury.setOETHContractAddress(oETHToken.target)
       const tx = await vault.optInForOETHRebasing()
       tx.wait()
       await expect(vault.optInForOETHRebasing()).to.be.revertedWith('oETH rebasing already enabled')
@@ -112,9 +112,9 @@ describe(" -- Testing Vault Contract -- ", function () {
 
     it("should setStateUnlocked and emit StateChanged if vault is locked & target and unlock date met", async function () {
       //send enough ETH
-      const amountToSend = ethers.utils.parseEther("1")
+      const amountToSend = ethers.parseEther("1")
       let receiveTx = await user1.sendTransaction({
-        to: vault.address,
+        to: vault.target,
         value: amountToSend,
       })
 
@@ -133,9 +133,9 @@ describe(" -- Testing Vault Contract -- ", function () {
       await helpers.time.increase(60 * 60 * 24 * 100)
 
       //send enough ETH - this will set it to unlocked
-      const amountToSend = ethers.utils.parseEther("1")
+      const amountToSend = ethers.parseEther("1")
       let receiveTx = await user1.sendTransaction({
-        to: vault.address,
+        to: vault.target,
         value: amountToSend,
       })
 
@@ -144,9 +144,9 @@ describe(" -- Testing Vault Contract -- ", function () {
 
     it("should fail to setStateUnlocked if target is not reached", async function () {
       //send not enough ETH
-      const amountToSend = ethers.utils.parseEther("0.5")
+      const amountToSend = ethers.parseEther("0.5")
       let receiveTx = await user1.sendTransaction({
-        to: lockedVault.address,
+        to: lockedVault.target,
         value: amountToSend,
       })
 
@@ -155,9 +155,9 @@ describe(" -- Testing Vault Contract -- ", function () {
 
     it("should fail to setStateUnlocked if unlock date is in the future", async function () {
       //send enough ETH
-      const amountToSend = ethers.utils.parseEther("1")
+      const amountToSend = ethers.parseEther("1")
       let receiveTx = await user1.sendTransaction({
-        to: vault.address,
+        to: vault.target,
         value: amountToSend,
       })
       await expect(vault.setStateUnlocked()).to.be.revertedWith('Vault has not reached maturity')
@@ -181,9 +181,9 @@ describe(" -- Testing Vault Contract -- ", function () {
 
     it("should emit Received with expected args when native token is received", async function () {
       //send some ETH
-      const amountToSend = ethers.utils.parseEther("0.33")
+      const amountToSend = ethers.parseEther("0.33")
       const tx = await user1.sendTransaction({
-        to: vault.address,
+        to: vault.target,
         value: amountToSend,
       })
 
@@ -199,9 +199,9 @@ describe(" -- Testing Vault Contract -- ", function () {
       await helpers.time.increase(60 * 60 * 24 * 100)
 
       //send some ETH
-      const amountToSend = ethers.utils.parseEther("1")
+      const amountToSend = ethers.parseEther("1")
       const tx = await user1.sendTransaction({
-        to: vault.address,
+        to: vault.target,
         value: amountToSend,
       })
 
@@ -227,7 +227,7 @@ describe(" -- Testing Vault Contract -- ", function () {
     })
 
     it("should fail when sending erc1155 tokens to a vault", async function () {
-      await expect(factory.connect(user1).safeTransferFrom(user1.address, vault.address, 0, 2, "0x"))
+      await expect(factory.connect(user1).safeTransferFrom(user1.address, vault.target, 0, 2, "0x"))
       .to.be.revertedWith("ERC1155InvalidReceiver")
     })
   })
@@ -259,53 +259,53 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy a mock ERC20 token for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const token1 = await MockToken.deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
+      await token1.waitForDeployment()
 
       // Deploy a mock ERC20 token for testing
       const token2 = await MockToken.deploy("Mock Token 2", "MOCK2")
-      await token2.deployed()
+      await token2.waitForDeployment()
 
       // Check the token balances before the transfer
-      expect(await token1.balanceOf(vault.address)).to.equal(0)
-      expect(await token2.balanceOf(vault.address)).to.equal(0)
+      expect(await token1.balanceOf(vault.target)).to.equal(0)
+      expect(await token2.balanceOf(vault.target)).to.equal(0)
 
       // Transfer some tokens to the vault contract
-      const tokenAmount = ethers.utils.parseUnits("0.2", 18)
-      const tx1 = await token1.transfer(vault.address, tokenAmount)
+      const tokenAmount = ethers.parseUnits("0.2", 18)
+      const tx1 = await token1.transfer(vault.target, tokenAmount)
       tx1.wait()
 
-      expect(await token1.balanceOf(vault.address)).to.equal(tokenAmount)
+      expect(await token1.balanceOf(vault.target)).to.equal(tokenAmount)
 
       // balance should still be zero until we add it as a supported token
       let totalBalance1 = await vault.getTotalBalance()
       expect(totalBalance1).to.equal(0)
 
       // add the token as a supported token in the treasury contract
-      expect(await treasury.addNativeStakedToken(token1.address)).to.not.be.reverted
+      expect(await treasury.addNativeStakedToken(token1.target)).to.not.be.reverted
 
       // now the vault balance should be equal to the token1 balance
       totalBalance1 = await vault.getTotalBalance()
       expect(totalBalance1).to.equal(tokenAmount)
 
       // send some native token to the vault
-      const amountToSend = ethers.utils.parseEther("0.2")
+      const amountToSend = ethers.parseEther("0.2")
       const tx = await user1.sendTransaction({
-        to: vault.address,
+        to: vault.target,
         value: amountToSend,
       })
 
-      expect(await ethers.provider.getBalance(vault.address)).to.equal(amountToSend)
-      expect(await vault.getTotalBalance()).to.equal(ethers.utils.parseEther("0.4"))
+      expect(await ethers.provider.getBalance(vault.target)).to.equal(amountToSend)
+      expect(await vault.getTotalBalance()).to.equal(ethers.parseEther("0.4"))
 
       // add the second token as a supported token in the treasury contract
-      expect(await treasury.addSupportedToken(token2.address)).to.not.be.reverted
+      expect(await treasury.addSupportedToken(token2.target)).to.not.be.reverted
 
       // Transfer some of the second tokens to the vault contract
-      const tx2 = await token1.transfer(vault.address, tokenAmount)
+      const tx2 = await token1.transfer(vault.target, tokenAmount)
       tx2.wait()
 
       // check that token 2 is accounted for in the total balance
-      expect(await vault.getTotalBalance()).to.equal(ethers.utils.parseEther("0.6"))
+      expect(await vault.getTotalBalance()).to.equal(ethers.parseEther("0.6"))
     })
 
     it("should remain locked then unlock correctly with supported base token", async function () {
@@ -313,36 +313,36 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy a mock ERC20 supported token for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const token1 = await MockToken.deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
+      await token1.waitForDeployment()
 
       // deploy mock staking token
       const token2 = await MockToken.deploy("Mock Token 2", "MOCK2")
-      await token2.deployed()
+      await token2.waitForDeployment()
 
       // make a Locked vault
-      vault = await makeLockedVault(factory, owner, user1, token1.address)
+      vault = await makeLockedVault(factory, owner, user1, token1.target)
 
       // Check the token balances before the transfer
-      expect(await token1.balanceOf(vault.address)).to.equal(0)
+      expect(await token1.balanceOf(vault.target)).to.equal(0)
 
       // Transfer some tokens to the vault contract
-      const tokenAmount = ethers.utils.parseUnits("20", 18)
-      const tx1 = await token1.transfer(vault.address, tokenAmount)
+      const tokenAmount = ethers.parseUnits("20", 18)
+      const tx1 = await token1.transfer(vault.target, tokenAmount)
       tx1.wait()
 
       // Check the token balance after the transfer
-      expect(await token1.balanceOf(vault.address)).to.equal(tokenAmount)
+      expect(await token1.balanceOf(vault.target)).to.equal(tokenAmount)
 
       // check the vault is still locked
       expect(await vault.state()).to.equal(0, 'vault state should == 0 (locked)')
 
       // add token2 as a native staking token in the treasury contract
-      expect(await treasury.addNativeStakedToken(token2.address)).to.not.be.reverted
+      expect(await treasury.addNativeStakedToken(token2.target)).to.not.be.reverted
 
       // send enough native token to the vault to unlock (shouldn't)
       const tx = await user1.sendTransaction({
-        to: vault.address,
-        value: ethers.utils.parseUnits("100", 18),
+        to: vault.target,
+        value: ethers.parseUnits("100", 18),
       })
 
       // check the vault is still locked
@@ -352,13 +352,13 @@ describe(" -- Testing Vault Contract -- ", function () {
       await expect(vault.setStateUnlocked()).to.be.revertedWith('Unsupported token')
 
       // add token1 as a supported token in the treasury contract
-      expect(await treasury.addSupportedToken(token1.address)).to.not.be.reverted
+      expect(await treasury.addSupportedToken(token1.target)).to.not.be.reverted
       
       // try to unlock it again
       await expect(vault.setStateUnlocked()).to.be.revertedWith('Target not met')
 
       // Transfer some native staked tokens to the vault contract
-      const tx2 = await token2.transfer(vault.address, ethers.utils.parseUnits("100", 18))
+      const tx2 = await token2.transfer(vault.target, ethers.parseUnits("100", 18))
       tx2.wait()
 
       // check the vault is still locked
@@ -368,11 +368,11 @@ describe(" -- Testing Vault Contract -- ", function () {
       await expect(vault.setStateUnlocked()).to.be.revertedWith('Target not met')
 
       // Transfer enough supported tokens to the vault contract to meet target
-      const tx3 = await token1.transfer(vault.address, ethers.utils.parseUnits("80", 18))
+      const tx3 = await token1.transfer(vault.target, ethers.parseUnits("80", 18))
       tx3.wait()
 
       // Check the token balance after the transfer is equal to target amount
-      expect(await token1.balanceOf(vault.address)).to.equal(ethers.utils.parseUnits("100", 18))
+      expect(await token1.balanceOf(vault.target)).to.equal(ethers.parseUnits("100", 18))
 
       // check the vault is still locked
       expect(await vault.state()).to.equal(0, 'vault state should == 0 (locked)')
@@ -404,25 +404,25 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy a mock ERC20 token for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const token1 = await MockToken.deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
+      await token1.waitForDeployment()
 
       // add the token as a staked token in the treasury contract
-      expect(await treasury.addNativeStakedToken(token1.address)).to.not.be.reverted
+      expect(await treasury.addNativeStakedToken(token1.target)).to.not.be.reverted
 
       // Transfer some tokens to the vault contract
-      const tokenAmount = ethers.utils.parseUnits("0.5", 18)
-      const tx1 = await token1.transfer(vault.address, tokenAmount)
+      const tokenAmount = ethers.parseUnits("0.5", 18)
+      const tx1 = await token1.transfer(vault.target, tokenAmount)
       tx1.wait()
 
       //send some ETH
-      const amountToSend = ethers.utils.parseEther("0.5")
+      const amountToSend = ethers.parseEther("0.5")
       const tx = await user1.sendTransaction({
-        to: vault.address,
+        to: vault.target,
         value: amountToSend,
       })
 
       const totalBalance = await vault.getTotalBalance()
-      expect(totalBalance).to.equal(ethers.utils.parseEther("1"))
+      expect(totalBalance).to.equal(ethers.parseEther("1"))
 
       const stateChangedEvent = await vault.queryFilter('StateChanged', tx.blockHash)
       expect(stateChangedEvent.length).to.equal(1)
@@ -443,23 +443,23 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy a mock ERC20 token for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const token1 = await MockToken.deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
+      await token1.waitForDeployment()
 
       // add the token as a supported token in the treasury contract
-      expect(await treasury.addNativeStakedToken(token1.address)).to.not.be.reverted
+      expect(await treasury.addNativeStakedToken(token1.target)).to.not.be.reverted
 
       // Transfer some tokens to the vault contract
-      const tokenAmount = ethers.utils.parseUnits("55", 18)
-      const tx1 = await token1.transfer(vault.address, tokenAmount)
+      const tokenAmount = ethers.parseUnits("55", 18)
+      const tx1 = await token1.transfer(vault.target, tokenAmount)
       tx1.wait()
 
-      expect(await token1.balanceOf(vault.address)).to.equal(tokenAmount)
+      expect(await token1.balanceOf(vault.target)).to.equal(tokenAmount)
 
       // expect vault to account for the token balance
       expect(await vault.getTotalBalance()).to.equal(tokenAmount)
 
       // remove the token from supported tokens
-      expect(await treasury.removeNativeStakedToken(token1.address)).to.not.be.reverted 
+      expect(await treasury.removeNativeStakedToken(token1.target)).to.not.be.reverted 
 
       // now the vault balance should be 0
       expect(await vault.getTotalBalance()).to.equal(0)
@@ -500,9 +500,9 @@ describe(" -- Testing Vault Contract -- ", function () {
       await helpers.time.increase(60 * 60 * 24 * 100) // 100 days
 
       //send enough ETH
-      const amountToSend = ethers.utils.parseEther("1")
+      const amountToSend = ethers.parseEther("1")
       const tx = await user1.sendTransaction({
-        to: vault.address,
+        to: vault.target,
         value: amountToSend,
       })
       tx.wait()
@@ -551,11 +551,11 @@ describe(" -- Testing Vault Contract -- ", function () {
       expect(await vault.state()).to.equal(0, 'vault should be locked')
 
       //send enough ETH
-      const amountToSend = ethers.utils.parseEther("1")
+      const amountToSend = ethers.parseEther("1")
 
       // Send the ETH to the vault contract
       let receiveTx = await user2.sendTransaction({
-        to: vault.address,
+        to: vault.target,
         value: amountToSend,
       })
 
@@ -609,25 +609,25 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy mock ERC20 tokens for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const token1 = await MockToken.deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
+      await token1.waitForDeployment()
       const token2 = await MockToken.deploy("Mock Token 2", "MOCK2")
-      await token2.deployed()
+      await token2.waitForDeployment()
 
       // Transfer enough tokens to reach 66% target amount
-      const tokenAmount = ethers.utils.parseUnits("33", 18)
-      await token1.transfer(vault100.address, tokenAmount)
-      await token2.transfer(vault100.address, tokenAmount)
+      const tokenAmount = ethers.parseUnits("33", 18)
+      await token1.transfer(vault100.target, tokenAmount)
+      await token2.transfer(vault100.target, tokenAmount)
 
       // send the remaining required ETH:
-      const ethToSend = ethers.utils.parseUnits("34", 18)
+      const ethToSend = ethers.parseUnits("34", 18)
       await user2.sendTransaction({
-        to: vault100.address,
+        to: vault100.target,
         value: ethToSend,
       })
 
       // Approve our mock tokens:
-      await treasury.addNativeStakedToken(token1.address)
-      await treasury.addNativeStakedToken(token2.address)
+      await treasury.addNativeStakedToken(token1.target)
+      await treasury.addNativeStakedToken(token2.target)
 
       // setStateUnlocked should be unlocked
       expect(await vault100.state()).to.equal(0, 'vault state should == 0 (locked)')
@@ -643,9 +643,9 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       // should payout all vaults
       const tx = await factory.connect(user1).payout(1)
-      vaultETHBalance = await ethers.provider.getBalance(vault100.address)
-      vaultToken1Balance = await token1.balanceOf(vault100.address)
-      vaultToken2Balance = await token2.balanceOf(vault100.address)
+      vaultETHBalance = await ethers.provider.getBalance(vault100.target)
+      vaultToken1Balance = await token1.balanceOf(vault100.target)
+      vaultToken2Balance = await token2.balanceOf(vault100.target)
       expect(vaultETHBalance).to.equal(0)
       expect(vaultToken1Balance).to.equal(0)
       expect(vaultToken2Balance).to.equal(0)
@@ -675,34 +675,34 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy mock ERC20 tokens for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const token1 = await MockToken.deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
+      await token1.waitForDeployment()
       const token2 = await MockToken.deploy("Mock Token 2", "MOCK2")
-      await token2.deployed()
+      await token2.waitForDeployment()
       const token3 = await MockToken.deploy("Mock Token 3", "MOCK2")
-      await token3.deployed()
+      await token3.waitForDeployment()
 
       // make new vault using token1 as base currency
-      vault = await makeLockedVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1, token1.address)
+      vault = await makeLockedVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1, token1.target)
 
       // Transfer enough tokens to reach 66% target amount
-      const tokenAmount = ethers.utils.parseUnits("33", 18)
-      await token1.transfer(vault.address, tokenAmount)
-      await token2.transfer(vault.address, tokenAmount)
+      const tokenAmount = ethers.parseUnits("33", 18)
+      await token1.transfer(vault.target, tokenAmount)
+      await token2.transfer(vault.target, tokenAmount)
 
       // Transfer enough token 3 to unlock if it was counted
-      await token3.transfer(vault.address, ethers.utils.parseUnits("67", 18))
+      await token3.transfer(vault.target, ethers.parseUnits("67", 18))
 
       // send the remaining required ETH:
-      const ethToSend = ethers.utils.parseUnits("67", 18)
+      const ethToSend = ethers.parseUnits("67", 18)
       await user2.sendTransaction({
-        to: vault.address,
+        to: vault.target,
         value: ethToSend,
       })
 
       // Approve our mock tokens:
-      await treasury.addSupportedToken(token1.address) // our base currency
-      await treasury.addSupportedToken(token2.address) // another random supported token
-      await treasury.addNativeStakedToken(token3.address) // a staked token
+      await treasury.addSupportedToken(token1.target) // our base currency
+      await treasury.addSupportedToken(token2.target) // another random supported token
+      await treasury.addNativeStakedToken(token3.target) // a staked token
 
       // state should be Locked
       expect(await vault.state()).to.equal(0, 'vault state should == 0 (locked)')
@@ -714,10 +714,10 @@ describe(" -- Testing Vault Contract -- ", function () {
       expect(await vault.state()).to.equal(0, 'vault state should == 0 (locked)')
 
       // Transfer enough token 1 to unlock
-      await token1.transfer(vault.address, ethers.utils.parseUnits("67", 18))
+      await token1.transfer(vault.target, ethers.parseUnits("67", 18))
 
       // base currency balance should be 100
-      expect(await token1.balanceOf(vault.address)).to.equal(ethers.utils.parseUnits("100", 18))
+      expect(await token1.balanceOf(vault.target)).to.equal(ethers.parseUnits("100", 18))
 
       await expect(vault.setStateUnlocked()).to.not.be.reverted
 
@@ -728,21 +728,21 @@ describe(" -- Testing Vault Contract -- ", function () {
       const initialOwnerToken1Balance = await token1.balanceOf(user1.address)
 
       // vault token1 balance before payout
-      const vaultToken1Balance_beforePayout = await token1.balanceOf(vault.address)
+      const vaultToken1Balance_beforePayout = await token1.balanceOf(vault.target)
 
       // get the tokenId so we can call payout on it
       const attributes = await vault.attributes()
 
       // should payout all vaults
       const tx = await factory.connect(user1).payout(attributes.tokenId)
-      const vaultETHBalance = await ethers.provider.getBalance(vault.address)
-      const vaultToken1Balance = await token1.balanceOf(vault.address)
-      const vaultToken2Balance = await token2.balanceOf(vault.address)
-      const vaultToken3Balance = await token3.balanceOf(vault.address)
+      const vaultETHBalance = await ethers.provider.getBalance(vault.target)
+      const vaultToken1Balance = await token1.balanceOf(vault.target)
+      const vaultToken2Balance = await token2.balanceOf(vault.target)
+      const vaultToken3Balance = await token3.balanceOf(vault.target)
       expect(vaultETHBalance).to.equal(ethToSend)
       expect(vaultToken1Balance).to.equal(0)
       expect(vaultToken2Balance).to.equal(tokenAmount)
-      expect(vaultToken3Balance).to.equal(ethers.utils.parseUnits("67", 18))
+      expect(vaultToken3Balance).to.equal(ethers.parseUnits("67", 18))
 
       // get gas used
       const txReceipt = await ethers.provider.getTransactionReceipt(tx.hash)
@@ -774,25 +774,25 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy mock ERC20 tokens for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const token1 = await MockToken.deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
+      await token1.waitForDeployment()
       const token2 = await MockToken.deploy("Mock Token 2", "MOCK2")
-      await token2.deployed()
+      await token2.waitForDeployment()
 
       // Transfer enough tokens to reach the target amount
-      const tokenAmount = ethers.utils.parseUnits("33", 18)
-      await token1.transfer(vault100.address, tokenAmount)
-      await token2.transfer(vault100.address, tokenAmount)
+      const tokenAmount = ethers.parseUnits("33", 18)
+      await token1.transfer(vault100.target, tokenAmount)
+      await token2.transfer(vault100.target, tokenAmount)
 
       // Send the remaining required ETH
-      const ethToSend = ethers.utils.parseUnits("34", 18)
+      const ethToSend = ethers.parseUnits("34", 18)
       await user2.sendTransaction({
-        to: vault100.address,
+        to: vault100.target,
         value: ethToSend,
       })
 
       // Approve our mock tokens
-      await treasury.addNativeStakedToken(token1.address)
-      await treasury.addNativeStakedToken(token2.address)
+      await treasury.addNativeStakedToken(token1.target)
+      await treasury.addNativeStakedToken(token2.target)
 
       // unlock the vault
       await vault100.setStateUnlocked()
@@ -810,9 +810,9 @@ describe(" -- Testing Vault Contract -- ", function () {
       const tx = await factory.connect(user1).payout(1)
 
       // Get vault balances after payout
-      const vaultETHBalance = await ethers.provider.getBalance(vault100.address)
-      const vaultToken1Balance = await token1.balanceOf(vault100.address)
-      const vaultToken2Balance = await token2.balanceOf(vault100.address)
+      const vaultETHBalance = await ethers.provider.getBalance(vault100.target)
+      const vaultToken1Balance = await token1.balanceOf(vault100.target)
+      const vaultToken2Balance = await token2.balanceOf(vault100.target)
       expect(vaultETHBalance).to.equal(0)
       expect(vaultToken1Balance).to.equal(0)
       expect(vaultToken2Balance).to.equal(0)
@@ -856,33 +856,33 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy mock ERC20 tokens for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const token1 = await MockToken.connect(user2).deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
+      await token1.waitForDeployment()
       const token2 = await MockToken.connect(user2).deploy("Mock Token 2", "MOCK2")
-      await token2.deployed()
+      await token2.waitForDeployment()
 
       // Transfer enough tokens to reach the target amount
-      const tokenAmount = ethers.utils.parseUnits("33", 18)
-      await token1.connect(user2).transfer(vault100.address, tokenAmount)
-      await token2.connect(user2).transfer(vault100.address, tokenAmount)
+      const tokenAmount = ethers.parseUnits("33", 18)
+      await token1.connect(user2).transfer(vault100.target, tokenAmount)
+      await token2.connect(user2).transfer(vault100.target, tokenAmount)
 
       // send the remaining required ETH:
-      const ethToSend = ethers.utils.parseUnits("34", 18)
+      const ethToSend = ethers.parseUnits("34", 18)
       await user2.sendTransaction({
-        to: vault100.address,
+        to: vault100.target,
         value: ethToSend,
       })
 
       // Check vault balance is as expected
-      const vaultETHBalance_beforePayout = await ethers.provider.getBalance(vault100.address)
-      const vaultToken1Balance_beforePayout = await token1.balanceOf(vault100.address)
-      const vaultToken2Balance_beforePayout = await token2.balanceOf(vault100.address)
-      expect(vaultETHBalance_beforePayout).to.equal(ethers.utils.parseUnits("34", 18))
-      expect(vaultToken1Balance_beforePayout).to.equal(ethers.utils.parseUnits("33", 18))
-      expect(vaultToken2Balance_beforePayout).to.equal(ethers.utils.parseUnits("33", 18))
+      const vaultETHBalance_beforePayout = await ethers.provider.getBalance(vault100.target)
+      const vaultToken1Balance_beforePayout = await token1.balanceOf(vault100.target)
+      const vaultToken2Balance_beforePayout = await token2.balanceOf(vault100.target)
+      expect(vaultETHBalance_beforePayout).to.equal(ethers.parseUnits("34", 18))
+      expect(vaultToken1Balance_beforePayout).to.equal(ethers.parseUnits("33", 18))
+      expect(vaultToken2Balance_beforePayout).to.equal(ethers.parseUnits("33", 18))
 
       // Approve our mock tokens:
-      await treasury.addNativeStakedToken(token1.address)
-      await treasury.addNativeStakedToken(token2.address)
+      await treasury.addNativeStakedToken(token1.target)
+      await treasury.addNativeStakedToken(token2.target)
 
       // setStateUnlocked should be unlocked
       expect(await vault100.state()).to.equal(0, 'vault state should == 0 (locked)')
@@ -909,9 +909,9 @@ describe(" -- Testing Vault Contract -- ", function () {
       const oneFifthOfVaultToken2Balance = ethers.BigNumber.from(tokenAmount.mul(2).div(10))
 
       // Vault should be left with 80% of ETH & Supported tokens
-      const vaultETHBalance_afterPayout = await ethers.provider.getBalance(vault100.address)
-      const vaultToken1Balance_afterPayout = await token1.balanceOf(vault100.address)
-      const vaultToken2Balance_afterPayout = await token2.balanceOf(vault100.address)
+      const vaultETHBalance_afterPayout = await ethers.provider.getBalance(vault100.target)
+      const vaultToken1Balance_afterPayout = await token1.balanceOf(vault100.target)
+      const vaultToken2Balance_afterPayout = await token2.balanceOf(vault100.target)
       expect(vaultETHBalance_afterPayout).to.equal(vaultETHBalance_beforePayout.sub(oneFifthOfVaultETHBalance))
       expect(vaultToken1Balance_afterPayout).to.equal(vaultToken1Balance_beforePayout.sub(oneFifthOfVaultToken1Balance))
       expect(vaultToken2Balance_afterPayout).to.equal(vaultToken2Balance_beforePayout.sub(oneFifthOfVaultToken2Balance))
@@ -949,33 +949,33 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy mock ERC20 tokens for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const token1 = await MockToken.connect(user2).deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
+      await token1.waitForDeployment()
       const token2 = await MockToken.connect(user2).deploy("Mock Token 2", "MOCK2")
-      await token2.deployed()
+      await token2.waitForDeployment()
 
       // Transfer enough tokens to reach the target amount
-      const tokenAmount = ethers.utils.parseUnits("33", 18)
-      await token1.connect(user2).transfer(vault100.address, tokenAmount)
-      await token2.connect(user2).transfer(vault100.address, tokenAmount)
+      const tokenAmount = ethers.parseUnits("33", 18)
+      await token1.connect(user2).transfer(vault100.target, tokenAmount)
+      await token2.connect(user2).transfer(vault100.target, tokenAmount)
 
       // send the remaining required ETH:
-      const ethToSend = ethers.utils.parseUnits("34", 18)
+      const ethToSend = ethers.parseUnits("34", 18)
       await user2.sendTransaction({
-        to: vault100.address,
+        to: vault100.target,
         value: ethToSend,
       })
 
       // Check vault balance is as expected
-      const vaultETHBalance_beforePayout = await ethers.provider.getBalance(vault100.address)
-      const vaultToken1Balance_beforePayout = await token1.balanceOf(vault100.address)
-      const vaultToken2Balance_beforePayout = await token2.balanceOf(vault100.address)
+      const vaultETHBalance_beforePayout = await ethers.provider.getBalance(vault100.target)
+      const vaultToken1Balance_beforePayout = await token1.balanceOf(vault100.target)
+      const vaultToken2Balance_beforePayout = await token2.balanceOf(vault100.target)
       expect(vaultETHBalance_beforePayout).to.equal(ethToSend)
       expect(vaultToken1Balance_beforePayout).to.equal(tokenAmount)
       expect(vaultToken2Balance_beforePayout).to.equal(tokenAmount)
 
       // Approve our mock tokens:
-      await treasury.addNativeStakedToken(token1.address)
-      await treasury.addNativeStakedToken(token2.address)
+      await treasury.addNativeStakedToken(token1.target)
+      await treasury.addNativeStakedToken(token2.target)
 
       // unlock the vault
       await vault100.setStateUnlocked()
@@ -999,9 +999,9 @@ describe(" -- Testing Vault Contract -- ", function () {
       const oneFifthOfVaultToken2Balance = ethers.BigNumber.from(tokenAmount.mul(2).div(10))
 
       // Vault should be left with 80% of ETH & Supported tokens
-      const vaultETHBalance_afterPayout = await ethers.provider.getBalance(vault100.address)
-      const vaultToken1Balance_afterPayout = await token1.balanceOf(vault100.address)
-      const vaultToken2Balance_afterPayout = await token2.balanceOf(vault100.address)
+      const vaultETHBalance_afterPayout = await ethers.provider.getBalance(vault100.target)
+      const vaultToken1Balance_afterPayout = await token1.balanceOf(vault100.target)
+      const vaultToken2Balance_afterPayout = await token2.balanceOf(vault100.target)
       expect(vaultETHBalance_afterPayout).to.equal(vaultETHBalance_beforePayout.sub(oneFifthOfVaultETHBalance))
       expect(vaultToken1Balance_afterPayout).to.equal(vaultToken1Balance_beforePayout.sub(oneFifthOfVaultToken1Balance))
       expect(vaultToken2Balance_afterPayout).to.equal(vaultToken2Balance_beforePayout.sub(oneFifthOfVaultToken2Balance))
@@ -1039,17 +1039,17 @@ describe(" -- Testing Vault Contract -- ", function () {
 
     it("should payout token holder % of balance proportional to token holder's share of native token", async function () {
       
-      const fullAmountToSend = ethers.utils.parseEther("100")
+      const fullAmountToSend = ethers.parseEther("100")
 
       // send all the ETH
       await user2.sendTransaction({
-        to: vault100.address,
+        to: vault100.target,
         value: fullAmountToSend,
       })
 
       // Check the vault contract balance is correct
-      let vaultBalance = await ethers.provider.getBalance(vault100.address)
-      expect(vaultBalance).to.equal(ethers.utils.parseEther("100"))
+      let vaultBalance = await ethers.provider.getBalance(vault100.target)
+      expect(vaultBalance).to.equal(ethers.parseEther("100"))
 
       // distribute the token
       await factory.connect(user1).safeTransferFrom(user1.address, user3.address, 1, 25, "0x")
@@ -1069,8 +1069,8 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       //holder should receive 75% of vaults minus break fee and gas:
       const holder1BalanceAfterPayout = await ethers.provider.getBalance(user1.address)
-      let payoutFee = ethers.utils.parseEther("75").mul(400).div(10000) // 400 basis points
-      let expectedBalanceChange = ethers.utils.parseEther("75").sub(payoutFee).sub(gasCost)
+      let payoutFee = ethers.parseEther("75").mul(400).div(10000) // 400 basis points
+      let expectedBalanceChange = ethers.parseEther("75").sub(payoutFee).sub(gasCost)
 
       expect(holder1BalanceAfterPayout).to.equal(holder1BalanceBeforePayout.add(expectedBalanceChange))
 
@@ -1089,8 +1089,8 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       //holder should receive all vaults minus break fee and gas:
       const holder2BalanceAfterPayout = await ethers.provider.getBalance(user3.address)
-      payoutFee = ethers.utils.parseEther("25").mul(400).div(10000) // 400 basis points
-      expectedBalanceChange = ethers.utils.parseEther("25").sub(payoutFee).sub(gasCost)
+      payoutFee = ethers.parseEther("25").mul(400).div(10000) // 400 basis points
+      expectedBalanceChange = ethers.parseEther("25").sub(payoutFee).sub(gasCost)
 
       expect(holder2BalanceAfterPayout).to.equal(holder2BalanceBeforePayout.add(expectedBalanceChange))
     })
@@ -1103,31 +1103,31 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy mock ERC20 tokens for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const token1 = await MockToken.connect(user2).deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
+      await token1.waitForDeployment()
       const token2 = await MockToken.connect(user2).deploy("Mock Token 2", "MOCK2")
-      await token2.deployed()
+      await token2.waitForDeployment()
 
       // Approve our mock tokens
-      await treasury.addNativeStakedToken(token1.address)
-      await treasury.addNativeStakedToken(token2.address)
+      await treasury.addNativeStakedToken(token1.target)
+      await treasury.addNativeStakedToken(token2.target)
 
-      const tokenAmount = ethers.utils.parseUnits("100", 18)
+      const tokenAmount = ethers.parseUnits("100", 18)
 
       // send all the ETH
       await user2.sendTransaction({
-        to: vault100.address,
+        to: vault100.target,
         value: tokenAmount,
       })
 
       // Transfer some staked tokens to the vault
-      await token1.connect(user2).transfer(vault100.address, tokenAmount)
-      await token2.connect(user2).transfer(vault100.address, tokenAmount)
+      await token1.connect(user2).transfer(vault100.target, tokenAmount)
+      await token2.connect(user2).transfer(vault100.target, tokenAmount)
 
       // Check the vault contract balance is correct
-      let vaultBalance = await ethers.provider.getBalance(vault100.address)
+      let vaultBalance = await ethers.provider.getBalance(vault100.target)
       expect(vaultBalance).to.equal(tokenAmount)
-      const vaultToken1Balance = await token1.balanceOf(vault100.address)
-      const vaultToken2Balance = await token2.balanceOf(vault100.address)
+      const vaultToken1Balance = await token1.balanceOf(vault100.target)
+      const vaultToken2Balance = await token2.balanceOf(vault100.target)
       expect(vaultToken1Balance).to.equal(tokenAmount)
       expect(vaultToken2Balance).to.equal(tokenAmount)
 
@@ -1153,11 +1153,11 @@ describe(" -- Testing Vault Contract -- ", function () {
       const holder1ETHBalanceAfterPayout = await ethers.provider.getBalance(user1.address)
       const holder1_token1Balance_afterPayout = await token1.balanceOf(user1.address)
       const holder1_token2Balance_afterPayout = await token2.balanceOf(user1.address)
-      let payoutFee = ethers.utils.parseEther("75").mul(400).div(10000) // 400 basis points
-      let expectedTokenBalanceChange = ethers.utils.parseEther("75").sub(payoutFee)
+      let payoutFee = ethers.parseEther("75").mul(400).div(10000) // 400 basis points
+      let expectedTokenBalanceChange = ethers.parseEther("75").sub(payoutFee)
 
       expect(holder1ETHBalanceAfterPayout).to.equal(holder1_ETHBalance_beforePayout.add(
-        ethers.utils.parseEther("75")).sub(gasCost).sub(payoutFee))
+        ethers.parseEther("75")).sub(gasCost).sub(payoutFee))
       expect(holder1_token1Balance_afterPayout).to.equal(holder1_token1Balance_beforePayout.add(expectedTokenBalanceChange))
       expect(holder1_token2Balance_afterPayout).to.equal(holder1_token2Balance_beforePayout.add(expectedTokenBalanceChange))
 
@@ -1178,11 +1178,11 @@ describe(" -- Testing Vault Contract -- ", function () {
       const holder2ETHBalanceAfterPayout = await ethers.provider.getBalance(user3.address)
       const holder2_token1Balance_afterPayout = await token1.balanceOf(user3.address)
       const holder2_token2Balance_afterPayout = await token2.balanceOf(user3.address)
-      payoutFee = ethers.utils.parseEther("25").mul(400).div(10000) // 400 basis points
-      expectedTokenBalanceChange = ethers.utils.parseEther("25").sub(payoutFee)
+      payoutFee = ethers.parseEther("25").mul(400).div(10000) // 400 basis points
+      expectedTokenBalanceChange = ethers.parseEther("25").sub(payoutFee)
 
       expect(holder2ETHBalanceAfterPayout).to.equal(holder2_ETHBalance_beforePayout.add(
-        ethers.utils.parseEther("25")).sub(gasCost).sub(payoutFee))
+        ethers.parseEther("25")).sub(gasCost).sub(payoutFee))
       expect(holder2_token1Balance_afterPayout).to.equal(holder2_token1Balance_beforePayout.add(expectedTokenBalanceChange))
       expect(holder2_token2Balance_afterPayout).to.equal(holder2_token2Balance_beforePayout.add(expectedTokenBalanceChange))
     })
@@ -1192,28 +1192,28 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy mock ERC20 tokens for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       const baseToken = await MockToken.connect(user2).deploy("Mock Token 1", "MOCK1")
-      await baseToken.deployed()
+      await baseToken.waitForDeployment()
 
       // make new vault using token1 as base currency
-      vault = await makeLockedVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1, baseToken.address)
+      vault = await makeLockedVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1, baseToken.target)
 
       // get the tokenId so we can call payout on it
       const attributes = await vault.attributes()
 
       // Approve our base token ?
-      await treasury.addSupportedToken(baseToken.address)
+      await treasury.addSupportedToken(baseToken.target)
 
-      const tokenAmount = ethers.utils.parseUnits("100", 18)
+      const tokenAmount = ethers.parseUnits("100", 18)
 
       // Transfer base token to the vault
-      await baseToken.connect(user2).transfer(vault.address, tokenAmount)
+      await baseToken.connect(user2).transfer(vault.target, tokenAmount)
 
       // unlock the vault
       let tx = await vault.setStateUnlocked()
       expect(await vault.state()).to.equal(1)
 
       // Check the vault contract balance is correct
-      const vault_baseTokenBalance = await baseToken.balanceOf(vault.address)
+      const vault_baseTokenBalance = await baseToken.balanceOf(vault.target)
       expect(vault_baseTokenBalance).to.equal(tokenAmount)
 
       // distribute the vault token
@@ -1236,8 +1236,8 @@ describe(" -- Testing Vault Contract -- ", function () {
       //holder should have received 75% of the base tokens in vault, minus break fee and ETH gas:
       const holder1ETHBalanceAfterPayout = await ethers.provider.getBalance(user1.address)
       const holder1_baseTokenBalance_afterPayout = await baseToken.balanceOf(user1.address)
-      let payoutFee = ethers.utils.parseEther("75").mul(400).div(10000) // 400 basis points
-      let expectedTokenBalanceChange = ethers.utils.parseEther("75").sub(payoutFee)
+      let payoutFee = ethers.parseEther("75").mul(400).div(10000) // 400 basis points
+      let expectedTokenBalanceChange = ethers.parseEther("75").sub(payoutFee)
 
       expect(holder1ETHBalanceAfterPayout).to.equal(holder1_ETHBalance_beforePayout.sub(gasCost))
       expect(holder1_baseTokenBalance_afterPayout).to.equal(holder1_baseTokenBalance_beforePayout.add(expectedTokenBalanceChange))
@@ -1257,8 +1257,8 @@ describe(" -- Testing Vault Contract -- ", function () {
       //holder is the last, so should receive all vault's base token balance minus break fee and gas:
       const holder2ETHBalanceAfterPayout = await ethers.provider.getBalance(user3.address)
       const holder2_baseTokenBalance_afterPayout = await baseToken.balanceOf(user3.address)
-      payoutFee = ethers.utils.parseEther("25").mul(400).div(10000) // 400 basis points
-      expectedTokenBalanceChange = ethers.utils.parseEther("25").sub(payoutFee)
+      payoutFee = ethers.parseEther("25").mul(400).div(10000) // 400 basis points
+      expectedTokenBalanceChange = ethers.parseEther("25").sub(payoutFee)
 
       expect(holder2ETHBalanceAfterPayout).to.equal(holder2_ETHBalance_beforePayout.sub(gasCost))
       expect(holder2_baseTokenBalance_afterPayout).to.equal(holder2_baseTokenBalance_beforePayout.add(expectedTokenBalanceChange))
@@ -1289,29 +1289,29 @@ describe(" -- Testing Vault Contract -- ", function () {
       // Deploy mock ERC20 tokens for testing
       const MockToken = await ethers.getContractFactory("MockToken")
       token1 = await MockToken.deploy("Mock Token 1", "MOCK1")
-      await token1.deployed()
+      await token1.waitForDeployment()
       token2 = await MockToken.deploy("Mock Token 2", "MOCK2")
-      await token2.deployed()
+      await token2.waitForDeployment()
       token3 = await MockToken.deploy("Mock Token 3", "MOCK3")
-      await token3.deployed()
+      await token3.waitForDeployment()
 
       // Approve our mock tokens:
-      await treasury.addNativeStakedToken(token1.address)
-      await treasury.addSupportedToken(token2.address)
-      await treasury.addSupportedToken(token3.address)
+      await treasury.addNativeStakedToken(token1.target)
+      await treasury.addSupportedToken(token2.target)
+      await treasury.addSupportedToken(token3.target)
     })
 
     it("should send open vault assets to the treasury", async function () {
 
       // Transfer tokens
-      let tokenAmount = ethers.utils.parseUnits("100", 18)
-      await token1.transfer(lockedVault.address, tokenAmount)
-      await token2.transfer(unlockedVault.address, tokenAmount)
-      await token3.transfer(openVault.address, tokenAmount)
+      let tokenAmount = ethers.parseUnits("100", 18)
+      await token1.transfer(lockedVault.target, tokenAmount)
+      await token2.transfer(unlockedVault.target, tokenAmount)
+      await token3.transfer(openVault.target, tokenAmount)
 
       // send some ETH to the open vault:
       await user2.sendTransaction({
-        to: openVault.address,
+        to: openVault.target,
         value: tokenAmount,
       })
 
@@ -1321,23 +1321,23 @@ describe(" -- Testing Vault Contract -- ", function () {
       expect(await unlockedVault.state()).to.equal(1)
       // verify that the open vault is in the Open state
       expect(await openVault.state()).to.equal(2)
-      expect(await treasury.isOpenVault(openVault.address)).to.be.true
+      expect(await treasury.isOpenVault(openVault.target)).to.be.true
 
       // Get the initial treasury balances of native and supported tokens
-      const initial_treasury_EthBalance = await ethers.provider.getBalance(treasury.address)
-      const initial_treasury_Token1Balance = await token1.balanceOf(treasury.address)
-      const initial_treasury_Token2Balance = await token2.balanceOf(treasury.address)
-      const initial_treasury_Token3Balance = await token3.balanceOf(treasury.address)
+      const initial_treasury_EthBalance = await ethers.provider.getBalance(treasury.target)
+      const initial_treasury_Token1Balance = await token1.balanceOf(treasury.target)
+      const initial_treasury_Token2Balance = await token2.balanceOf(treasury.target)
+      const initial_treasury_Token3Balance = await token3.balanceOf(treasury.target)
 
       // call collect on the treasury which should pull balance from the Open Vault only
       tx = await treasury.connect(user1).collect()
       const txReceipt = await tx.wait()
 
       // Get the updated balances after collecting from the Open Vault
-      const updated_treasury_EthBalance = await ethers.provider.getBalance(treasury.address)
-      const updated_treasury_Token1Balance = await token1.balanceOf(treasury.address)
-      const updated_treasury_Token2Balance = await token2.balanceOf(treasury.address)
-      const updated_treasury_Token3Balance = await token3.balanceOf(treasury.address)
+      const updated_treasury_EthBalance = await ethers.provider.getBalance(treasury.target)
+      const updated_treasury_Token1Balance = await token1.balanceOf(treasury.target)
+      const updated_treasury_Token2Balance = await token2.balanceOf(treasury.target)
+      const updated_treasury_Token3Balance = await token3.balanceOf(treasury.target)
 
       // Verify that balances have changed as expected
       expect(updated_treasury_EthBalance).to.equal(initial_treasury_EthBalance.add(tokenAmount),
@@ -1355,14 +1355,14 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       // Verify the SendNativeTokenToTreasury event
       expect(sendNativeTokenEvent).to.exist
-      expect(sendNativeTokenEvent.args.treasuryAddress).to.equal(treasury.address, 'Native token event: treasury address should be correct')
+      expect(sendNativeTokenEvent.args.treasuryAddress).to.equal(treasury.target, 'Native token event: treasury address should be correct')
       expect(sendNativeTokenEvent.args.amount).to.equal(tokenAmount, 'Native token event: native token amount should be correct')
 
       // Verify the SendSupportedTokenToTreasury event
       expect(sendSupportedTokenEvents[0]).to.exist
 
-      expect(sendSupportedTokenEvents[0].args.tokenAddress).to.equal(token3.address, 'token3: address should be correct')
-      expect(sendSupportedTokenEvents[0].args.recipientAddress).to.equal(treasury.address, 'token3: recipientAddress should be correct')
+      expect(sendSupportedTokenEvents[0].args.tokenAddress).to.equal(token3.target, 'token3: address should be correct')
+      expect(sendSupportedTokenEvents[0].args.recipientAddress).to.equal(treasury.target, 'token3: recipientAddress should be correct')
       expect(sendSupportedTokenEvents[0].args.amount).to.equal(tokenAmount, 'amount should be correct')
     })
   })

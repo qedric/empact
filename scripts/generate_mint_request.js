@@ -30,7 +30,6 @@ async function main() {
       )
 
       const mr = await generateMintRequest(factory.address, owner, to, typedData)
-      console.log(mr)
 }
 
 // We recommend this pattern to be able to use async/await everywhere
