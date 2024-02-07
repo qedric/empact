@@ -10,6 +10,7 @@ import "./IVault.sol";
 interface IExtendedERC20 is IERC20 {
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
+    function decimals() external view returns(uint8);
 }
 
 interface IFactory {
@@ -21,13 +22,19 @@ contract Generator is IGenerator, AccessControl {
 
     IFactory public immutable factory;
 
-    /// @dev prefix for the token url
+    bytes1 constant _decimalPlace = '.';
+
+    /// @notice The token url should point to dApp portal; will be appended by <tokenId>
     string private _tokenUrlPrefix;
     string internal _chainSymbol;
 
     event TokenUrlPrefixUpdated(string oldPrefix, string newPrefix);
 
-    constructor(string memory chainSymbol, string memory tokenUrlPrefix, address _factory) {
+    constructor(
+        string memory chainSymbol, 
+        string memory tokenUrlPrefix,
+        address _factory
+    ) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _chainSymbol = chainSymbol;
         _tokenUrlPrefix = tokenUrlPrefix;
@@ -90,9 +97,9 @@ contract Generator is IGenerator, AccessControl {
             '},{"trait_type":"Vault Asset","value":"',
             baseTokenSymbol,
             '"},{"trait_type":"Target Balance","value":"',
-            _convertWeiToEthString(attributes.targetBalance),
+            _formatUnits(attributes.targetBalance, attributes.baseToken == address(0) ? 18 : IExtendedERC20(attributes.baseToken).decimals()),
             '"},{"trait_type":"Current Balance","value":"',
-            _convertWeiToEthString(balance),
+            _formatUnits(balance,  attributes.baseToken == address(0) ? 18 : IExtendedERC20(attributes.baseToken).decimals()),
             '"},{"trait_type":"Receive Address","value":"0x',
             _toAsciiString(receiveAddress),
             '"},{"display_type":"boost_percentage","trait_type":"Percent Complete","value":',
@@ -220,39 +227,52 @@ contract Generator is IGenerator, AccessControl {
         else return bytes1(uint8(b) + 0x57);
     }
 
-    function _convertWeiToEthString(uint weiValue) internal pure returns (string memory) {
-        // Check if the value is less than 0.00001 ETH (10000000000000 wei)
-        if (weiValue < 10000000000000) {
-            return "0";
-        }
-        
-        // Truncate the last 14 digits of the wei value
-        uint truncatedWeiValue = weiValue / 10000000000000;
+    function _formatUnits(uint256 value, uint8 decimals) internal pure returns (string memory str) {
+        require(decimals > 0, 'must be > 0');
+        require(decimals <= 77, "Too many decimals"); // Safety check to prevent overflow, inspired by the max digits of a uint
 
-        string memory str = _uint2str(truncatedWeiValue);
+        // Adjust the value based on the decimals minus max decimal places
+        uint adjustedValue = value / 10**(decimals - 3);
 
-        // If the length of the string is less than 5, prepend leading zeros
-        if (bytes(str).length < 5) {
-            uint leadingZeros = 5 - bytes(str).length;
-            string memory zeros = new string(leadingZeros);
-            bytes memory zerosBytes = bytes(zeros);
-            for (uint i = 0; i < leadingZeros; i++) {
-                zerosBytes[i] = "0";
-            }
-            str = string(abi.encodePacked(zerosBytes, bytes(str)));
+        if (adjustedValue == 0) {
+            return '0';
         }
+
+        // Convert the adjusted value to a string
+        str = _uint2str(adjustedValue);
 
         uint len = bytes(str).length;
 
-        if (len > 5) {
-            // Insert '.' before the last 5 characters
-            string memory prefix = _insertCharAtIndex(str,len-5,'.');
-            return prefix; 
+        // Determine the number of chars to truncate, and decimal places to add
+        if (len >= 7) {
+            str = _substring(str, 0, len - 3);
+        } else if (len == 6) {
+            str = _substring(str, 0, 4);
+            str = _insertCharAtIndex(str, 3, _decimalPlace);
+        } else if (len == 5) {
+            str = _substring(str, 0, 4);
+            str = _insertCharAtIndex(str, 2, _decimalPlace);
+        } else if (len == 4) {
+            str = _insertCharAtIndex(str, 1, _decimalPlace);
         } else {
-            // Prepend '0.' to the start of the string
-            string memory prefix = string(abi.encodePacked("0.", str));
-            return prefix;
+            // Add leading zeros plus a "0." prefix
+            while (len < 3) {
+                str = string(abi.encodePacked("0", str));
+                len++;
+            }
+            str = string(abi.encodePacked("0.", str));
         }
+    }
+
+    function _substring(string memory str, uint startIndex, uint endIndex) internal pure returns (string memory) {
+        bytes memory strBytes = bytes(str);
+        bytes memory result = new bytes(endIndex - startIndex);
+
+        for (uint i = startIndex; i < endIndex; i++) {
+            result[i - startIndex] = strBytes[i];
+        }
+
+        return string(result);
     }
 
     function _insertCharAtIndex(string memory str, uint index, bytes1 newChar) internal pure returns (string memory) {

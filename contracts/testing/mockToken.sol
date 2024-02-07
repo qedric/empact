@@ -22,3 +22,20 @@ contract MockOETHToken is ERC20 {
         _isNonRebasingAccount = false;
     }
 }
+
+contract MockTokenWithDecimals is ERC20 {
+
+    uint8 private decimals_;
+
+    constructor(string memory name_, string memory symbol_, uint8 _decimals) ERC20(name_, symbol_) {
+        _mint(msg.sender, 1000000000000000000000000); // Mint 1,000,000 tokens to the contract deployer
+        decimals_ = _decimals;
+    }
+
+    /**
+     * @dev Returns the number of decimals. This overrides the default value of 18.
+     */
+    function decimals() public view virtual override returns (uint8) {
+        return decimals_;
+    }
+}
