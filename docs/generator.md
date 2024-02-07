@@ -30,7 +30,7 @@ function vaults(uint256 tokenId) external view returns (address)
 contract IFactory factory
 ```
 
-### _chainSymbol
+### \_chainSymbol
 
 ```solidity
 string _chainSymbol
@@ -66,31 +66,31 @@ function setTokenUrlPrefix(string tokenUrlPrefix) external
 
 this will display in NFT metadata
 
-### _generateAttributes
+### \_generateAttributes
 
 ```solidity
 function _generateAttributes(struct IVault.Attr attributes, address receiveAddress, uint256 percent, uint256 balance) internal view returns (string)
 ```
 
-### _generateSVG
+### \_generateSVG
 
 ```solidity
 function _generateSVG(uint256 percent) internal pure returns (bytes)
 ```
 
-### _generatePaths
+### \_generatePaths
 
 ```solidity
 function _generatePaths(uint256 percentage) internal pure returns (string pathsString)
 ```
 
-### _getBalance
+### \_getBalance
 
 ```solidity
 function _getBalance(contract IVault vault) internal view returns (uint256)
 ```
 
-### _getPercent
+### \_getPercent
 
 ```solidity
 function _getPercent(contract IVault vault, uint256 balance) internal view returns (uint256 percentage)
@@ -98,31 +98,31 @@ function _getPercent(contract IVault vault, uint256 balance) internal view retur
 
 _calculates the percentage towards unlock based on time and target balance_
 
-### _uint2str
+### \_uint2str
 
 ```solidity
 function _uint2str(uint256 _i) internal pure returns (string _uintAsString)
 ```
 
-### _toAsciiString
+### \_toAsciiString
 
 ```solidity
 function _toAsciiString(address x) internal pure returns (string)
 ```
 
-### _char
+### \_char
 
 ```solidity
 function _char(bytes1 b) internal pure returns (bytes1 c)
 ```
 
-### _convertWeiToEthString
+### \_convertWeiToEthString
 
 ```solidity
 function _convertWeiToEthString(uint256 weiValue) internal pure returns (string)
 ```
 
-### _insertCharAtIndex
+### \_insertCharAtIndex
 
 ```solidity
 function _insertCharAtIndex(string str, uint256 index, bytes1 newChar) internal pure returns (string)
