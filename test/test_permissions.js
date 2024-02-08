@@ -207,7 +207,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const txReceipt = await tx.wait()
 
       // const mintedEvent = txReceipt.events.find(event => event.event === 'TokensMintedWithSignature')
-      const supportedTokenAddedEvent = await treasury.queryFilter(treasury.filters.SupportedTokenAdded(), txReceipt.blockHash)
+      const supportedTokenAddedEvent = await treasury.queryFilter(treasury.filters.SupportedTokenAdded(), -1)
 
       // Verify that the event was emitted with the expected args
       expect(supportedTokenAddedEvent[0].args[0]).to.equal(token.target)
@@ -243,7 +243,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const txReceipt = await txAdd.wait()
 
       // const mintedEvent = txReceipt.events.find(event => event.event === 'TokensMintedWithSignature')
-      const supportedTokenAddedEvent = await treasury.queryFilter(treasury.filters.SupportedTokenAdded(), txReceipt.blockHash)
+      const supportedTokenAddedEvent = await treasury.queryFilter(treasury.filters.SupportedTokenAdded(), -1)
 
       // Verify that the event was emitted with the expected args
       expect(supportedTokenAddedEvent[0].args[0]).to.equal(token.target)
@@ -253,7 +253,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const txRemoveReceipt = await txRemove.wait()
 
       // const mintedEvent = txReceipt.events.find(event => event.event === 'TokensMintedWithSignature')
-      const supportedTokenRemovedEvent = await treasury.queryFilter(treasury.filters.SupportedTokenRemoved(), txRemoveReceipt.blockHash)
+      const supportedTokenRemovedEvent = await treasury.queryFilter(treasury.filters.SupportedTokenRemoved(), -1)
 
       // Verify that the event was emitted with the expected args
       expect(supportedTokenRemovedEvent[0].args[0]).to.equal(token.target)
@@ -278,7 +278,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const txReceipt = await tx.wait()
 
       // const mintedEvent = txReceipt.events.find(event => event.event === 'TokensMintedWithSignature')
-      const supportedTokenAddedEvent = await treasury.queryFilter(treasury.filters.SupportedTokenAdded(), txReceipt.blockHash)
+      const supportedTokenAddedEvent = await treasury.queryFilter(treasury.filters.SupportedTokenAdded(), -1)
 
       // Verify that the event was emitted with the expected args
       expect(supportedTokenAddedEvent[0].args[0]).to.equal(token.target)
@@ -330,7 +330,8 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const txFakeReceipt = await txFakeMint.wait()
 
       // get the real vault that we want to set to open in the real treasury, with our fake factory
-      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockHash)
+      //const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
+      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
       const Vault = await ethers.getContractFactory("Vault")
       const vault = Vault.attach(vaultCreatedEvent[0].args[0])
 
@@ -374,7 +375,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const txReceipt = await tx.wait()
 
       // get the vault
-      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockHash)
+      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
       const Vault = await ethers.getContractFactory("Vault")
       const vault = Vault.attach(vaultCreatedEvent[0].args[0])
 
@@ -410,7 +411,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const tx2Receipt = await tx2.wait();
 
       // Verify that the CollectedOpenVaults event was emitted
-      const collectedOpenVaultsEvent = tx2Receipt.events.find(event => event.event === 'CollectedOpenVaults');
+      const collectedOpenVaultsEvent = await treasury.queryFilter(treasury.filters.CollectedOpenVaults(), -1)
       expect(collectedOpenVaultsEvent).to.exist;
 
       // Get the final treasury balance after collecting
@@ -440,9 +441,10 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const txReceipt = await tx.wait()
 
       // get the vault
-      const vaultCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
+      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
       const Vault = await ethers.getContractFactory("Vault")
-      const vault = Vault.attach(vaultCreatedEvent.args.vault)
+      console.log(vaultCreatedEvent)
+      const vault = Vault.attach(vaultCreatedEvent[0].args[0])
 
       // send 0.9 ETH to the vault to keep it locked
       const amountToSendToLockedVault = ethers.parseEther("0.9")
@@ -466,7 +468,7 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const tx2Receipt = await tx2.wait();
 
       // Verify that the DistributedOpenVaultsToLockedVaults event was emitted
-      const distributedNativeTokensToLockedVaultsEvent = tx2Receipt.events.find(event => event.event === 'DistributedNativeTokensToLockedVaults');
+      const distributedNativeTokensToLockedVaultsEvent = await treasury.queryFilter(treasury.filters.DistributedNativeTokensToLockedVaults(), -1)
       expect(distributedNativeTokensToLockedVaultsEvent).to.exist;
     });
 
@@ -514,10 +516,9 @@ describe(" -- Testing Permissions & Access -- ", function () {
       expect(balance).to.equal(4)
 
       // const mintedEvent = txReceipt.events.find(event => event.event === 'TokensMintedWithSignature')
-      const vaultCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
-
+      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
       const Vault = await ethers.getContractFactory("Vault")
-      vault = Vault.attach(vaultCreatedEvent.args.vault)
+      vault = Vault.attach(vaultCreatedEvent[0].args[0])
     })
 
     it("should revert when calling initialize after initialization", async function () {

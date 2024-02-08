@@ -33,11 +33,11 @@ describe(" -- Testing Treasury Contract -- ", function () {
       const tx = await treasury.connect(TREASURER).setOETHContractAddress(user1.address)
       const txReceipt = await tx.wait()
 
-      const OriginProtocolTokenUpdatedEvent = txReceipt.events.find(event => event.event === 'OriginProtocolTokenUpdated')
+      const OriginProtocolTokenUpdatedEvent = await treasury.queryFilter(treasury.filters.OriginProtocolTokenUpdated(), -1)
 
       // Verify that the event was emitted with the new address
-      expect(OriginProtocolTokenUpdatedEvent.args[0]).to.equal(oldOETHAddress)
-      expect(OriginProtocolTokenUpdatedEvent.args[1]).to.equal(user1.address)
+      expect(OriginProtocolTokenUpdatedEvent[0].args[0]).to.equal(oldOETHAddress)
+      expect(OriginProtocolTokenUpdatedEvent[0].args[1]).to.equal(user1.address)
 
       // Verify that the OETH contract address has been updated
       const updatedOETHAddress = await treasury.oETHTokenAddress()
@@ -113,9 +113,9 @@ describe(" -- Testing Treasury Contract -- ", function () {
       const txReceipt = await tx.wait()
 
       // get the vault
-      const vaultCreatedEvent = txReceipt.events.find(event => event.event === 'VaultDeployed')
+      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockHash)
       const Vault = await ethers.getContractFactory("Vault")
-      const vault = Vault.attach(vaultCreatedEvent.args.vault)
+      const vault = Vault.attach(vaultCreatedEvent[0].args[0])
 
       // move time forward 100 days
       await helpers.time.increase(60 * 60 * 24 * 100)
@@ -181,11 +181,10 @@ describe(" -- Testing Treasury Contract -- ", function () {
 
       // 1. setup a locked vault with native, staked, and supported tokens:
 
-      let tokenAmount = ethers.parseUnits("10", 18)
-
       /*
         Locked vault has 10 of each native, staked, and supported tokens
       */
+      tokenAmount = ethers.parseUnits("10", 18)
       await user2.sendTransaction({
         to: lockedVault.target,
         value: tokenAmount,
@@ -260,11 +259,11 @@ describe(" -- Testing Treasury Contract -- ", function () {
 
       // Verify that balances have changed as expected
       const amountCollectedOfEachToken = ethers.parseUnits("50", 18)
-      expect(updated_ETH_Balance).to.equal(initial_ETH_Balance.add(amountCollectedOfEachToken))
-      expect(updated_NS_Token1Balance).to.equal(initial_NS_Token1Balance.add(amountCollectedOfEachToken))
-      expect(updated_NS_Token2Balance).to.equal(initial_NS_Token2Balance.add(amountCollectedOfEachToken))
-      expect(updated_S_Token1Balance).to.equal(initial_S_Token1Balance.add(amountCollectedOfEachToken))
-      expect(updated_S_Token2Balance).to.equal(initial_S_Token2Balance.add(amountCollectedOfEachToken))
+      expect(updated_ETH_Balance).to.equal(initial_ETH_Balance + amountCollectedOfEachToken)
+      expect(updated_NS_Token1Balance).to.equal(initial_NS_Token1Balance + amountCollectedOfEachToken)
+      expect(updated_NS_Token2Balance).to.equal(initial_NS_Token2Balance + amountCollectedOfEachToken)
+      expect(updated_S_Token1Balance).to.equal(initial_S_Token1Balance + amountCollectedOfEachToken)
+      expect(updated_S_Token2Balance).to.equal(initial_S_Token2Balance + amountCollectedOfEachToken)
     })
 
     it("should distribute native token balance to locked vaults", async function () {
@@ -343,7 +342,6 @@ describe(" -- Testing Treasury Contract -- ", function () {
 
       // Distribute vaults to the locked vaults
       const tx = await treasury.distributeNativeTokenRewards() // Distribute to the three locked vaults
-      const distVaultEvents = await treasury.queryFilter("DistributedNativeTokensToLockedVault")
       const distEvents = await treasury.queryFilter("DistributedNativeTokensToLockedVaults")
       expect(distEvents[0].args.balanceBeforeDistribution).to.equal(treasuryBalanceBefore)
       expect(distEvents[0].args.numberOfRecipients).to.equal(2)
@@ -360,8 +358,8 @@ describe(" -- Testing Treasury Contract -- ", function () {
       console.log('locked vault 2 after distribute:', balance2After)
       console.log('locked vault 3 after distribute:', balance3After)*/
       expect(balance1After).to.equal(balance1Before)
-      expect(balance2After).to.equal(balance2Before.add(ethers.parseEther("24")))
-      expect(balance3After).to.equal(balance3Before.add(ethers.parseEther("36")))
+      expect(balance2After).to.equal(balance2Before + ethers.parseEther("24"))
+      expect(balance3After).to.equal(balance3Before + ethers.parseEther("36"))
     })
 
     it("distribute should fail if there are no native tokens in the treasury", async function () {
@@ -434,15 +432,13 @@ describe(" -- Testing Treasury Contract -- ", function () {
 
       // Distribute token 1 to the locked vaults
       const tx1 = await treasury.distributeSupportedTokenRewards(ns_token1.target)
-      let distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
       let distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
       expect(distEvents[0].args.supportedToken).to.equal(ns_token1.target)
       expect(distEvents[0].args.balanceBeforeDistribution).to.equal(treasuryTokenBalanceBefore)
       expect(distEvents[0].args.numberOfRecipients).to.equal(2)
 
       // Distribute token 2 to the locked vaults
-      const tx2 = await treasury.distributeSupportedTokenRewards  (s_token2.target)
-      distVaultEvents = await treasury.queryFilter("DistributedSupportedTokenToLockedVault")
+      const tx2 = await treasury.distributeSupportedTokenRewards(s_token2.target)
       distEvents = await treasury.queryFilter("DistributedSupportedTokensToLockedVaults")
       expect(distEvents[1].args.supportedToken).to.equal(s_token2.target)
       expect(distEvents[1].args.balanceBeforeDistribution).to.equal(treasuryTokenBalanceBefore)
@@ -454,11 +450,12 @@ describe(" -- Testing Treasury Contract -- ", function () {
 
       //proportionateShare = (treasuryTokenBalance * lockedBalances[i]) / tokenTotalBalance;
 
-      const token1_share_vault1 = treasuryTokenBalanceBefore.mul(token1balance1Before).div(token1balance1Before.add(token1balance2Before).add(token1balance3Before))
-      const token2_share_vault1 = treasuryTokenBalanceBefore.mul(token2balance1Before).div(token2balance1Before.add(token2balance2Before).add(token2balance3Before))
+      const token1_share_vault1 = (treasuryTokenBalanceBefore * token1balance1Before) / (token1balance1Before + token1balance2Before + token1balance3Before);
+      const token2_share_vault1 = (treasuryTokenBalanceBefore * token2balance1Before) / (token2balance1Before + token2balance2Before + token2balance3Before);
 
-      const token1_share_vault3 = treasuryTokenBalanceBefore.mul(token1balance3Before).div(token1balance1Before.add(token1balance2Before).add(token1balance3Before))
-      const token2_share_vault3 = treasuryTokenBalanceBefore.mul(token2balance3Before).div(token2balance1Before.add(token2balance2Before).add(token2balance3Before))
+      const token1_share_vault3 = (treasuryTokenBalanceBefore * token1balance3Before) / (token1balance1Before + token1balance2Before + token1balance3Before);
+      const token2_share_vault3 = (treasuryTokenBalanceBefore * token2balance3Before) / (token2balance1Before + token2balance2Before + token2balance3Before);
+
       /*console.log(token1_share_vault1)
       console.log(token2_share_vault1)
       console.log(token1_share_vault3)
@@ -475,14 +472,14 @@ describe(" -- Testing Treasury Contract -- ", function () {
       console.log('locked vault 2 after distribute:', balance2After)
       console.log('locked vault 3 after distribute:', balance3After)*/
       
-      expect(token1balance1After).to.equal(token1balance1Before.add(token1_share_vault1))
-      expect(token2balance1After).to.equal(token2balance1Before.add(token2_share_vault1))
+      expect(token1balance1After).to.equal(token1balance1Before + token1_share_vault1)
+      expect(token2balance1After).to.equal(token2balance1Before + token2_share_vault1)
 
       expect(token1balance2After).to.equal(token1balance2Before)
       expect(token2balance2After).to.equal(token2balance2Before)
 
-      expect(token1balance3After).to.equal(token1balance3Before.add(token1_share_vault3))
-      expect(token2balance3After).to.equal(token2balance3Before.add(token2_share_vault3))
+      expect(token1balance3After).to.equal(token1balance3Before + token1_share_vault3)
+      expect(token2balance3After).to.equal(token2balance3Before + token2_share_vault3)
     })
 
     it("distribute should fail if there are no native staked tokens in the treasury", async function () {

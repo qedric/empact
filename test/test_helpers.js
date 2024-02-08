@@ -185,12 +185,13 @@ async function makeVault(factory, signer, to) {
   const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeVaultFee })
   const txReceipt = await tx.wait()
 
-  const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockHash)
+  //const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockHash)
+  const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
   const Vault = await ethers.getContractFactory("Vault")
   const vault = Vault.attach(vaultCreatedEvent[0].args[0])
 
   // Find the VaultInitialised event within the Vault contract
-  const vaultInitialisedEvent = await vault.queryFilter(vault.filters.VaultInitialised(), txReceipt.blockHash);
+  const vaultInitialisedEvent = await vault.queryFilter(vault.filters.VaultInitialised(), -1);
   
   //console.log(vaultInitialisedEvent[0].args)
   
@@ -227,12 +228,12 @@ async function make10K_decimalVault(factory, signer, to, baseToken, decimals) {
   const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeVaultFee })
   const txReceipt = await tx.wait()
 
-  const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockHash)
+  const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
   const Vault = await ethers.getContractFactory("Vault")
   const vault = Vault.attach(vaultCreatedEvent[0].args[0])
 
   // Find the VaultInitialised event within the Vault contract
-  const vaultInitialisedEvent = await vault.queryFilter(vault.filters.VaultInitialised(), txReceipt.blockHash);
+  const vaultInitialisedEvent = await vault.queryFilter(vault.filters.VaultInitialised(), -1);
   expect(vaultInitialisedEvent.length).to.equal(1); // Ensure only one VaultInitialised event was emitted
   expect(vaultInitialisedEvent[0].args.attributes[5]).to.equal(`A 10K ${decimals} decimal test vault`)
   expect(vaultInitialisedEvent[0].args.attributes[6]).to.equal('no unlock time')
@@ -240,10 +241,11 @@ async function make10K_decimalVault(factory, signer, to, baseToken, decimals) {
   return vault
 }
 
-async function makeVault_100edition_target100_noUnlockTime(factory, signer, to, baseToken) {
+async function makeVault_100edition_target100_noUnlockTime(factory, signer, to, baseToken, name) {
 
+  const finalName = name || 'A 100-edition test vault'
   const timestamp = await getCurrentBlockTime()
-  const targetBalance = ethers.parseUnits("100", "ether").toString()
+  const targetBalance = ethers.parseUnits("100", 18).toString()
   const typedData = await getTypedData(
     factory.target,
     to.address,
@@ -253,7 +255,7 @@ async function makeVault_100edition_target100_noUnlockTime(factory, signer, to, 
     100,
     timestamp,
     targetBalance,
-    'A 100-edition test vault',
+    finalName,
     'no unlock time'    
   )
 
@@ -264,14 +266,18 @@ async function makeVault_100edition_target100_noUnlockTime(factory, signer, to, 
   const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeVaultFee })
   const txReceipt = await tx.wait()
 
-  const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockHash)
+  //console.log('block number:',txReceipt.blockNumber)
+  //const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockHash)
+  const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockNumber)
+
+  //console.log('\nvault created: \n', vaultCreatedEvent)
   const Vault = await ethers.getContractFactory("Vault")
   const vault = Vault.attach(vaultCreatedEvent[0].args[0])
 
   // Find the VaultInitialised event within the Vault contract
-  const vaultInitialisedEvent = await vault.queryFilter(vault.filters.VaultInitialised(), txReceipt.blockHash);
+  const vaultInitialisedEvent = await vault.queryFilter(vault.filters.VaultInitialised(), -1);
   expect(vaultInitialisedEvent.length).to.equal(1); // Ensure only one VaultInitialised event was emitted
-  expect(vaultInitialisedEvent[0].args.attributes[5]).to.equal('A 100-edition test vault')
+  expect(vaultInitialisedEvent[0].args.attributes[5]).to.equal(finalName)
   expect(vaultInitialisedEvent[0].args.attributes[6]).to.equal('no unlock time')
 
   return vault
@@ -300,12 +306,12 @@ async function makeVault_100edition_notarget_99days(factory, signer, to) {
   const tx = await factory.connect(to).mintWithSignature(mintRequest.typedData.message, mintRequest.signature, { value: makeVaultFee })
   const txReceipt = await tx.wait()
 
-  const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockHash)
+  const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
   const Vault = await ethers.getContractFactory("Vault")
   const vault = Vault.attach(vaultCreatedEvent[0].args[0])
 
   // Find the VaultInitialised event within the Vault contract
-  const vaultInitialisedEvent = await vault.queryFilter(vault.filters.VaultInitialised(), txReceipt.blockHash);
+  const vaultInitialisedEvent = await vault.queryFilter(vault.filters.VaultInitialised(), -1);
   expect(vaultInitialisedEvent.length).to.equal(1); // Ensure only one VaultInitialised event was emitted
   expect(vaultInitialisedEvent[0].args.attributes[1]).to.equal(2)
   expect(vaultInitialisedEvent[0].args.attributes[5]).to.equal('A 100-edition test vault')
@@ -317,7 +323,7 @@ async function makeVault_100edition_notarget_99days(factory, signer, to) {
 async function makeLockedVault(factory, signer, to, baseToken) {
 
   // get new vault: 
-  const v = await makeVault_100edition_target100_noUnlockTime(factory, signer, to, baseToken)
+  const v = await makeVault_100edition_target100_noUnlockTime(factory, signer, to, baseToken, 'Locked Vault')
 
   // verify that it is locked
   expect(await v.state()).to.equal(0)
@@ -350,8 +356,6 @@ async function makeOpenVault(factory, signer, to) {
 
   // get the tokenId so we can call payout on it
   const tokenId = await v.attributes().then(a => a.tokenId)
-
-  console.log('token id of the open vault:', tokenId)
 
   // call payout to open it
   let tx = await factory.connect(to).payout(tokenId)

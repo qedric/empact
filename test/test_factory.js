@@ -35,8 +35,6 @@ describe(" -- Testing Factory Contract -- ", function () {
       const mr = await generateMintRequest(factory.target, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1.address)
       const initialBalanceUser1 = await factory.balanceOf(user1.address, 0)
 
-      console.log(initialBalanceUser1)
-
       const tx = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(mr.typedData.message, mr.signature, { value: makeVaultFee })
 
       // Verify that the token was minted and assigned to the correct recipient
@@ -44,13 +42,13 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(finalBalanceUser1).to.equal(initialBalanceUser1+BigInt(4))
 
       // Verify events in the Factory contract
-      const tokensMintedEvent = await factory.queryFilter('TokensMintedWithSignature', tx.blockHash)
+      const tokensMintedEvent = await factory.queryFilter('TokensMintedWithSignature', -1)
       expect(tokensMintedEvent.length).to.equal(1)
       expect(tokensMintedEvent[0].args.signer).to.equal(INITIAL_DEFAULT_ADMIN_AND_SIGNER.address)
       expect(tokensMintedEvent[0].args.mintedTo).to.equal(user1.address)
       expect(tokensMintedEvent[0].args.tokenIdMinted).to.equal(0)
 
-      const vaultDeployedEvent = await factory.queryFilter('VaultDeployed', tx.blockHash)
+      const vaultDeployedEvent = await factory.queryFilter('VaultDeployed', -1)
       expect(vaultDeployedEvent.length).to.equal(1)
       expect(vaultDeployedEvent[0].args.msgSender).to.equal(INITIAL_DEFAULT_ADMIN_AND_SIGNER.address)
 
@@ -232,7 +230,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const newMakeVaultFee = ethers.parseUnits("0.005", "ether")
       const receipt = await factory.connect(owner).setMakeVaultFee(newMakeVaultFee)
 
-      const events = await factory.queryFilter("MakeVaultFeeUpdated", receipt.blockHash)
+      const events = await factory.queryFilter("MakeVaultFeeUpdated", -1)
       expect(events.length).to.equal(1)
 
       const event = events[0]
@@ -243,7 +241,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const newBreakVaultBps = 500 // 5% represented in basis points
       const receipt = await factory.connect(owner).setBreakVaultBps(newBreakVaultBps)
 
-      const events = await factory.queryFilter("BreakVaultBpsUpdated", receipt.blockHash)
+      const events = await factory.queryFilter("BreakVaultBpsUpdated", -1)
       expect(events.length).to.equal(1)
 
       const event = events[0]
@@ -254,7 +252,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const newFeeRecipient = await ethers.Wallet.createRandom().address
       const receipt = await factory.connect(owner).setFeeRecipient(newFeeRecipient)
 
-      const events = await factory.queryFilter("FeeRecipientUpdated", receipt.blockHash)
+      const events = await factory.queryFilter("FeeRecipientUpdated", -1)
       expect(events.length).to.equal(1)
 
       const event = events[0]
@@ -265,7 +263,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const newVaultImplementation = await deployVaultImplementation(factory.target, treasury.target)
       const receipt = await factory.connect(owner).setVaultImplementation(newVaultImplementation.target)
 
-      const events = await factory.queryFilter("VaultImplementationUpdated", receipt.blockHash)
+      const events = await factory.queryFilter("VaultImplementationUpdated", -1)
       expect(events.length).to.equal(1)
 
       const event = events[0]
@@ -276,7 +274,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const newGenerator = await deployGenerator('Generator', 'SepoliaETH', 'https://zebra.xyz/', factory.target)
       const receipt = await factory.connect(owner).setGenerator(newGenerator.target)
 
-      const events = await factory.queryFilter("GeneratorUpdated", receipt.blockHash)
+      const events = await factory.queryFilter("GeneratorUpdated", -1)
       expect(events.length).to.equal(1)
 
       const event = events[0]
@@ -287,7 +285,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       const newTreasury = await deployTreasury(factory.target)
       const receipt = await factory.connect(owner).setTreasury(newTreasury.target)
 
-      const events = await factory.queryFilter("TreasuryUpdated", receipt.blockHash)
+      const events = await factory.queryFilter("TreasuryUpdated", -1)
       expect(events.length).to.equal(1)
 
       const event = events[0]
@@ -344,7 +342,7 @@ describe(" -- Testing Factory Contract -- ", function () {
       await payoutTx.wait()
 
       // get the StateChanged event from the transaction
-      events = await factory.queryFilter("Payout", payoutTx.blockHash)
+      events = await factory.queryFilter("Payout", -1)
 
       expect(events[0].args.vaultAddress).to.equal(vault.target)
       expect(events[0].args.tokenId).to.equal(0)
@@ -397,9 +395,15 @@ describe(" -- Testing Factory Contract -- ", function () {
         { value: makeVaultFee }
       )
       const txReceipt = await tx.wait()
-      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockHash)
+      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
       const Vault = await ethers.getContractFactory("Vault")
       const vault1 = Vault.attach(vaultCreatedEvent[0].args[0])
+
+      // get the tokenId so we can call payout on it
+      const tokenId_vault = await vault.attributes().then(a => a.tokenId)
+      const tokenId_vault1 = await vault1.attributes().then(a => a.tokenId)
+
+      console.log('vault1 id:', tokenId_vault1)
 
       // Verify that the initial vault's tokens were minted and assigned to the correct recipient
       const balanceUser1 = await factory.balanceOf(user1.address, 0)
@@ -430,18 +434,18 @@ describe(" -- Testing Factory Contract -- ", function () {
       expect(await factory.balanceOf(user2.address, 0)).to.equal(2)
 
       // call payout on 1st vault and make sure that AddedOpenVault event NOT emitted
-      tx1 = await factory.connect(user1).payout(0)
-      const payout1Event = await treasury.queryFilter('AddedOpenVault', tx1.blockHash)
+      tx1 = await factory.connect(user1).payout(tokenId_vault)
+      const payout1Event = await treasury.queryFilter('AddedOpenVault', -1)
       expect(payout1Event).to.be.empty
 
       // call payout on 2nd vault and make sure that AddedOpenVault event was emitted
-      tx2 = await factory.connect(user2).payout(1)
-      const payout2Event = await treasury.queryFilter('AddedOpenVault', tx2.blockHash)
+      tx2 = await factory.connect(user2).payout(tokenId_vault1)
+      const payout2Event = await treasury.queryFilter('AddedOpenVault', -1)
       expect(payout2Event.length).to.be.gt(0)
 
       // call payout on 1st vault with user2, and make sure that AddedOpenVault event was emitted
-      tx3 = await factory.connect(user2).payout(0)
-      const payout3Event = await treasury.queryFilter('AddedOpenVault', tx3.blockHash)
+      tx3 = await factory.connect(user2).payout(tokenId_vault)
+      const payout3Event = await treasury.queryFilter('AddedOpenVault', -1)
       expect(payout3Event.length).to.be.gt(0)
     })
 
