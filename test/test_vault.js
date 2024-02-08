@@ -578,7 +578,7 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       const withdrawalFeeBps = await factory.withdrawalFeeBps()
       const withdrawalFee = amountToSend * (withdrawalFeeBps)/BigInt(10000)
-      const withdrawNetAmount = amountToSend.sub(withdrawalFee)
+      const withdrawNetAmount = amountToSend - (withdrawalFee)
 
       const event = events[0]
       expect(event.args.who).to.equal(user1.address, 'Withdrawal should have correct recipient address')
@@ -591,12 +591,12 @@ describe(" -- Testing Vault Contract -- ", function () {
       expect(feeEvents[0].args.amount).to.equal(withdrawalFee, 'fee should match fee amount')
       
       // Calculate the expected recipient and fee recipient balances
-      const expectedRecipientBalance = recipientBalanceBefore + (withdrawNetAmount.sub(gasCost))
+      const expectedRecipientBalance = recipientBalanceBefore + (withdrawNetAmount - (gasCost))
       const expectedFeeRecipientBalance = feeRecipientBalanceBefore + (withdrawalFee)
 
       // Check if the actual balances match the expected balances
-      expect(await user1.getBalance()).to.equal(expectedRecipientBalance, 'Recipient should receive correct amount')
-      expect(await feeRecipient.getBalance()).to.equal(expectedFeeRecipientBalance, 'Fee recipient should receive correct amount')
+      expect(await user1.provider.getBalance(user1.address)).to.equal(expectedRecipientBalance, 'Recipient should receive correct amount')
+      expect(await feeRecipient.provider.getBalance(feeRecipient.address)).to.equal(expectedFeeRecipientBalance, 'Fee recipient should receive correct amount')
     })
 
     /*
@@ -660,7 +660,7 @@ describe(" -- Testing Vault Contract -- ", function () {
       const user1ETHBalanceAfterPayout = await ethers.provider.getBalance(user1.address)
       const payoutFee = ethToSend * BigInt(400)/BigInt(10000) // 400 basis points
       const tokenPayoutFee = tokenAmount * BigInt(400)/BigInt(10000) // 400 basis points
-      const expectedBalanceChange = ethToSend.sub(payoutFee).sub(gasCost)
+      const expectedBalanceChange = ethToSend - (payoutFee) - (gasCost)
       expect(user1ETHBalanceAfterPayout).to.equal(initialOwnerETHBalance + (expectedBalanceChange))
 
       // holder should receive all token1 and token2 balance:
@@ -668,8 +668,8 @@ describe(" -- Testing Vault Contract -- ", function () {
       const ownerToken2BalanceAfterPayout = await token2.balanceOf(user1.address)
       //console.log('ownerToken1BalanceAfterPayout', ownerToken1BalanceAfterPayout)
       //console.log('ownerToken2BalanceAfterPayout', ownerToken2BalanceAfterPayout)
-      expect(ownerToken1BalanceAfterPayout).to.equal(initialOwnerToken1Balance + (tokenAmount).sub(tokenPayoutFee))
-      expect(ownerToken2BalanceAfterPayout).to.equal(initialOwnerToken2Balance + (tokenAmount).sub(tokenPayoutFee))
+      expect(ownerToken1BalanceAfterPayout).to.equal(initialOwnerToken1Balance + (tokenAmount) - (tokenPayoutFee))
+      expect(ownerToken2BalanceAfterPayout).to.equal(initialOwnerToken2Balance + (tokenAmount) - (tokenPayoutFee))
     })
 
     it("should withdraw correct amounts of supported token to sole owner", async function () {
@@ -753,7 +753,7 @@ describe(" -- Testing Vault Contract -- ", function () {
       // holder should receive all supported token balance, minus ETH break fee and gas:
       const user1ETHBalanceAfterPayout = await ethers.provider.getBalance(user1.address)
       const tokenPayoutFee = vaultToken1Balance_beforePayout * BigInt(400)/BigInt(10000) // 400 basis points
-      expect(user1ETHBalanceAfterPayout).to.equal(initialOwnerETHBalance.sub(gasCost))
+      expect(user1ETHBalanceAfterPayout).to.equal(initialOwnerETHBalance - (gasCost))
 
       // holder should receive all token1 balance:
       const ownerToken1BalanceAfterPayout = await token1.balanceOf(user1.address)
@@ -764,7 +764,7 @@ describe(" -- Testing Vault Contract -- ", function () {
       const feeRecipientBaseTokenBalance = await token1.balanceOf(feeRecipient.address)
 
       expect(ownerToken1BalanceAfterPayout).to.equal(initialOwnerToken1Balance + (
-        vaultToken1Balance_beforePayout).sub(tokenPayoutFee))
+        vaultToken1Balance_beforePayout) - (tokenPayoutFee))
       expect(ownerToken2BalanceAfterPayout).to.equal(0)
       expect(ownerToken3BalanceAfterPayout).to.equal(0)
 
@@ -828,9 +828,9 @@ describe(" -- Testing Vault Contract -- ", function () {
       const tokenPayoutFee = tokenAmount * BigInt(400)/BigInt(10000) // 400 basis points
 
       // Calculate expected balance changes
-      const expectedETHChange = ethToSend.sub(payoutFee).sub(gasCost)
-      const expectedToken1Change = tokenAmount.sub(tokenPayoutFee)
-      const expectedToken2Change = tokenAmount.sub(tokenPayoutFee)
+      const expectedETHChange = ethToSend - (payoutFee) - (gasCost)
+      const expectedToken1Change = tokenAmount - (tokenPayoutFee)
+      const expectedToken2Change = tokenAmount - (tokenPayoutFee)
 
       // Get owner balances after payout
       const ownerETHBalanceAfterPayout = await ethers.provider.getBalance(user1.address)
@@ -914,9 +914,9 @@ describe(" -- Testing Vault Contract -- ", function () {
       const vaultETHBalance_afterPayout = await ethers.provider.getBalance(vault100.target)
       const vaultToken1Balance_afterPayout = await token1.balanceOf(vault100.target)
       const vaultToken2Balance_afterPayout = await token2.balanceOf(vault100.target)
-      expect(vaultETHBalance_afterPayout).to.equal(vaultETHBalance_beforePayout.sub(oneFifthOfVaultETHBalance))
-      expect(vaultToken1Balance_afterPayout).to.equal(vaultToken1Balance_beforePayout.sub(oneFifthOfVaultToken1Balance))
-      expect(vaultToken2Balance_afterPayout).to.equal(vaultToken2Balance_beforePayout.sub(oneFifthOfVaultToken2Balance))
+      expect(vaultETHBalance_afterPayout).to.equal(vaultETHBalance_beforePayout - (oneFifthOfVaultETHBalance))
+      expect(vaultToken1Balance_afterPayout).to.equal(vaultToken1Balance_beforePayout - (oneFifthOfVaultToken1Balance))
+      expect(vaultToken2Balance_afterPayout).to.equal(vaultToken2Balance_beforePayout - (oneFifthOfVaultToken2Balance))
 
       // get gas used
       const txReceipt = await ethers.provider.getTransactionReceipt(tx.hash)
@@ -929,7 +929,7 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       // expected balance change == (vaultETHbalance_before * 0.2) - payout fee - gas cost
 
-      const expectedBalanceChange = oneFifthOfVaultETHBalance.sub(payoutFee).sub(gasCost)
+      const expectedBalanceChange = oneFifthOfVaultETHBalance - (payoutFee) - (gasCost)
 
       expect(nftHolderETHBalance_afterPayout).to.equal(nftHolderETHBalance_beforePayout + (expectedBalanceChange))
 
@@ -938,8 +938,8 @@ describe(" -- Testing Vault Contract -- ", function () {
       const nftHolderToken2Balance_afterPayout = await token2.balanceOf(user3.address)
       //console.log('ownerToken1BalanceAfterPayout', ownerToken1BalanceAfterPayout)
       //console.log('ownerToken2BalanceAfterPayout', ownerToken2BalanceAfterPayout)
-      expect(nftHolderToken1Balance_afterPayout).to.equal(nftHolderToken1Balance_beforePayout + (oneFifthOfVaultToken1Balance).sub(tokenPayoutFee))
-      expect(nftHolderToken2Balance_afterPayout).to.equal(nftHolderToken2Balance_beforePayout + (oneFifthOfVaultToken2Balance).sub(tokenPayoutFee))
+      expect(nftHolderToken1Balance_afterPayout).to.equal(nftHolderToken1Balance_beforePayout + (oneFifthOfVaultToken1Balance) - (tokenPayoutFee))
+      expect(nftHolderToken2Balance_afterPayout).to.equal(nftHolderToken2Balance_beforePayout + (oneFifthOfVaultToken2Balance) - (tokenPayoutFee))
     })
 
     it("should send correct fee amounts when withdrawing mix of native & supported tokens for 20% owner", async function () {
@@ -1004,9 +1004,9 @@ describe(" -- Testing Vault Contract -- ", function () {
       const vaultETHBalance_afterPayout = await ethers.provider.getBalance(vault100.target)
       const vaultToken1Balance_afterPayout = await token1.balanceOf(vault100.target)
       const vaultToken2Balance_afterPayout = await token2.balanceOf(vault100.target)
-      expect(vaultETHBalance_afterPayout).to.equal(vaultETHBalance_beforePayout.sub(oneFifthOfVaultETHBalance))
-      expect(vaultToken1Balance_afterPayout).to.equal(vaultToken1Balance_beforePayout.sub(oneFifthOfVaultToken1Balance))
-      expect(vaultToken2Balance_afterPayout).to.equal(vaultToken2Balance_beforePayout.sub(oneFifthOfVaultToken2Balance))
+      expect(vaultETHBalance_afterPayout).to.equal(vaultETHBalance_beforePayout - (oneFifthOfVaultETHBalance))
+      expect(vaultToken1Balance_afterPayout).to.equal(vaultToken1Balance_beforePayout - (oneFifthOfVaultToken1Balance))
+      expect(vaultToken2Balance_afterPayout).to.equal(vaultToken2Balance_beforePayout - (oneFifthOfVaultToken2Balance))
 
       // get gas used
       const txReceipt = await ethers.provider.getTransactionReceipt(tx.hash)
@@ -1018,15 +1018,15 @@ describe(" -- Testing Vault Contract -- ", function () {
       const tokenPayoutFee = oneFifthOfVaultToken1Balance * BigInt(400)/BigInt(10000) // 400 basis points
 
       // expected balance change == (vaultETHbalance_before * 0.2) - payout fee - gas cost
-      const expectedBalanceChange = oneFifthOfVaultETHBalance.sub(payoutFee).sub(gasCost)
+      const expectedBalanceChange = oneFifthOfVaultETHBalance - (payoutFee) - (gasCost)
 
       expect(nftHolderETHBalance_afterPayout).to.equal(nftHolderETHBalance_beforePayout + (expectedBalanceChange))
 
       // holder should receive 20% of vault's token1 and token2 balances:
       const nftHolderToken1Balance_afterPayout = await token1.balanceOf(user3.address)
       const nftHolderToken2Balance_afterPayout = await token2.balanceOf(user3.address)
-      expect(nftHolderToken1Balance_afterPayout).to.equal(nftHolderToken1Balance_beforePayout + (oneFifthOfVaultToken1Balance).sub(tokenPayoutFee))
-      expect(nftHolderToken2Balance_afterPayout).to.equal(nftHolderToken2Balance_beforePayout + (oneFifthOfVaultToken2Balance).sub(tokenPayoutFee))
+      expect(nftHolderToken1Balance_afterPayout).to.equal(nftHolderToken1Balance_beforePayout + (oneFifthOfVaultToken1Balance) - (tokenPayoutFee))
+      expect(nftHolderToken2Balance_afterPayout).to.equal(nftHolderToken2Balance_beforePayout + (oneFifthOfVaultToken2Balance) - (tokenPayoutFee))
 
       // Get fee recipient balances after payout
       const feeRecipientETHBalanceAfterPayout = await ethers.provider.getBalance(feeRecipient.address)
@@ -1072,7 +1072,7 @@ describe(" -- Testing Vault Contract -- ", function () {
       //holder should receive 75% of vaults minus break fee and gas:
       const holder1BalanceAfterPayout = await ethers.provider.getBalance(user1.address)
       let payoutFee = ethers.parseEther("75") * BigInt(400) / BigInt(10000) // 400 basis points
-      let expectedBalanceChange = ethers.parseEther("75").sub(payoutFee).sub(gasCost)
+      let expectedBalanceChange = ethers.parseEther("75") - (payoutFee) - (gasCost)
 
       expect(holder1BalanceAfterPayout).to.equal(holder1BalanceBeforePayout + (expectedBalanceChange))
 
@@ -1092,7 +1092,7 @@ describe(" -- Testing Vault Contract -- ", function () {
       //holder should receive all vaults minus break fee and gas:
       const holder2BalanceAfterPayout = await ethers.provider.getBalance(user3.address)
       payoutFee = ethers.parseEther("25") * BigInt(400) / BigInt(10000) // 400 basis points
-      expectedBalanceChange = ethers.parseEther("25").sub(payoutFee).sub(gasCost)
+      expectedBalanceChange = ethers.parseEther("25") - (payoutFee) - (gasCost)
 
       expect(holder2BalanceAfterPayout).to.equal(holder2BalanceBeforePayout + (expectedBalanceChange))
     })
@@ -1156,10 +1156,10 @@ describe(" -- Testing Vault Contract -- ", function () {
       const holder1_token1Balance_afterPayout = await token1.balanceOf(user1.address)
       const holder1_token2Balance_afterPayout = await token2.balanceOf(user1.address)
       let payoutFee = ethers.parseEther("75") * BigInt(400) / BigInt(10000) // 400 basis points
-      let expectedTokenBalanceChange = ethers.parseEther("75").sub(payoutFee)
+      let expectedTokenBalanceChange = ethers.parseEther("75") - (payoutFee)
 
       expect(holder1ETHBalanceAfterPayout).to.equal(holder1_ETHBalance_beforePayout + (
-        ethers.parseEther("75")).sub(gasCost).sub(payoutFee))
+        ethers.parseEther("75")) - (gasCost) - (payoutFee))
       expect(holder1_token1Balance_afterPayout).to.equal(holder1_token1Balance_beforePayout + (expectedTokenBalanceChange))
       expect(holder1_token2Balance_afterPayout).to.equal(holder1_token2Balance_beforePayout + (expectedTokenBalanceChange))
 
@@ -1181,10 +1181,10 @@ describe(" -- Testing Vault Contract -- ", function () {
       const holder2_token1Balance_afterPayout = await token1.balanceOf(user3.address)
       const holder2_token2Balance_afterPayout = await token2.balanceOf(user3.address)
       payoutFee = ethers.parseEther("25") * BigInt(400) / BigInt(10000) // 400 basis points
-      expectedTokenBalanceChange = ethers.parseEther("25").sub(payoutFee)
+      expectedTokenBalanceChange = ethers.parseEther("25") - (payoutFee)
 
       expect(holder2ETHBalanceAfterPayout).to.equal(holder2_ETHBalance_beforePayout + (
-        ethers.parseEther("25")).sub(gasCost).sub(payoutFee))
+        ethers.parseEther("25")) - (gasCost) - (payoutFee))
       expect(holder2_token1Balance_afterPayout).to.equal(holder2_token1Balance_beforePayout + (expectedTokenBalanceChange))
       expect(holder2_token2Balance_afterPayout).to.equal(holder2_token2Balance_beforePayout + (expectedTokenBalanceChange))
     })
@@ -1239,9 +1239,9 @@ describe(" -- Testing Vault Contract -- ", function () {
       const holder1ETHBalanceAfterPayout = await ethers.provider.getBalance(user1.address)
       const holder1_baseTokenBalance_afterPayout = await baseToken.balanceOf(user1.address)
       let payoutFee = ethers.parseEther("75") * BigInt(400) / BigInt(10000) // 400 basis points
-      let expectedTokenBalanceChange = ethers.parseEther("75").sub(payoutFee)
+      let expectedTokenBalanceChange = ethers.parseEther("75") - (payoutFee)
 
-      expect(holder1ETHBalanceAfterPayout).to.equal(holder1_ETHBalance_beforePayout.sub(gasCost))
+      expect(holder1ETHBalanceAfterPayout).to.equal(holder1_ETHBalance_beforePayout - (gasCost))
       expect(holder1_baseTokenBalance_afterPayout).to.equal(holder1_baseTokenBalance_beforePayout + (expectedTokenBalanceChange))
 
       // HOLDER 2:
@@ -1260,9 +1260,9 @@ describe(" -- Testing Vault Contract -- ", function () {
       const holder2ETHBalanceAfterPayout = await ethers.provider.getBalance(user3.address)
       const holder2_baseTokenBalance_afterPayout = await baseToken.balanceOf(user3.address)
       payoutFee = ethers.parseEther("25") * BigInt(400) / BigInt(10000) // 400 basis points
-      expectedTokenBalanceChange = ethers.parseEther("25").sub(payoutFee)
+      expectedTokenBalanceChange = ethers.parseEther("25") - (payoutFee)
 
-      expect(holder2ETHBalanceAfterPayout).to.equal(holder2_ETHBalance_beforePayout.sub(gasCost))
+      expect(holder2ETHBalanceAfterPayout).to.equal(holder2_ETHBalance_beforePayout - (gasCost))
       expect(holder2_baseTokenBalance_afterPayout).to.equal(holder2_baseTokenBalance_beforePayout + (expectedTokenBalanceChange))
     })
   })

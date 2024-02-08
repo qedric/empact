@@ -395,15 +395,13 @@ describe(" -- Testing Factory Contract -- ", function () {
         { value: makeVaultFee }
       )
       const txReceipt = await tx.wait()
-      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
+      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockNumber)
       const Vault = await ethers.getContractFactory("Vault")
       const vault1 = Vault.attach(vaultCreatedEvent[0].args[0])
 
       // get the tokenId so we can call payout on it
       const tokenId_vault = await vault.attributes().then(a => a.tokenId)
       const tokenId_vault1 = await vault1.attributes().then(a => a.tokenId)
-
-      console.log('vault1 id:', tokenId_vault1)
 
       // Verify that the initial vault's tokens were minted and assigned to the correct recipient
       const balanceUser1 = await factory.balanceOf(user1.address, 0)

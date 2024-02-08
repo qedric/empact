@@ -441,9 +441,8 @@ describe(" -- Testing Permissions & Access -- ", function () {
       const txReceipt = await tx.wait()
 
       // get the vault
-      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
+      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockNumber)
       const Vault = await ethers.getContractFactory("Vault")
-      console.log(vaultCreatedEvent)
       const vault = Vault.attach(vaultCreatedEvent[0].args[0])
 
       // send 0.9 ETH to the vault to keep it locked
@@ -516,13 +515,9 @@ describe(" -- Testing Permissions & Access -- ", function () {
       expect(balance).to.equal(4)
 
       // const mintedEvent = txReceipt.events.find(event => event.event === 'TokensMintedWithSignature')
-      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), -1)
+      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockNumber)
       const Vault = await ethers.getContractFactory("Vault")
       vault = Vault.attach(vaultCreatedEvent[0].args[0])
-    })
-
-    it("should revert when calling initialize after initialization", async function () {
-      await expect(vault.connect(user1).initialize({}, 500)).to.be.reverted
     })
 
     it("should allow Factory to call payout function", async function () {

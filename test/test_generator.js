@@ -35,10 +35,6 @@ describe(" -- Testing Generator Contract -- ", function () {
     generator = deployedContracts.generator
   })
 
-  it("should set the correct attributes with native token target balance", async function () {
-    console.log("TO DO")
-  })
-
   it("should set the correct attributes with supported token target balance", async function () {
 
     const MockTokenWithDecimals = await ethers.getContractFactory("MockTokenWithDecimals")
