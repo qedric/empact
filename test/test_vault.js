@@ -347,14 +347,8 @@ describe(" -- Testing Vault Contract -- ", function () {
 
       // check the vault is still locked
       expect(await vault.state()).to.equal(0, 'vault state should == 0 (locked)')
-
-      // try to unlock it 
-      await expect(vault.setStateUnlocked()).to.be.revertedWith('Unsupported token')
-
-      // add token1 as a supported token in the treasury contract
-      expect(await treasury.addSupportedToken(token1.target)).to.not.be.reverted
       
-      // try to unlock it again
+      // try to unlock it
       await expect(vault.setStateUnlocked()).to.be.revertedWith('Target not met')
 
       // Transfer some native staked tokens to the vault contract

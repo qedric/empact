@@ -94,10 +94,6 @@ contract Vault is IVault, Initializable {
                 );
             } else {
                 require(
-                    ITreasury(treasury).isSupportedToken(_attributes.baseToken),
-                    'Unsupported token'
-                );
-                require(
                     _getTokenBalance(_attributes.baseToken) >= _attributes.targetBalance,
                     'Target not met'
                 );
