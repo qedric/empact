@@ -466,6 +466,205 @@ describe(" -- Testing Factory Contract -- ", function () {
     })
   })
 
+  describe("Admin Payout & Burn", function () {
+
+    let factory, vault
+    let INITIAL_DEFAULT_ADMIN_AND_SIGNER
+    let user1, user2
+    let feeRecipient
+
+    before(async function () {
+      [INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1, user2, feeRecipient] = await ethers.getSigners()
+    })
+
+    beforeEach(async function () {
+      const deployedContracts = await deploy(feeRecipient.address, 'SepoliaETH', 'https://zebra.xyz/')
+      factory = deployedContracts.factory
+      treasury = deployedContracts.treasury
+      vault = await makeVault(factory, INITIAL_DEFAULT_ADMIN_AND_SIGNER, user1)
+    })
+
+    /*
+      1. check that user has a balance
+      2. send enough vaults to unlock
+      3. execute payout
+      4. check that tokens have been burned
+      5. check that payout event was fired
+    */
+    it("Payout should succeed when token exists and user has balance, tokens should then be burned", async function () {
+
+      // Verify that the token was minted and assigned to the correct recipient
+      const intialBalanceUser1 = await factory.balanceOf(user1.address, 0)
+      expect(intialBalanceUser1).to.equal(4)
+
+      //send enough ETH
+      const amountToSend = ethers.parseEther("1")
+      let receiveTx = await user2.sendTransaction({
+        to: vault.target,
+        value: amountToSend,
+      })
+
+      // Increase block time to after the unlockTime
+      await helpers.time.increase(60 * 60 * 24 * 100) // 100 days
+
+      // Call setTargetReached()
+      const targetReachedTx = await vault.setStateUnlocked()
+
+      // Call the payout function
+      const payoutTx = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).adminPayout(0, user1.address)
+      await payoutTx.wait()
+
+      // get the StateChanged event from the transaction
+      events = await factory.queryFilter("Payout", -1)
+
+      expect(events[0].args.vaultAddress).to.equal(vault.target)
+      expect(events[0].args.tokenId).to.equal(0)
+
+      // Verify that the tokens were burned
+      const balanceUser1 = await factory.balanceOf(user1.address, 0)
+      expect(balanceUser1).to.equal(0)
+    })
+
+    /*
+      1. issue vault with 1 share, check it is marked open on first payout
+      2. issue vault with 4 shares, divide between 2 users
+      3. ensure vault is moved to open on last payout
+    */
+    it("Should call treasury.addOpenVault if it is the last payout", async function () {
+      // Generate a signature for the mint request
+      const timestamp = await ethers.provider.getBlockNumber().then(blockNumber =>
+      // getBlock returns a block object and it has a timestamp property.
+      ethers.provider.getBlock(blockNumber).then(block => block.timestamp))
+      const startTime = Math.floor(timestamp - 60 * 60 * 24 * 2) // - 2 days
+      const endTime = Math.floor(timestamp + 60 * 60 * 24 * 7) // + 7 days
+      const unlockTime = Math.floor(timestamp - 60 * 60 * 24 * 99)
+      const targetBalance = ethers.parseUnits("1", "ether").toString()
+
+      const typedData = await getTypedData(
+        factory.target,
+        user2.address,
+        ZERO_ADDRESS,
+        startTime,
+        endTime,
+        1,
+        unlockTime,
+        targetBalance,
+        'A test vault',
+        '1 edition'    
+      )
+
+      const mr = await generateMintRequest(
+        factory.target,
+        INITIAL_DEFAULT_ADMIN_AND_SIGNER,
+        user2.address,
+        typedData
+      )
+
+      const makeVaultFee = ethers.parseUnits("0.004", "ether")
+
+      const tx = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).mintWithSignature(
+        mr.typedData.message,
+        mr.signature,
+        { value: makeVaultFee }
+      )
+      const txReceipt = await tx.wait()
+      const vaultCreatedEvent = await factory.queryFilter(factory.filters.VaultDeployed(), txReceipt.blockNumber)
+      const Vault = await ethers.getContractFactory("Vault")
+      const vault1 = Vault.attach(vaultCreatedEvent[0].args[0])
+
+      // get the tokenId so we can call payout on it
+      const tokenId_vault = await vault.attributes().then(a => a.tokenId)
+      const tokenId_vault1 = await vault1.attributes().then(a => a.tokenId)
+
+      // Verify that the initial vault's tokens were minted and assigned to the correct recipient
+      const balanceUser1 = await factory.balanceOf(user1.address, 0)
+      expect(balanceUser1).to.equal(4)
+
+      // Verify that the single token vault was minted and assigned to the correct recipient
+      const balanceUser2 = await factory.balanceOf(user2.address, 1)
+      expect(balanceUser2).to.equal(1)
+
+      // Increase block time to after the unlockTime
+      await helpers.time.increase(60 * 60 * 24 * 100) // 100 days
+
+      //send eth to both tokens to unlock them
+      //send enough ETH
+      const amountToSend = ethers.parseEther("1")
+      let receiveTx1 = await user2.sendTransaction({
+        to: vault.target,
+        value: amountToSend,
+      })
+      let receiveTx2 = await user2.sendTransaction({
+        to: vault1.target,
+        value: amountToSend,
+      })
+
+      // transfer 2 tokens from user1 to user2
+      await factory.connect(user1).safeTransferFrom(user1.address, user2.address, 0, 2, "0x")
+      expect(await factory.balanceOf(user1.address, 0)).to.equal(2)
+      expect(await factory.balanceOf(user2.address, 0)).to.equal(2)
+
+      // call payout on 1st vault and make sure that AddedOpenVault event NOT emitted
+      tx1 = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).adminPayout(tokenId_vault, user1.address)
+      const payout1Event = await treasury.queryFilter('AddedOpenVault', -1)
+      expect(payout1Event).to.be.empty
+
+      // call payout on 2nd vault and make sure that AddedOpenVault event was emitted
+      tx2 = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).adminPayout(tokenId_vault1, user2.address)
+      const payout2Event = await treasury.queryFilter('AddedOpenVault', -1)
+      expect(payout2Event.length).to.be.gt(0)
+
+      // call payout on 1st vault with user2, and make sure that AddedOpenVault event was emitted
+      tx3 = await factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).adminPayout(tokenId_vault, user2.address)
+      const payout3Event = await treasury.queryFilter('AddedOpenVault', -1)
+      expect(payout3Event.length).to.be.gt(0)
+    })
+
+    /*
+      Try execute adminPayout from an unauthorsed address
+    */
+    it("Payout should fail when caller is not authorised", async function () {
+
+      // Verify that the token was minted and assigned to the correct recipient
+      const intialBalanceUser1 = await factory.balanceOf(user1.address, 0)
+      expect(intialBalanceUser1).to.equal(4)
+
+      //send enough ETH
+      const amountToSend = ethers.parseEther("1")
+      let receiveTx = await user2.sendTransaction({
+        to: vault.target,
+        value: amountToSend,
+      })
+
+      // Increase block time to after the unlockTime
+      await helpers.time.increase(60 * 60 * 24 * 100) // 100 days
+
+      // Call setTargetReached()
+      const targetReachedTx = await vault.setStateUnlocked()
+
+      // Call the payout function
+      await expect(factory.connect(user1).adminPayout(0, user1.address)).to.be.revertedWith(/AccessControl: account .* is missing role .*/)
+    })
+
+    /*
+      1. execute payout on a non-existant tokenId
+      2. check that function reverted with token not found
+    */
+    it("Payout should fail when token doesn't exist", async function () {
+      // Call the payout function
+      await expect(factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).adminPayout(1, user1.address)).to.be.revertedWith("Token not found")
+    })
+
+    /*
+      1. execute payout with a non-holder
+      2. check that function reverted with not authorised
+    */
+    it("Payout should fail when user has no balance", async function () {
+      // Call the payout function
+      await expect(factory.connect(INITIAL_DEFAULT_ADMIN_AND_SIGNER).adminPayout(0, user2.address)).to.be.revertedWith("Not authorised!")
+    })
+  })
+
   describe("Metadata", function () {
 
     let factory, vault

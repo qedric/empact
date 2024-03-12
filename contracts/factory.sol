@@ -308,6 +308,48 @@ contract Factory is
         }
     }
 
+    /**
+    * @notice Executes the payout process for a given token ID on behalf of a token holder,
+        burning the token holder's token balance and calling the payout function in the associated vault contract.
+    * @dev This function can only be called by an admin. It first checks the token holder's balance of the specified token ID. 
+        If the balance is greater than zero, it burns the tokens to prevent double claiming. 
+        It then calls the `payout` function of the corresponding vault contract. 
+        If the vault's state changes to 'Open', it updates the treasury contract.
+    * @param tokenId The ID of the token for which the payout is being processed.
+    * @param tokenHolder The address of the token holder.
+    * @custom:modifier tokenExists Ensures that the token for the given token ID exists before processing the payout.
+    * @custom:modifier onlyAdmin Ensures that only the admin can call this function.
+    */
+    function adminPayout(uint256 tokenId, address tokenHolder) external tokenExists(tokenId) onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 tokenHolderBalance = balanceOf(tokenHolder, tokenId);
+
+        require(tokenHolderBalance != 0, "Not authorised!");
+
+        // get the total supply before burning
+        uint256 totalSupplyBeforePayout = totalSupply(tokenId);
+
+        // burn the tokens so the token holder can't claim twice
+        _burn(tokenHolder, tokenId, tokenHolderBalance);
+
+        try IVault(payable(vaults[tokenId])).payout{value: 0} (
+            tokenHolder,
+            feeRecipient,
+            tokenHolderBalance,
+            totalSupplyBeforePayout
+        ) returns (IVault.State state) {
+            emit Payout(address(vaults[tokenId]), tokenId);
+            if (state == IVault.State.Open) {
+                // vault is now open; update the treasury
+                treasury.addOpenVault(address(vaults[tokenId]));
+            }
+        } catch Error(string memory reason) {
+            revert(reason);
+        } catch (bytes memory /*lowLevelData*/) {
+            revert("payout failed");
+        }
+    }
+    
+
     /*//////////////////////////////////////////////////////////////
     Configuration
     //////////////////////////////////////////////////////////////*/
