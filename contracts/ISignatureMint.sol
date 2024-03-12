@@ -3,13 +3,17 @@ pragma solidity ^0.8.11;
 
 interface ISignatureMint { 
     /**
-     *  @notice The body of a request to mint tokens.
+     *  @notice The body of a request to mint a new vault.
      *
      *  @param to The receiver of the tokens to mint.
-     *  @param quantity The quantity of tokens to mint.
+     *  @param baseToken The address of the asset used to calculate balance.
      *  @param validityStartTimestamp The unix timestamp after which the payload is valid.
      *  @param validityEndTimestamp The unix timestamp at which the payload expires.
-     *  @param uri The metadata URI of the token to mint. (Not applicable for ERC20 tokens)
+     *  @param quantity The quantity of tokens to mint.
+     *  @param unlockTime The block timestamp before which the vault cannot be unlocked.
+     *  @param targetBalance The balance of the base asset required before which the vault cannot be unlocked.
+     *  @param name The name of the vault.
+     *  @param description A description of the vault.
      */
     struct MintRequest {
         address to;
